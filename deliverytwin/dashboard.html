@@ -1,0 +1,916 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f5f7fa">
+  <title>Delivery Twin | Command Center</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #122338;
+      --muted: #6c7a8d;
+      --line: #e6ebf1;
+      --canvas: #f4f6f9;
+      --paper: #fff;
+      --navy: #10243a;
+      --teal: #138779;
+      --teal-soft: #e4f4f0;
+      --amber: #b86b13;
+      --amber-soft: #fff3df;
+      --red: #bd4c4b;
+      --shadow: 0 3px 14px rgb(24 42 62 / 5%);
+      font-family: Inter, "Segoe UI", Arial, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--canvas); color: var(--ink); }
+    .topbar {
+      height: 68px; background: var(--navy); color: white; display: flex;
+      align-items: center; justify-content: space-between; padding: 0 max(28px, calc((100vw - 1380px) / 2));
+    }
+    .brand { display: flex; align-items: center; gap: 12px; font-weight: 700; letter-spacing: .01em; }
+    .brand-mark { width: 32px; height: 32px; border-radius: 9px; background: #24a293; display: grid; place-items: center; font-size: 17px; }
+    .brand small { display: block; color: #b8c6d6; font-size: 10px; font-weight: 500; letter-spacing: .13em; margin-top: 3px; }
+    .top-meta { display: flex; align-items: center; gap: 18px; color: #c6d1dc; font-size: 12px; }
+    .live { color: #8ee0c7; display: inline-flex; align-items: center; gap: 7px; }
+    .live::before { content: ""; width: 7px; height: 7px; background: #55d1a7; border-radius: 50%; box-shadow: 0 0 0 4px rgb(85 209 167 / 14%); }
+    main { max-width: 1380px; margin: 0 auto; padding: 30px 28px 44px; }
+    .heading { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 22px; gap: 20px; }
+    .eyebrow { font-size: 10px; letter-spacing: .16em; color: var(--muted); font-weight: 750; text-transform: uppercase; }
+    h1 { margin: 7px 0 4px; font-size: clamp(24px, 3vw, 31px); letter-spacing: -.035em; }
+    .subtitle { color: var(--muted); font-size: 13px; }
+    .date-pill, .badge { border: 1px solid var(--line); background: white; border-radius: 999px; padding: 8px 12px; font-size: 11px; color: var(--muted); white-space: nowrap; }
+    .journey { background: var(--paper); border: 1px solid var(--line); border-radius: 13px; padding: 9px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; box-shadow: var(--shadow); margin-bottom: 18px; }
+    .stage { appearance: none; border: 1px solid transparent; border-radius: 9px; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; display: flex; align-items: center; gap: 11px; min-width: 0; position: relative; padding: 10px 12px; transition: background .15s, border-color .15s, box-shadow .15s; }
+    .stage:hover { background: #f7f9fb; }
+    .stage[aria-selected="true"] { background: #f0f7f5; border-color: #d9eee7; box-shadow: inset 0 -2px #138779; }
+    .stage:focus-visible { outline: 3px solid #80cfc0; outline-offset: 2px; }
+    .stage-icon { width: 33px; height: 33px; border: 1px solid #dce5eb; border-radius: 50%; display: grid; place-items: center; color: #567087; font-size: 12px; font-weight: 700; background: white; z-index: 1; }
+    .stage[aria-selected="true"] .stage-icon { background: var(--teal-soft); border-color: #c5e8df; color: var(--teal); }
+    .stage-label { font-size: 11px; font-weight: 750; letter-spacing: .08em; }
+    .stage-caption { margin-top: 3px; font-size: 10px; color: var(--muted); }
+    [role="tabpanel"][hidden] { display: none; }
+    .stage-intro { margin: 2px 0 16px; display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; }
+    .stage-intro h2 { margin: 0; font-size: 19px; letter-spacing: -.025em; }
+    .stage-intro p { margin: 5px 0 0; color: var(--muted); font-size: 11px; }
+    .grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 16px; }
+    .card { background: var(--paper); border: 1px solid var(--line); border-radius: 13px; box-shadow: var(--shadow); }
+    .card-head { padding: 17px 19px 0; display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+    .card-title { margin: 0; font-size: 13px; font-weight: 750; }
+    .card-kicker { margin-top: 4px; font-size: 10px; color: var(--muted); }
+    .overview { grid-column: span 8; padding-bottom: 18px; }
+    .overview-content { padding: 18px 19px 0; display: grid; grid-template-columns: 1fr 1fr; gap: 26px; align-items: center; }
+    .confidence { display: flex; align-items: center; gap: 19px; }
+    .ring { --value: 38%; width: 108px; aspect-ratio: 1; border-radius: 50%; display: grid; place-items: center; background: conic-gradient(#bd7b29 var(--value), #edf0f3 0); position: relative; flex: 0 0 auto; }
+    .ring::before { content: ""; position: absolute; inset: 8px; border-radius: 50%; background: white; }
+    .ring-value { position: relative; font-size: 24px; font-weight: 750; letter-spacing: -.04em; }
+    .ring-value small { display: block; color: var(--muted); font-size: 9px; font-weight: 600; letter-spacing: .04em; text-align: center; }
+    .confidence-copy strong { font-size: 13px; display: block; margin-bottom: 5px; }
+    .confidence-copy span { color: var(--muted); font-size: 11px; line-height: 1.5; display: block; }
+    .metric-stack { display: grid; grid-template-columns: 1fr 1fr; gap: 11px; }
+    .mini-metric { border-left: 2px solid #e5eaf0; padding: 2px 0 2px 11px; }
+    .mini-metric strong { display: block; font-size: 18px; letter-spacing: -.03em; }
+    .mini-metric span { color: var(--muted); font-size: 10px; }
+    .mini-metric.warn { border-left-color: #e7b262; }
+    .mini-metric.warn strong { color: var(--amber); }
+    .baseline { margin: 20px 19px 0; padding: 12px 14px; border-radius: 9px; background: #f7f9fb; display: flex; justify-content: space-between; gap: 10px; color: var(--muted); font-size: 10px; }
+    .baseline strong { color: var(--ink); font-size: 11px; }
+    .baseline > div { display: grid; gap: 4px; }
+    .risk { grid-column: span 4; overflow: hidden; }
+    .risk-banner { margin: 15px 17px 0; padding: 12px 13px; border-radius: 9px; background: var(--amber-soft); border: 1px solid #f2e3c7; }
+    .risk-label { color: var(--amber); font-size: 9px; font-weight: 800; letter-spacing: .12em; }
+    .risk-banner p { color: #59452b; margin: 7px 0 0; font-size: 11px; line-height: 1.5; }
+    .risk-list { padding: 8px 18px 14px; }
+    .risk-row { padding: 9px 0; display: flex; align-items: flex-start; gap: 9px; border-bottom: 1px solid #f0f2f4; font-size: 10px; }
+    .risk-row:last-child { border-bottom: 0; }
+    .risk-dot { width: 7px; height: 7px; border-radius: 50%; margin-top: 3px; background: #d3973e; flex: 0 0 auto; }
+    .risk-row strong { display: block; font-size: 10px; margin-bottom: 3px; }
+    .risk-row span { color: var(--muted); }
+    .sources { grid-column: span 7; }
+    .sources-list { padding: 10px 19px 17px; display: grid; grid-template-columns: 1fr 1fr; gap: 0 20px; }
+    .source-row { display: flex; align-items: center; gap: 10px; padding: 11px 0; border-bottom: 1px solid #f0f2f4; min-width: 0; }
+    .source-logo { width: 29px; height: 29px; border-radius: 8px; display: grid; place-items: center; font-size: 9px; font-weight: 800; color: #405d76; background: #edf2f7; flex: 0 0 auto; }
+    .source-copy { min-width: 0; flex: 1; }
+    .source-copy strong { font-size: 10px; display: block; }
+    .source-copy span { font-size: 9px; color: var(--muted); display: block; margin-top: 3px; }
+    .simulated { font-size: 8px; font-weight: 750; letter-spacing: .06em; color: #597b70; background: #edf6f1; border-radius: 999px; padding: 5px 7px; white-space: nowrap; }
+    .action { grid-column: span 5; }
+    .action-body { padding: 14px 19px 18px; }
+    .action-pick { display: flex; justify-content: space-between; align-items: center; padding: 12px; border-radius: 9px; background: #f0f7f5; border: 1px solid #dfefea; }
+    .pick-label { display: flex; align-items: center; gap: 10px; }
+    .pick-icon { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 8px; background: #d9eee7; color: var(--teal); font-weight: 800; }
+    .pick-label strong { font-size: 11px; display: block; }
+    .pick-label span { font-size: 9px; color: var(--muted); display: block; margin-top: 4px; }
+    .pick-confidence { font-size: 15px; font-weight: 750; color: var(--teal); }
+    .pick-confidence small { display: block; text-align: right; font-size: 8px; color: var(--muted); font-weight: 600; margin-top: 3px; }
+    .action-note { margin: 12px 2px 0; color: var(--muted); font-size: 10px; line-height: 1.55; }
+    .full { grid-column: span 12; }
+    .wide { grid-column: span 8; }
+    .narrow { grid-column: span 4; }
+    .half { grid-column: span 6; }
+    .detail-list { padding: 8px 19px 17px; }
+    .detail-row { display: flex; justify-content: space-between; gap: 15px; padding: 11px 0; border-bottom: 1px solid #f0f2f4; font-size: 10px; }
+    .detail-row:last-child { border-bottom: 0; }
+    .detail-row span { color: var(--muted); }
+    .detail-row strong { text-align: right; }
+    .forecast-callout { margin: 16px 19px 18px; border-radius: 9px; background: #f4f6fb; border: 1px solid #e4e9f4; padding: 13px 15px; }
+    .forecast-callout strong { font-size: 11px; }
+    .forecast-callout p { margin: 6px 0 0; color: var(--muted); font-size: 10px; line-height: 1.55; }
+    .option-list { padding: 12px 18px 17px; display: grid; gap: 10px; }
+    .option { display: grid; grid-template-columns: minmax(130px, 1.4fr) repeat(3, minmax(82px, .7fr)); align-items: center; gap: 12px; padding: 13px; border: 1px solid var(--line); border-radius: 9px; }
+    .option.recommended { background: #f0f7f5; border-color: #cde9df; }
+    .option-name strong { display: block; font-size: 11px; }
+    .option-name span { display: block; margin-top: 4px; color: var(--muted); font-size: 9px; line-height: 1.4; }
+    .option-metric span { display: block; color: var(--muted); font-size: 8px; text-transform: uppercase; letter-spacing: .06em; }
+    .option-metric strong { display: block; margin-top: 4px; font-size: 11px; }
+    .approval-note { margin: 0 19px 18px; padding: 12px 14px; border-radius: 8px; background: #f8f9fb; color: var(--muted); font-size: 10px; line-height: 1.5; }
+    .footer { display: flex; justify-content: space-between; padding: 18px 2px 0; font-size: 9px; color: #8793a1; }
+    .error { display: none; margin: 0 0 15px; border: 1px solid #f2cccc; border-radius: 8px; background: #fff2f2; padding: 11px 14px; color: #923b3a; font-size: 12px; }
+    .chat-launcher {
+      position: fixed; right: 24px; bottom: 22px; z-index: 20; border: 0; border-radius: 999px;
+      background: var(--teal); color: white; padding: 13px 18px; font: inherit; font-size: 12px;
+      font-weight: 750; box-shadow: 0 6px 22px rgb(16 36 58 / 22%); cursor: pointer;
+    }
+    .chat-launcher:focus-visible, .chat-close:focus-visible, .chat-send:focus-visible,
+    .chat-input:focus-visible { outline: 3px solid #80cfc0; outline-offset: 2px; }
+    .chat-panel {
+      position: fixed; right: 24px; bottom: 82px; z-index: 21; width: min(390px, calc(100vw - 32px));
+      height: min(570px, calc(100dvh - 108px)); min-height: 340px; display: flex; flex-direction: column;
+      background: white; border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 12px 42px rgb(16 36 58 / 24%);
+      overflow: hidden;
+    }
+    #chat-panel[hidden] { display: none; }
+    .chat-head { background: var(--navy); color: white; padding: 14px 16px; display: flex; align-items: center; justify-content: space-between; }
+    .chat-head strong { display: block; font-size: 12px; }
+    .chat-head span { display: block; margin-top: 4px; color: #c6d1dc; font-size: 9px; }
+    .chat-close { appearance: none; border: 0; border-radius: 6px; background: transparent; color: white; font-size: 20px; cursor: pointer; padding: 3px 7px; }
+    .chat-status { min-height: 31px; padding: 8px 14px; background: #f7f9fb; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 10px; line-height: 1.4; }
+    .chat-messages { flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+    .chat-message { max-width: 90%; padding: 10px 12px; border-radius: 11px; font-size: 11px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .chat-message.assistant { align-self: flex-start; background: #f0f4f7; color: var(--ink); border-bottom-left-radius: 3px; }
+    .chat-message.user { align-self: flex-end; background: var(--teal-soft); color: var(--ink); border-bottom-right-radius: 3px; }
+    .chat-message.error-message { background: #fff2f2; color: #923b3a; }
+    .chat-form { padding: 11px; border-top: 1px solid var(--line); display: flex; gap: 8px; align-items: flex-end; }
+    .chat-input { flex: 1; min-height: 40px; max-height: 100px; resize: vertical; border: 1px solid #d9e1e8; border-radius: 8px; padding: 10px; font: inherit; font-size: 11px; }
+    .chat-send { min-height: 40px; border: 0; border-radius: 8px; background: var(--teal); color: white; padding: 0 13px; font: inherit; font-size: 11px; font-weight: 700; cursor: pointer; }
+    .chat-send:disabled, .chat-input:disabled { opacity: .55; cursor: not-allowed; }
+    @media (max-width: 900px) {
+      .overview, .risk { grid-column: span 12; }
+      .sources, .action { grid-column: span 6; }
+    }
+    @media (max-width: 620px) {
+      .topbar { height: 60px; padding: 0 17px; }
+      .top-meta > span:first-child { display: none; }
+      main { padding: 23px 15px 34px; }
+      .heading { align-items: flex-start; flex-direction: column; gap: 12px; }
+      .journey { padding: 7px; grid-template-columns: 1fr 1fr; gap: 5px; }
+      .stage { padding: 9px 7px; }
+      .stage-caption { font-size: 9px; }
+      .overview-content { grid-template-columns: 1fr; gap: 18px; }
+      .sources, .action { grid-column: span 12; }
+      .sources-list { grid-template-columns: 1fr; }
+      .baseline { flex-wrap: wrap; }
+      .wide, .narrow, .half { grid-column: span 12; }
+      .option { grid-template-columns: 1fr 1fr; }
+      .chat-launcher { right: 16px; bottom: 16px; }
+      .chat-panel { right: 16px; bottom: 72px; width: calc(100vw - 32px); height: min(70dvh, 570px); }
+    }
+    .intake { margin-bottom: 16px; padding-bottom: 18px; }
+    .intake-body { padding: 14px 19px 0; display: grid; gap: 14px; }
+    .intake-step { border: 1px solid var(--line); border-radius: 10px; padding: 14px 15px; background: #fbfcfd; }
+    .intake-step[hidden] { display: none; }
+    .step-title { margin: 0 0 4px; font-size: 12px; font-weight: 750; display: flex; gap: 8px; align-items: center; }
+    .step-num { width: 20px; height: 20px; border-radius: 50%; background: var(--teal-soft); color: var(--teal); display: grid; place-items: center; font-size: 10px; font-weight: 800; }
+    .step-help { margin: 0 0 10px; font-size: 10px; color: var(--muted); }
+    .intake-text { width: 100%; min-height: 78px; resize: vertical; border: 1px solid #d5dde5; border-radius: 8px; padding: 10px 11px; font: inherit; font-size: 12px; color: var(--ink); }
+    .intake-text:focus-visible, .intake-btn:focus-visible, .q-option input:focus-visible { outline: 3px solid #80cfc0; outline-offset: 2px; }
+    .intake-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; align-items: center; }
+    .intake-btn { appearance: none; border: 1px solid #cfd9e1; background: white; color: var(--ink); border-radius: 8px; padding: 8px 13px; font: inherit; font-size: 11px; font-weight: 700; cursor: pointer; }
+    .intake-btn.primary { background: var(--teal); border-color: var(--teal); color: white; }
+    .intake-btn:disabled { opacity: .55; cursor: not-allowed; }
+    .intake-error { margin: 0 19px; padding: 9px 12px; border-radius: 8px; background: #fbeceb; color: #8a2f2e; font-size: 11px; }
+    .intake-error[hidden] { display: none; }
+    .q-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .q-card { border: 1px solid var(--line); border-radius: 9px; background: white; padding: 12px; margin: 0; min-width: 0; }
+    .q-card legend { padding: 0 4px; font-size: 9px; font-weight: 800; letter-spacing: .1em; color: var(--teal); text-transform: uppercase; }
+    .q-text { font-size: 11px; font-weight: 700; margin: 2px 0 8px; }
+    .q-option { display: flex; gap: 7px; align-items: flex-start; font-size: 10px; padding: 4px 0; cursor: pointer; }
+    .q-option .tag { margin-left: 4px; font-size: 8px; font-weight: 800; color: #597b70; background: #edf6f1; border-radius: 999px; padding: 2px 6px; white-space: nowrap; }
+    .evidence { margin: 8px 0 0; padding: 8px 10px; background: #f4f7f9; border-radius: 7px; font-size: 9px; color: var(--muted); line-height: 1.5; }
+    .evidence strong { color: var(--ink); }
+    .clarity { font-size: 10px; font-weight: 700; color: var(--amber); }
+    .fp-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+    .fp-dim { border: 1px solid var(--line); border-radius: 9px; background: white; padding: 10px 11px; }
+    .fp-dim .dim-name { font-size: 9px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+    .fp-dim .dim-value { font-size: 11px; font-weight: 700; margin-top: 4px; overflow-wrap: anywhere; }
+    .analog-table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 10px; }
+    .analog-table th, .analog-table td { text-align: left; padding: 7px 8px; border-bottom: 1px solid #edf0f3; vertical-align: top; }
+    .analog-table th { color: var(--muted); font-size: 9px; letter-spacing: .08em; text-transform: uppercase; }
+    .dim-chip { display: inline-block; min-width: 34px; text-align: center; border-radius: 999px; padding: 3px 7px; font-weight: 800; font-size: 9px; }
+    .dim-chip.full { background: var(--teal-soft); color: var(--teal); }
+    .dim-chip.part { background: var(--amber-soft); color: var(--amber); }
+    .dim-chip.none { background: #f0f2f4; color: var(--muted); }
+    .rom-hero { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+    .rom-hero .mini-metric { background: white; border: 1px solid var(--line); border-left-width: 3px; border-radius: 9px; padding: 10px 12px; }
+    .rom-explain { margin: 12px 0 0; padding: 10px 12px; background: #f4f7f9; border-radius: 8px; font-size: 10px; color: var(--muted); line-height: 1.6; }
+    .gate-ok { color: var(--teal); font-weight: 800; }
+    .gate-bad { color: var(--red); font-weight: 800; }
+    .approved-banner { padding: 12px 14px; border-radius: 9px; background: var(--teal-soft); border: 1px solid #c5e8df; color: #0c5d52; font-size: 11px; font-weight: 700; }
+    .awaiting { display: none; padding: 28px; border: 1px dashed var(--line); border-radius: 12px; background: white; color: var(--muted); font-size: 12px; line-height: 1.7; text-align: center; }
+    .awaiting code { background: #f0f2f4; padding: 2px 6px; border-radius: 5px; color: var(--ink, #1c2733); }
+    body[data-sim="false"] .awaiting { display: block; }
+    .sim-bar { display: flex; align-items: center; gap: 10px; margin: 0 0 14px; flex-wrap: wrap; }
+    .sim-status { font-size: 11px; color: var(--muted); }
+    body[data-sim="false"] #panel-sense .grid,
+    body[data-sim="false"] #panel-forecast .grid,
+    body[data-sim="false"] #panel-act .grid { display: none; }
+    body[data-sim="false"] #panel-shape > .grid { display: none; }
+    .shape-actions { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+    .intake-btn.danger { border-color: #e6b8b8; color: #8a2f2e; }
+    .intake-btn.danger:hover { background: #fff5f4; }
+    @media (max-width: 900px) { .q-grid, .fp-grid, .rom-hero { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body data-sim="false">
+  <header class="topbar">
+    <div class="brand"><span class="brand-mark">↗</span><span>DELIVERY TWIN<small>COMMAND CENTER</small></span></div>
+    <div class="top-meta"><span class="live">SIMULATED DATA</span><span id="workflow-status" aria-live="polite">Workflow loading…</span><span id="updated">Loading…</span></div>
+  </header>
+  <main>
+    <div class="heading">
+      <div>
+        <div class="eyebrow">Portfolio / Q2 value stream</div>
+        <h1 id="initiative-name">Auto-Pay Modernization</h1>
+        <div class="subtitle">Delivery outlook · Shared API gateway milestone</div>
+      </div>
+      <div class="date-pill" id="as-of">Loading report…</div>
+    </div>
+    <div id="error" class="error" role="alert"></div>
+    <div class="journey" role="tablist" aria-label="Delivery lifecycle stages">
+      <button class="stage" id="tab-shape" type="button" role="tab" aria-selected="true" aria-controls="panel-shape" tabindex="0" data-stage="shape">
+        <span class="stage-icon">01</span><span><span class="stage-label">SHAPE</span><span class="stage-caption">Commitment baseline</span></span>
+      </button>
+      <button class="stage" id="tab-sense" type="button" role="tab" aria-selected="false" aria-controls="panel-sense" tabindex="-1" data-stage="sense">
+        <span class="stage-icon">02</span><span><span class="stage-label">SENSE</span><span class="stage-caption">Delivery signals</span></span>
+      </button>
+      <button class="stage" id="tab-forecast" type="button" role="tab" aria-selected="false" aria-controls="panel-forecast" tabindex="-1" data-stage="forecast">
+        <span class="stage-icon">03</span><span><span class="stage-label">FORECAST</span><span class="stage-caption">Probability outlook</span></span>
+      </button>
+      <button class="stage" id="tab-act" type="button" role="tab" aria-selected="false" aria-controls="panel-act" tabindex="-1" data-stage="act">
+        <span class="stage-icon">04</span><span><span class="stage-label">ACT</span><span class="stage-caption">Recovery decision</span></span>
+      </button>
+    </div>
+    <section id="panel-shape" class="stage-panel" role="tabpanel" aria-labelledby="tab-shape" tabindex="0">
+      <div class="stage-intro"><div><h2>Shape the commitment</h2><p>Approved baseline, effort range, assumptions, and delivery capacity.</p></div><div class="shape-actions"><button id="clear-all-data" class="intake-btn danger" type="button">Clear all demo data</button><span id="clear-data-status" class="sim-status" role="status"></span><span class="badge" id="shape-stage-status">INTAKE IN PROGRESS</span></div></div>
+      <div class="awaiting" role="status">Delivery metrics are blank until you click <strong>Simulate next sprint</strong> on the SENSE tab. The intake form below works at any time.</div>
+      <section class="card intake" id="intake" aria-labelledby="intake-title">
+        <div class="card-head"><div><h3 class="card-title" id="intake-title">New project intake</h3><div class="card-kicker">Messy request → clarified fingerprint → explainable ROM → approved baseline</div></div><span class="badge" id="intake-step-badge">STEP 1 OF 5</span></div>
+        <div class="intake-body">
+          <div class="intake-step" id="intake-step-1">
+            <h4 class="step-title"><span class="step-num">1</span>Messy intake</h4>
+            <p class="step-help">Paste a vague request the way it arrives from the business.</p>
+            <textarea id="intake-text" class="intake-text" maxlength="2000" aria-label="Project request" placeholder="Describe the project request…"></textarea>
+            <div class="intake-actions">
+              <button id="intake-sample" class="intake-btn" type="button">Use sample request</button>
+              <button id="intake-analyze" class="intake-btn primary" type="button">Analyze request</button>
+            </div>
+          </div>
+          <div class="intake-step" id="intake-step-2" hidden>
+            <h4 class="step-title"><span class="step-num">2</span>Clarification questions <span id="intake-clarity" class="clarity"></span></h4>
+            <p class="step-help" id="intake-retrieval"></p>
+            <div id="intake-questions" class="q-grid"></div>
+            <div class="intake-actions"><button id="intake-fingerprint-btn" class="intake-btn primary" type="button">Confirm answers &amp; match fingerprint</button></div>
+          </div>
+          <div class="intake-step" id="intake-step-3" hidden>
+            <h4 class="step-title"><span class="step-num">3</span>6D delivery fingerprint</h4>
+            <p class="step-help">The new project is matched to past initiatives on six dimensions.</p>
+            <div id="intake-fingerprint" class="fp-grid"></div>
+            <div id="intake-analogs"></div>
+            <div class="intake-actions"><button id="intake-rom-btn" class="intake-btn primary" type="button">Generate explainable ROM</button></div>
+          </div>
+          <div class="intake-step" id="intake-step-4" hidden>
+            <h4 class="step-title"><span class="step-num">4</span>Explainable ROM</h4>
+            <div id="intake-rom" class="rom-hero"></div>
+            <p id="intake-rom-explain" class="rom-explain"></p>
+            <div class="intake-actions"><button id="intake-commit-btn" class="intake-btn primary" type="button">Check feasible commitment</button></div>
+          </div>
+          <div class="intake-step" id="intake-step-5" hidden>
+            <h4 class="step-title"><span class="step-num">5</span>Feasible commitment · decision gate</h4>
+            <div id="intake-commitment" class="rom-hero"></div>
+            <p id="intake-commit-explain" class="rom-explain"></p>
+            <div class="intake-actions">
+              <button id="intake-approve" class="intake-btn primary" type="button">Approve baseline</button>
+              <button id="intake-continue" class="intake-btn" type="button" hidden>Continue to SENSE →</button>
+            </div>
+            <div id="intake-approved" class="approved-banner" role="status" hidden></div>
+          </div>
+        </div>
+        <div id="intake-error" class="intake-error" role="alert" hidden></div>
+      </section>
+      <div class="grid">
+        <section class="card overview">
+          <div class="card-head"><div><h3 class="card-title">ROM estimate &amp; confidence</h3><div class="card-kicker">Explainable range with an explicit integration buffer</div></div><span class="badge">P50 / P80 RANGE</span></div>
+          <div class="overview-content">
+            <div class="confidence"><div class="ring" style="--value:0%"><div class="ring-value"><span id="initial-confidence-ring">—</span><small>INITIAL</small></div></div><div class="confidence-copy"><strong>Initial commitment confidence</strong><span>Calculated after the intake fields are completed.</span></div></div>
+            <div class="metric-stack">
+              <div class="mini-metric"><strong id="baseline-p50">—</strong><span>P50 effort estimate</span></div>
+              <div class="mini-metric"><strong id="baseline-p80">—</strong><span>P80 effort estimate</span></div>
+              <div class="mini-metric"><strong id="buffer">—</strong><span>Integration buffer</span></div>
+              <div class="mini-metric"><strong id="target-date">—</strong><span>Committed target date</span></div>
+            </div>
+          </div>
+        </section>
+        <section class="card narrow">
+          <div class="card-head"><div><h3 class="card-title">Capacity baseline</h3><div class="card-kicker">Planview resource allocation</div></div></div>
+          <div class="detail-list">
+            <div class="detail-row"><span>Allocated team</span><strong id="allocated-capacity">—</strong></div>
+            <div class="detail-row"><span>Current headroom</span><strong id="capacity-headroom">—</strong></div>
+            <div class="detail-row"><span>Delivery fingerprint</span><strong id="shape-fingerprint-status">—</strong></div>
+            <div class="detail-row"><span>Baseline status</span><strong id="shape-baseline-status">Awaiting intake</strong></div>
+          </div>
+        </section>
+        <section class="card full">
+          <div class="card-head"><div><h3 class="card-title">Commitment assumptions</h3><div class="card-kicker">Visible inputs used to shape the plan</div></div></div>
+          <div class="detail-list">
+            <div class="detail-row"><span>Scope pattern</span><strong>Legacy adapters and shared API gateway</strong></div>
+            <div class="detail-row"><span>Critical capability</span><strong>Data engineering / Kafka</strong></div>
+            <div class="detail-row"><span>Delivery guardrail</span><strong>Approve only with visible capacity and confidence</strong></div>
+          </div>
+        </section>
+      </div>
+    </section>
+    <section id="panel-sense" class="stage-panel" role="tabpanel" aria-labelledby="tab-sense" tabindex="0" hidden>
+      <div class="stage-intro"><div><h2>Sense delivery conditions</h2><p>Signals arriving from workforce, sprint execution, and operations.</p></div><span class="badge">CROSS-SYSTEM SIGNALS</span></div>
+      <div class="awaiting" role="status">No delivery signals yet. Click <strong>Simulate next sprint</strong> below to load test data and move the date forward one sprint.</div>
+      <div class="sim-bar">
+        <button id="sim-run" class="intake-btn primary" type="button">Simulate next sprint</button>
+        <span id="sim-status" class="sim-status" role="status"></span>
+      </div>
+      <div class="grid">
+        <section class="card risk wide">
+          <div class="card-head"><div><h3 class="card-title">Cross-system collision</h3><div class="card-kicker">The approved plan no longer reflects current delivery reality</div></div><span class="badge">AT RISK</span></div>
+          <div class="risk-banner"><div class="risk-label">DELIVERY CONDITIONS HAVE DIVERGED</div><p id="finding">Checking source signals…</p></div>
+          <div class="risk-list">
+            <div class="risk-row"><span class="risk-dot"></span><div><strong>Capacity drain · UKG / ServiceNow</strong><span><b id="support-hours">16h</b> / week pulled into P1 production support</span></div></div>
+            <div class="risk-row"><span class="risk-dot"></span><div><strong>Scope growth · Azure DevOps</strong><span><b id="story-count">14 stories</b> and <b id="scope-points">64 pts</b> added outside the baseline</span></div></div>
+            <div class="risk-row"><span class="risk-dot"></span><div><strong>Environment blocker · ServiceNow</strong><span>Kafka production mirror in CAB for <b id="change-age">9 days</b></span></div></div>
+            <div class="risk-row"><span class="risk-dot"></span><div><strong>Approved time away · UKG</strong><span><b id="pto-hours">40h</b> PTO recorded for lead engineer</span></div></div>
+          </div>
+        </section>
+        <section class="card narrow">
+          <div class="card-head"><div><h3 class="card-title">Workforce availability</h3><div class="card-kicker">Oracle HR / HCM + UKG Pro WFM</div></div></div>
+          <div class="detail-list">
+            <div class="detail-row"><span>Available allocation</span><strong id="sense-capacity">7.5 / 8.0 FTE</strong></div>
+            <div class="detail-row"><span>Lead support load</span><strong id="sense-support">16 h / week</strong></div>
+            <div class="detail-row"><span>Approved PTO</span><strong id="sense-pto">40 h</strong></div>
+            <div class="detail-row"><span>Specialist dependency</span><strong>Data engineering</strong></div>
+          </div>
+        </section>
+        <section class="card full">
+          <div class="card-head"><div><h3 class="card-title">Source systems</h3><div class="card-kicker">Production connectors are simulated for this prototype</div></div><span class="badge">5 SOURCES</span></div>
+          <div class="sources-list">
+            <div class="source-row"><span class="source-logo">PV</span><div class="source-copy"><strong>Planview</strong><span>Baseline · milestones · capacity</span></div><span class="simulated">SIMULATED</span></div>
+            <div class="source-row"><span class="source-logo">ADO</span><div class="source-copy"><strong>Azure DevOps</strong><span>Sprints · velocity · scope</span></div><span class="simulated">SIMULATED</span></div>
+            <div class="source-row"><span class="source-logo">SN</span><div class="source-copy"><strong>ServiceNow</strong><span>Incidents · changes · blockers</span></div><span class="simulated">SIMULATED</span></div>
+            <div class="source-row"><span class="source-logo">OR</span><div class="source-copy"><strong>Oracle HR / HCM</strong><span>Headcount · roles · skills</span></div><span class="simulated">SIMULATED</span></div>
+            <div class="source-row"><span class="source-logo">UKG</span><div class="source-copy"><strong>UKG Pro WFM</strong><span>Time · shifts · PTO</span></div><span class="simulated">SIMULATED</span></div>
+          </div>
+        </section>
+      </div>
+    </section>
+    <section id="panel-forecast" class="stage-panel" role="tabpanel" aria-labelledby="tab-forecast" tabindex="0" hidden>
+      <div class="stage-intro"><div><h2>Forecast likely outcomes</h2><p>Forecast updates from the sample signals generated for each sprint.</p></div><span class="badge">RULE-BASED OUTLOOK</span></div>
+      <div class="awaiting" role="status">No forecast yet. Use <strong>Simulate next sprint</strong> on the SENSE tab.</div>
+      <div class="grid">
+        <section class="card overview">
+          <div class="card-head"><div><h3 class="card-title" id="forecast-title">Sprint delivery outlook</h3><div class="card-kicker" id="forecast-kicker">Estimate from current simulated signals</div></div><span class="badge">CURRENT OUTLOOK</span></div>
+          <div class="overview-content">
+            <div class="confidence"><div class="ring" id="confidence-ring"><div class="ring-value"><span id="confidence">—</span>%<small>ON-TIME</small></div></div><div class="confidence-copy"><strong>Rules-based on-time estimate</strong><span>Recomputed from this sprint's seeded source signals.</span></div></div>
+            <div class="metric-stack">
+              <div class="mini-metric warn"><strong id="forecast-slip">—</strong><span>Estimated completion shift</span></div>
+              <div class="mini-metric"><strong id="forecast-p50">—</strong><span>Baseline P50 effort</span></div>
+              <div class="mini-metric warn"><strong id="forecast-scope">—</strong><span>Unplanned scope in current sprint</span></div>
+              <div class="mini-metric"><strong id="forecast-capacity">—</strong><span>Allocated / available FTE</span></div>
+            </div>
+          </div>
+          <div class="forecast-callout"><strong>Portfolio ripple · Shared API gateway</strong><p id="forecast-ripple">The projected slip is reflected in the shared API gateway outlook.</p></div>
+        </section>
+        <section class="card narrow">
+          <div class="card-head"><div><h3 class="card-title">Explainable drivers</h3><div class="card-kicker">Signals propagated into outlook</div></div></div>
+          <div class="risk-list">
+            <div class="risk-row"><span class="risk-dot"></span><div><strong>Workforce drain</strong><span>Support load and approved time off reduce effective capacity.</span></div></div>
+            <div class="risk-row"><span class="risk-dot"></span><div><strong>Scope growth</strong><span>Unplanned legacy adapters consume sprint capacity.</span></div></div>
+            <div class="risk-row"><span class="risk-dot"></span><div><strong>CAB delay</strong><span>Kafka environment dependency remains unresolved.</span></div></div>
+          </div>
+        </section>
+        <section class="card full">
+          <div class="card-head"><div><h3 class="card-title">Forecast method</h3><div class="card-kicker">Deterministic heuristic applied to seeded sprint signals</div></div></div>
+          <div class="detail-list">
+            <div class="detail-row"><span>Current sprint</span><strong id="forecast-sprint">—</strong></div>
+            <div class="detail-row"><span>Signals evaluated</span><strong id="forecast-signal-count">—</strong></div>
+            <div class="detail-row"><span>Output</span><strong>Rules-based estimate</strong></div>
+          </div>
+        </section>
+      </div>
+    </section>
+    <section id="panel-act" class="stage-panel" role="tabpanel" aria-labelledby="tab-act" tabindex="0" hidden>
+      <div class="stage-intro"><div><h2>Choose a recovery path</h2><p>Compare the trade-offs. Any real plan change requires human approval.</p></div><span class="badge">DECISION REQUIRED</span></div>
+      <div class="awaiting" role="status">No recovery options yet. Use <strong>Simulate next sprint</strong> on the SENSE tab.</div>
+      <div class="grid">
+        <section class="card full">
+          <div class="card-head"><div><h3 class="card-title">Recovery scenario comparison</h3><div class="card-kicker" id="act-kicker">Options recalculated from the latest simulated sprint signals.</div></div><span class="badge" id="act-recommendation">DECISION REQUIRED</span></div>
+          <div class="option-list">
+            <div class="option" id="act-option-a">
+              <div class="option-name"><strong id="act-title-a">OPTION A · Contractors</strong><span id="act-description-a">Adds temporary capacity after onboarding.</span></div>
+              <div class="option-metric"><span>Incremental cost</span><strong id="act-cost-a">+$118K</strong></div>
+              <div class="option-metric"><span>Confidence</span><strong id="act-confidence-a">—</strong></div>
+              <div class="option-metric"><span>Trade-off</span><strong id="act-tradeoff-a">One-sprint onboarding</strong></div>
+            </div>
+            <div class="option" id="act-option-b">
+              <div class="option-name"><strong id="act-title-b">OPTION B · Squad reallocation</strong><span id="act-description-b">Moves capacity from Audit Reporting.</span></div>
+              <div class="option-metric"><span>Incremental cost</span><strong id="act-cost-b">$0</strong></div>
+              <div class="option-metric"><span>Confidence</span><strong id="act-confidence-b">—</strong></div>
+              <div class="option-metric"><span>Trade-off</span><strong id="act-tradeoff-b">Audit +4 weeks</strong></div>
+            </div>
+            <div class="option" id="act-option-c">
+              <div class="option-name"><strong id="act-title-c">OPTION C · Phase + unblock</strong><span id="act-description-c">Phase remaining scope and protect critical capacity.</span></div>
+              <div class="option-metric"><span>Incremental cost</span><strong id="act-cost-c">$0</strong></div>
+              <div class="option-metric"><span>Confidence</span><strong id="act-confidence-c">—</strong></div>
+              <div class="option-metric"><span>Trade-off</span><strong id="act-tradeoff-c">Cold archive deferred</strong></div>
+            </div>
+          </div>
+          <p class="approval-note" id="act-note">The recommendation is advisory. No option is approved and no source-system write-back occurs.</p>
+        </section>
+        <section class="card full">
+          <div class="card-head"><div><h3 class="card-title">If approved · proposed synchronization</h3><div class="card-kicker">The production design routes an approved action to the owning systems</div></div><span class="badge">SIMULATED · NO WRITE-BACK</span></div>
+          <div class="detail-list">
+            <div class="detail-row"><span>Milestone</span><strong id="act-sync-milestone">Awaiting simulation</strong></div>
+            <div class="detail-row"><span>Azure DevOps</span><strong id="act-sync-ado">Awaiting simulation</strong></div>
+            <div class="detail-row"><span>ServiceNow</span><strong id="act-sync-servicenow">Awaiting simulation</strong></div>
+            <div class="detail-row"><span>Workforce</span><strong id="act-sync-workforce">Awaiting simulation</strong></div>
+          </div>
+        </section>
+      </div>
+    </section>
+    <footer class="footer"><span>DELIVERY TWIN · Illustrative prototype using synthetic data</span><span>Deterministic signals · Human approval required</span></footer>
+  </main>
+  <aside id="chat-panel" class="chat-panel" role="dialog" aria-label="Ask Delivery Twin" aria-modal="false" hidden>
+    <div class="chat-head">
+      <div><strong>Ask Delivery Twin</strong><span>Read-only answers about this delivery report</span></div>
+      <button class="chat-close" id="chat-close" type="button" aria-label="Close chat">×</button>
+    </div>
+    <div id="chat-status" class="chat-status" role="status">Checking Microsoft Foundry configuration…</div>
+    <div id="chat-messages" class="chat-messages" role="log" aria-live="polite" aria-relevant="additions">
+      <div class="chat-message assistant">Ask about the current delivery signals or what the dashboard figures mean. I’ll distinguish report data from illustrative pitch-deck values.</div>
+    </div>
+    <form id="chat-form" class="chat-form">
+      <textarea id="chat-input" class="chat-input" aria-label="Your question" maxlength="1200" placeholder="Ask a question…" disabled></textarea>
+      <button id="chat-send" class="chat-send" type="submit" disabled>Send</button>
+    </form>
+  </aside>
+  <button id="chat-toggle" class="chat-launcher" type="button" aria-expanded="false" aria-controls="chat-panel">Ask Delivery Twin</button>
+  <script>
+    const byId = (id) => document.getElementById(id);
+    const stageTabs = [...document.querySelectorAll('[role="tab"]')];
+    function selectStage(tab, moveFocus = false) {
+      stageTabs.forEach((item) => {
+        const selected = item === tab;
+        item.setAttribute("aria-selected", String(selected));
+        item.tabIndex = selected ? 0 : -1;
+        byId(item.getAttribute("aria-controls")).hidden = !selected;
+      });
+      if (location.hash !== `#${tab.dataset.stage}`) {
+        history.replaceState(null, "", `#${tab.dataset.stage}`);
+      }
+      if (moveFocus) tab.focus();
+    }
+    stageTabs.forEach((tab, index) => {
+      tab.addEventListener("click", () => selectStage(tab));
+      tab.addEventListener("keydown", (event) => {
+        const direction = event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0;
+        if (direction) {
+          event.preventDefault();
+          selectStage(stageTabs[(index + direction + stageTabs.length) % stageTabs.length], true);
+        } else if (event.key === "Home" || event.key === "End") {
+          event.preventDefault();
+          selectStage(stageTabs[event.key === "Home" ? 0 : stageTabs.length - 1], true);
+        }
+      });
+    });
+    const initialStage = stageTabs.find((tab) => tab.dataset.stage === location.hash.slice(1));
+    if (initialStage) selectStage(initialStage);
+
+    async function refreshReport() {
+      try {
+        const response = await fetch("/api/report", { cache: "no-store" });
+        if (!response.ok) throw new Error(`Report request failed (${response.status})`);
+        const report = await response.json();
+        document.body.dataset.sim = report.simulated ? "true" : "false";
+        if (!report.simulated) {
+          byId("workflow-status").textContent = "AWAITING SIMULATION";
+          byId("as-of").textContent = "NOT SIMULATED";
+          byId("shape-stage-status").textContent = "NO DEMO DATA";
+          byId("updated").textContent = `Updated ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
+          byId("error").style.display = "none";
+          return;
+        }
+        if (!report.workflow || !Array.isArray(report.workflow.completed_stages)) {
+          throw new Error("Agent Framework workflow metadata is unavailable");
+        }
+        const { initiative, signals } = report;
+        const forecast = report.workflow.stages.forecast;
+        const act = report.workflow.stages.act;
+        const sprintNumber = report.simulation.sprints_advanced;
+        byId("initiative-name").textContent = initiative.name;
+        byId("as-of").textContent = `AS OF ${report.as_of} · +${report.simulation.sprints_advanced} SPRINTS`;
+        byId("workflow-status").textContent = `AGENT FRAMEWORK · ${report.workflow.completed_stages.length}/4 STAGES`;
+        byId("forecast-title").textContent = `Sprint ${sprintNumber} delivery outlook`;
+        byId("forecast-kicker").textContent = `Sprint ${sprintNumber} of the simulated delivery timeline`;
+        byId("confidence").textContent = forecast.on_time_pct;
+        byId("confidence-ring").style.setProperty("--value", `${forecast.on_time_pct}%`);
+        byId("forecast-slip").textContent = `+${forecast.projected_slip_days} days`;
+        byId("forecast-ripple").textContent = forecast.projected_slip_days
+          ? `The current estimate moves the shared API gateway milestone by about ${forecast.projected_slip_days} days.`
+          : "Current signals keep the shared API gateway milestone on its baseline date.";
+        byId("scope-points").textContent = `${signals.unplanned_story_points} pts`;
+        byId("forecast-p50").textContent = `${initiative.baseline_p50_hours.toLocaleString()} h`;
+        byId("forecast-scope").textContent = `${signals.unplanned_story_points} pts`;
+        byId("forecast-capacity").textContent = `${signals.allocated_fte.toFixed(1)} / ${signals.capacity_fte.toFixed(1)}`;
+        byId("forecast-sprint").textContent = `Sprint ${sprintNumber}`;
+        byId("forecast-signal-count").textContent =
+          `${signals.unplanned_work_item_count} items · ${signals.active_priority_1_incidents} incidents`;
+        byId("act-recommendation").textContent = `RECOMMEND OPTION ${act.recommended_option}`;
+        byId("act-kicker").textContent =
+          `Option confidence reflects the current sprint ${sprintNumber} signal mix.`;
+        for (const option of act.options) {
+          const id = option.id.toLowerCase();
+          byId(`act-title-${id}`).textContent = option.title;
+          byId(`act-description-${id}`).textContent = option.description;
+          byId(`act-cost-${id}`).textContent = option.cost;
+          byId(`act-confidence-${id}`).textContent = `${option.confidence_pct}%`;
+          byId(`act-tradeoff-${id}`).textContent = option.tradeoff;
+          byId(`act-option-${id}`).classList.toggle("recommended", option.recommended);
+        }
+        byId("act-sync-milestone").textContent = act.actions.milestone;
+        byId("act-sync-ado").textContent = act.actions.azure_devops;
+        byId("act-sync-servicenow").textContent = act.actions.servicenow;
+        byId("act-sync-workforce").textContent = act.actions.workforce;
+        byId("act-note").textContent =
+          `Option ${act.recommended_option} is recommended for the simulated signals. No option is approved; source-system write-back remains disabled.`;
+        byId("sense-capacity").textContent = `${signals.allocated_fte.toFixed(1)} / ${signals.capacity_fte.toFixed(1)} FTE`;
+        byId("sense-support").textContent = `${signals.lead_production_support_hours_per_week} h / week`;
+        byId("sense-pto").textContent = `${signals.lead_approved_pto_hours} h`;
+        byId("support-hours").textContent = `${signals.lead_production_support_hours_per_week}h`;
+        byId("story-count").textContent = `${signals.unplanned_work_item_count} stories`;
+        byId("change-age").textContent = `${signals.oldest_blocking_change_age_days} days`;
+        byId("pto-hours").textContent = `${signals.lead_approved_pto_hours}h`;
+        byId("finding").textContent = report.zero_prompt_finding;
+        byId("updated").textContent = `Updated ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
+        byId("error").style.display = "none";
+      } catch (error) {
+        byId("error").textContent = `Dashboard data could not be loaded: ${error.message}`;
+        byId("error").style.display = "block";
+      }
+    }
+    refreshReport();
+
+    async function runSimulation(body, doneMessage) {
+      const status = byId("sim-status");
+      const button = byId("sim-run");
+      button.disabled = true;
+      status.textContent = "Working…";
+      try {
+        const response = await fetch("/api/simulate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.error || `Request failed (${response.status})`);
+        await refreshReport();
+        status.textContent = data.simulated
+          ? `${doneMessage} sprint ${data.sprints_advanced}, ${data.started_on} → ${data.as_of}.`
+          : doneMessage;
+      } catch (error) {
+        status.textContent = `Simulation failed: ${error.message}`;
+      } finally {
+        button.disabled = false;
+      }
+    }
+    byId("sim-run").addEventListener("click", () =>
+      runSimulation({ next_sprint: true }, "Advanced:"));
+    byId("clear-all-data").addEventListener("click", async (event) => {
+      if (!window.confirm("Permanently delete all demo source rows, intake approvals, and simulation state from the local database? The schema will remain. You can reload synthetic data one sprint at a time with Simulate next sprint.")) return;
+      const button = event.currentTarget;
+      const status = byId("clear-data-status");
+      button.disabled = true;
+      status.textContent = "Clearing…";
+      try {
+        const response = await fetch("/api/reset-all", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ confirm: true }),
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.error || `Request failed (${response.status})`);
+        await refreshReport();
+        status.textContent = `Cleared ${data.rows_deleted} database rows.`;
+      } catch (error) {
+        status.textContent = `Clear failed: ${error.message}`;
+      } finally {
+        button.disabled = false;
+      }
+    });
+    const SAMPLE_REQUEST = "We need to modernize the auto-pay platform so customers can schedule payments faster. The legacy stuff is slow and we need it done by end of Q1.";
+    const intake = { text: "", analysis: null, result: null };
+    const intakeSteps = [1, 2, 3, 4, 5].map((n) => byId(`intake-step-${n}`));
+
+    function el(tag, className, text) {
+      const node = document.createElement(tag);
+      if (className) node.className = className;
+      if (text !== undefined) node.textContent = text;
+      return node;
+    }
+    function intakeShowUpTo(step) {
+      intakeSteps.forEach((node, index) => { node.hidden = index + 1 > step; });
+      byId("intake-step-badge").textContent = `STEP ${step} OF 5`;
+    }
+    function clearCommitmentSummary() {
+      ["baseline-p50", "baseline-p80", "buffer", "target-date", "allocated-capacity", "capacity-headroom",
+        "initial-confidence-ring", "shape-fingerprint-status"].forEach((id) => { byId(id).textContent = "—"; });
+      byId("panel-shape").querySelector(".ring").style.setProperty("--value", "0%");
+      byId("shape-baseline-status").textContent = "Awaiting intake";
+      byId("shape-stage-status").textContent = "INTAKE IN PROGRESS";
+    }
+    function intakeError(message) {
+      const box = byId("intake-error");
+      box.textContent = message || "";
+      box.hidden = !message;
+    }
+    async function intakePost(path, body) {
+      const response = await fetch(path, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || `Request failed (${response.status})`);
+      return data;
+    }
+    async function intakeRun(button, task) {
+      intakeError("");
+      button.disabled = true;
+      try { await task(); } catch (error) { intakeError(error.message); } finally { button.disabled = false; }
+    }
+    const hours = (value) => `${Number(value).toLocaleString()} h`;
+    const list = (value) => (Array.isArray(value) ? (value.length ? value.join(", ") : "none") : String(value));
+
+    function selectedAnswers() {
+      const answers = {};
+      document.querySelectorAll("#intake-questions input:checked").forEach((input) => { answers[input.name] = input.value; });
+      return answers;
+    }
+    function renderQuestions(analysis) {
+      const container = byId("intake-questions");
+      container.replaceChildren();
+      byId("intake-clarity").textContent = `· ${analysis.clarity.specified} of ${analysis.clarity.total} areas specified in the request`;
+      byId("intake-retrieval").textContent = `${analysis.retrieval.method} · ${analysis.retrieval.initiatives_searched} historical initiatives searched. Suggested answers come from the best-matching lesson; change any of them.`;
+      analysis.clarifications.forEach((item) => {
+        const card = el("fieldset", "q-card");
+        card.append(el("legend", "", item.category), el("div", "q-text", item.question));
+        item.options.forEach((option) => {
+          const label = el("label", "q-option");
+          const input = document.createElement("input");
+          input.type = "radio";
+          input.name = item.id;
+          input.value = option.value;
+          input.checked = option.value === item.suggested;
+          input.addEventListener("change", () => {
+            intakeShowUpTo(2);
+            intake.result = null;
+            clearCommitmentSummary();
+          });
+          const text = el("span", "", option.label);
+          if (option.value === item.suggested) text.append(el("span", "tag", "SUGGESTED"));
+          label.append(input, text);
+          card.append(label);
+        });
+        const evidence = el("div", "evidence");
+        evidence.append(el("strong", "", "Historical evidence"));
+        item.evidence.forEach((entry) => {
+          const line = el("div", "", `${entry.initiative}: ${entry.lesson}`);
+          if (entry.matched_terms.length) line.append(el("em", "", ` [matched: ${entry.matched_terms.join(", ")}]`));
+          evidence.append(line);
+        });
+        card.append(evidence);
+        container.append(card);
+      });
+    }
+    const dimensionLabels = {
+      structure: "Structure", complexity: "Complexity", systems: "Systems",
+      roles: "Roles", dependencies: "Dependencies", delivery_pattern: "Delivery pattern",
+    };
+    function chip(score) {
+      const level = score >= 1 ? "full" : score > 0 ? "part" : "none";
+      return el("span", `dim-chip ${level}`, `${Math.round(score * 100)}%`);
+    }
+    function renderFingerprint(result) {
+      const { rom, commitment } = result;
+      byId("baseline-p50").textContent = hours(rom.p50_hours);
+      byId("baseline-p80").textContent = hours(rom.p80_hours);
+      byId("buffer").textContent = `${rom.integration_buffer_pct}%`;
+      byId("target-date").textContent = commitment.target_date;
+      byId("allocated-capacity").textContent = `${commitment.allocated_fte.toFixed(1)} / ${commitment.capacity_fte.toFixed(1)} FTE`;
+      byId("capacity-headroom").textContent = `${(commitment.capacity_fte - commitment.allocated_fte).toFixed(1)} FTE`;
+      byId("initial-confidence-ring").textContent = commitment.confidence_pct;
+      byId("panel-shape").querySelector(".ring").style.setProperty("--value", `${commitment.confidence_pct}%`);
+      byId("shape-fingerprint-status").textContent = "6 dimensions matched";
+      byId("shape-baseline-status").textContent = "Ready for approval";
+      byId("shape-stage-status").textContent = "INTAKE READY";
+      const grid = byId("intake-fingerprint");
+      grid.replaceChildren();
+      Object.entries(dimensionLabels).forEach(([key, label]) => {
+        const cell = el("div", "fp-dim");
+        cell.append(el("div", "dim-name", label), el("div", "dim-value", list(result.fingerprint[key])));
+        grid.append(cell);
+      });
+      const table = el("table", "analog-table");
+      const head = el("tr");
+      ["Matched initiative", "Fit", ...Object.values(dimensionLabels)].forEach((title) => head.append(el("th", "", title)));
+      table.append(head);
+      result.matches.forEach((match) => {
+        const row = el("tr");
+        row.append(el("td", "", match.name), el("td", "", `${match.similarity_pct}%`));
+        Object.keys(dimensionLabels).forEach((key) => {
+          const cell = el("td");
+          cell.append(chip(match.dimensions[key].score));
+          row.append(cell);
+        });
+        table.append(row);
+      });
+      const holder = byId("intake-analogs");
+      holder.replaceChildren(table);
+    }
+    function metric(value, label) {
+      const box = el("div", "mini-metric");
+      box.append(el("strong", "", value), el("span", "", label));
+      return box;
+    }
+    function renderRom(result) {
+      const { rom } = result;
+      byId("intake-rom").replaceChildren(
+        metric(hours(rom.p50_hours), "P50 effort"),
+        metric(hours(rom.p80_hours), "P80 effort"),
+        metric(`${rom.integration_buffer_pct}%`, "Integration buffer"),
+        metric(String(rom.analogs.length), "Analogs used"),
+      );
+      byId("intake-rom-explain").textContent =
+        `P50: median analog base ${hours(rom.base_p50_hours)} + ${hours(rom.buffer_hours_p50)} integration buffer (${rom.integration_buffer_pct}%), rounded to ${hours(rom.p50_hours)}. ` +
+        `P80: ${hours(rom.base_p80_hours)} + ${hours(rom.buffer_hours_p80)} buffer, rounded to ${hours(rom.p80_hours)}. ` +
+        `Analogs: ${rom.analogs.join("; ")}. Deterministic — the same fingerprint always yields the same range.`;
+    }
+    function renderCommitment(result) {
+      const c = result.commitment;
+      byId("intake-commitment").replaceChildren(
+        metric(`${c.allocated_fte.toFixed(1)} of ${c.capacity_fte.toFixed(1)} FTE`, "Capacity available"),
+        metric(c.target_date, "Target date"),
+        metric(`${c.confidence_pct}%`, "Initial confidence"),
+        metric(`${c.required_fte_p80} FTE`, "Needed to hit P80"),
+      );
+      const explain = byId("intake-commit-explain");
+      explain.replaceChildren(
+        document.createTextNode(`P80 of ${hours(result.rom.p80_hours)} over ${c.weeks_to_target} weeks at ${c.hours_per_fte_week} h/FTE-week needs ${c.required_fte_p80} FTE; ${c.allocated_fte.toFixed(1)} FTE are allocated. `),
+        el("span", c.feasible ? "gate-ok" : "gate-bad", c.feasible ? "Feasible — ready for approval." : "Not feasible with current capacity."),
+      );
+      byId("intake-approve").disabled = !c.feasible;
+    }
+    function renderApproved(baseline) {
+      byId("shape-baseline-status").textContent = "Approved";
+      byId("shape-stage-status").textContent = "BASELINE APPROVED";
+      byId("intake-approved").textContent =
+        `Baseline #${baseline.id} approved ${baseline.approved_at}: P50 ${hours(baseline.p50_hours)} · P80 ${hours(baseline.p80_hours)} · ` +
+        `${baseline.allocated_fte.toFixed(1)}/${baseline.capacity_fte.toFixed(1)} FTE · ${baseline.target_date} · ${baseline.confidence_pct}% confidence.`;
+      byId("intake-approved").hidden = false;
+      byId("intake-approve").hidden = true;
+      byId("intake-continue").hidden = false;
+    }
+
+    byId("intake-sample").addEventListener("click", () => {
+      byId("intake-text").value = SAMPLE_REQUEST;
+      intake.result = null;
+      clearCommitmentSummary();
+      intakeShowUpTo(1);
+    });
+    byId("intake-text").addEventListener("input", () => {
+      intake.result = null;
+      clearCommitmentSummary();
+      intakeShowUpTo(1);
+      intakeError("");
+    });
+    byId("intake-analyze").addEventListener("click", (event) => intakeRun(event.currentTarget, async () => {
+      intake.text = byId("intake-text").value;
+      intake.analysis = await intakePost("/api/intake/analyze", { text: intake.text });
+      renderQuestions(intake.analysis);
+      intakeShowUpTo(2);
+    }));
+    byId("intake-fingerprint-btn").addEventListener("click", (event) => intakeRun(event.currentTarget, async () => {
+      intake.result = await intakePost("/api/intake/evaluate", { text: intake.text, answers: selectedAnswers() });
+      renderFingerprint(intake.result);
+      intakeShowUpTo(3);
+    }));
+    byId("intake-rom-btn").addEventListener("click", () => { renderRom(intake.result); intakeShowUpTo(4); });
+    byId("intake-commit-btn").addEventListener("click", () => {
+      renderCommitment(intake.result);
+      byId("intake-approved").hidden = true;
+      byId("intake-approve").hidden = false;
+      byId("intake-continue").hidden = true;
+      intakeShowUpTo(5);
+    });
+    byId("intake-approve").addEventListener("click", (event) => intakeRun(event.currentTarget, async () => {
+      const approved = await intakePost("/api/intake/approve", { text: intake.text, answers: intake.result.answers });
+      renderApproved(approved.baseline);
+    }));
+    byId("intake-continue").addEventListener("click", () => selectStage(byId("tab-sense"), true));
+
+    const chatToggle = byId("chat-toggle");
+    const chatPanel = byId("chat-panel");
+    const chatClose = byId("chat-close");
+    const chatForm = byId("chat-form");
+    const chatInput = byId("chat-input");
+    const chatSend = byId("chat-send");
+    const chatStatus = byId("chat-status");
+    const chatMessagesElement = byId("chat-messages");
+    const chatHistory = [];
+    let chatAvailable = false;
+
+    function setChatOpen(open) {
+      chatPanel.hidden = !open;
+      chatToggle.setAttribute("aria-expanded", String(open));
+      if (open) chatInput.focus();
+      else chatToggle.focus();
+    }
+    function appendChatMessage(role, text, isError = false) {
+      const message = document.createElement("div");
+      message.className = `chat-message ${role}${isError ? " error-message" : ""}`;
+      message.textContent = text;
+      chatMessagesElement.append(message);
+      chatMessagesElement.scrollTop = chatMessagesElement.scrollHeight;
+    }
+    chatToggle.addEventListener("click", () => setChatOpen(chatPanel.hidden));
+    chatClose.addEventListener("click", () => setChatOpen(false));
+    chatInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" && !event.shiftKey && !event.isComposing) {
+        event.preventDefault();
+        chatForm.requestSubmit();
+      }
+    });
+    async function checkChatAvailability() {
+      try {
+        const response = await fetch("/api/chat/status", { cache: "no-store" });
+        const status = await response.json();
+        if (!response.ok) throw new Error(status.error || `Chat status failed (${response.status})`);
+        chatAvailable = status.available === true;
+        chatStatus.textContent = status.message;
+        chatInput.disabled = !chatAvailable;
+        chatSend.disabled = !chatAvailable;
+      } catch (error) {
+        chatStatus.textContent = `Chat configuration could not be checked: ${error.message}`;
+        chatInput.disabled = true;
+        chatSend.disabled = true;
+      }
+    }
+    chatForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const question = chatInput.value.trim();
+      if (!question || !chatAvailable) return;
+
+      appendChatMessage("user", question);
+      chatInput.value = "";
+      chatInput.disabled = true;
+      chatSend.disabled = true;
+      chatStatus.textContent = "Getting a report-grounded answer…";
+      try {
+        const response = await fetch("/api/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ question, history: chatHistory })
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || `Chat request failed (${response.status})`);
+        appendChatMessage("assistant", result.answer);
+        chatHistory.push({ role: "user", content: question }, { role: "assistant", content: result.answer });
+        if (chatHistory.length > 8) chatHistory.splice(0, chatHistory.length - 8);
+        chatStatus.textContent = "Answers are grounded in the current report; no source changes are made.";
+      } catch (error) {
+        appendChatMessage("assistant", error.message, true);
+        chatStatus.textContent = "The assistant could not answer this question.";
+      } finally {
+        chatInput.disabled = !chatAvailable;
+        chatSend.disabled = !chatAvailable;
+        if (chatAvailable) chatInput.focus();
+      }
+    });
+    checkChatAvailability();
+  </script>
+</body>
+</html>
