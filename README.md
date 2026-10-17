@@ -6,10 +6,10 @@ This Python 3.10+ prototype turns the source-system layer in the Delivery Twin p
 
 | Source | Source-specific tables | Example data |
 |---|---|---|
-| Planview | `planview_projects`, `planview_milestones`, `planview_resource_assignments` | Approved baseline, 7.5 of 8.0 FTE, shared API gateway milestone |
-| Azure DevOps | `ado_projects`, `ado_sprints`, `ado_work_items` | Sprint 4 with 14 unplanned legacy-adapter stories totaling 64 points |
-| ServiceNow | `servicenow_incidents`, `servicenow_change_requests` | P1 support incident and Kafka production-mirror change in CAB review |
-| Oracle HR / HCM | `oracle_workers`, `oracle_worker_skills` | Active delivery roles and data-engineering/Kafka skills |
+| Planview | `planview_projects`, `planview_milestones`, `planview_resource_assignments` | Customer 360 Q4 baseline, 7.5 of 8.0 FTE |
+| Azure DevOps | `ado_projects`, `ado_sprints`, `ado_work_items` | Customer profile integrations and unplanned scope |
+| ServiceNow | `servicenow_incidents`, `servicenow_change_requests` | Customer profile reconciliation incident and identity-matching change in CAB review |
+| Oracle HR / HCM | `oracle_workers`, `oracle_worker_skills` | Customer data, CRM integration, identity resolution, and privacy skills |
 | UKG Pro WFM | `ukg_shifts`, `ukg_time_entries`, `ukg_pto_requests` | Lead engineer's 16 weekly support hours and 40 approved PTO hours |
 
 The shared delivery model holds initiatives, milestones, people, and skills; `source_entity_map` is available for mapping real source identifiers to shared entities. `source_systems` and `ingestion_runs` record connector mode and load history. See [`deliverytwin/schema.sql`](deliverytwin/schema.sql).

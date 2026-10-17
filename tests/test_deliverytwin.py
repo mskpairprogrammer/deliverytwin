@@ -27,8 +27,8 @@ from deliverytwin import (
 )
 
 VAGUE_REQUEST = (
-    "We need to modernize the auto-pay platform so customers can schedule payments faster. "
-    "The legacy stuff is slow and we need it done by end of Q1."
+    "We need one view of every customer across the business. "
+    "Teams get different answers, and leadership wants this fixed soon."
 )
 
 
@@ -56,8 +56,24 @@ class DeliveryTwinTests(unittest.TestCase):
         self.assertEqual(report["signals"]["unplanned_work_item_count"], 14)
         self.assertEqual(report["signals"]["unplanned_story_points"], 64)
         self.assertEqual(report["signals"]["lead_production_support_hours_per_week"], 16)
+        self.assertEqual(report["initiative"]["name"], "Customer 360")
+        self.assertEqual(report["initiative"]["portfolio"], "Q4 value stream")
         self.assertEqual(report["signals"]["lead_approved_pto_hours"], 40)
         self.assertEqual(report["signals"]["oldest_blocking_change_age_days"], 9)
+        self.assertEqual(
+            self.connection.execute(
+                "SELECT short_description FROM servicenow_change_requests"
+            ).fetchone()["short_description"],
+            "Customer identity matching rules deployment",
+        )
+        self.assertEqual(
+            self.connection.execute("SELECT name FROM delivery_milestones").fetchone()["name"],
+            "",
+        )
+        self.assertEqual(
+            self.connection.execute("SELECT COUNT(*) FROM skills WHERE name = 'Kafka'").fetchone()[0],
+            0,
+        )
         self.assertTrue(report["collision_detected"])
         self.assertFalse(report["writeback_performed"])
         self.assertTrue(all(c["writeback_enabled"] == 0 for c in report["connectors"]))
@@ -124,15 +140,16 @@ class DeliveryTwinTests(unittest.TestCase):
 
     def _intake_answers(self) -> dict[str, str]:
         return {
-            "architecture": "strangler",
-            "data": "kafka_mirror",
-            "security": "pci_cab",
-            "reuse": "reuse_gateway",
+            "architecture": "incremental",
+            "data": "event_sync",
+            "security": "pii_consent",
+            "reuse": "reuse_mdm",
         }
 
     def test_intake_asks_clarifications_with_historical_evidence(self) -> None:
         seed_demo(self.connection, date(2026, 2, 20))
-        analysis = analyze_intake(self.connection, VAGUE_REQUEST)
+        with patch("deliverytwin.intake.openai_configured", return_value=False):
+            analysis = analyze_intake(self.connection, VAGUE_REQUEST)
 
         self.assertEqual(
             [item["id"] for item in analysis["clarifications"]],
@@ -142,15 +159,23 @@ class DeliveryTwinTests(unittest.TestCase):
         suggested = {item["id"]: item["suggested"] for item in analysis["clarifications"]}
         self.assertEqual(suggested, self._intake_answers())
         self.assertTrue(all(item["evidence"] for item in analysis["clarifications"]))
+        data_question = next(
+            item for item in analysis["clarifications"] if item["id"] == "data"
+        )
+        self.assertIn("CRM", data_question["question"])
+        self.assertIn("consent", next(
+            option["label"] for option in analysis["clarifications"][2]["options"]
+            if option["value"] == "pii_consent"
+        ).lower())
 
-    def test_intake_reproduces_the_deck_rom_and_commitment(self) -> None:
+    def test_intake_reproduces_the_customer360_rom_and_commitment(self) -> None:
         demo_day = date(2026, 10, 17)
         seed_demo(self.connection, demo_day)
         result = evaluate_intake(self.connection, VAGUE_REQUEST, self._intake_answers(), demo_day)
 
         self.assertEqual(
             [match["id"] for match in result["matches"]],
-            ["hist-card-rewards", "hist-bill-pay", "hist-merchant-settlement"],
+            ["hist-bill-pay", "hist-merchant-settlement", "hist-card-rewards"],
         )
         self.assertEqual(result["fingerprint"]["complexity"], "high")
         self.assertEqual(result["rom"]["p50_hours"], 4450)
@@ -171,7 +196,7 @@ class DeliveryTwinTests(unittest.TestCase):
         with self.assertRaises(IntakeError):
             evaluate_intake(self.connection, VAGUE_REQUEST, {**self._intake_answers(), "data": "bogus"})
         with self.assertRaises(IntakeError):
-            evaluate_intake(self.connection, VAGUE_REQUEST, {"architecture": "strangler"})
+            evaluate_intake(self.connection, VAGUE_REQUEST, {"architecture": "incremental"})
 
     def test_approval_recomputes_server_side_and_persists_baseline(self) -> None:
         demo_day = date(2026, 10, 17)

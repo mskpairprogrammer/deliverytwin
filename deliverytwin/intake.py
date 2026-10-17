@@ -37,25 +37,28 @@ QUESTIONS: tuple[dict[str, Any], ...] = (
     {
         "id": "architecture",
         "category": "Architecture",
-        "question": "How will the new capability be delivered against the existing platform?",
-        "hints": ("architecture", "gateway", "cutover", "strangler", "rewrite", "microservice"),
+        "question": "How should Customer 360 fit with the existing customer platforms?",
+        "hints": ("architecture", "crm", "mdm", "profile", "platform"),
         "options": {
-            "strangler": {
-                "label": "Incremental strangler migration behind the shared API gateway",
+            "incremental": {
+                "label": "Add unified profiles alongside existing CRM and service platforms",
                 "structure": "legacy-modernization",
-                "delivery_pattern": "incremental-strangler",
+                "delivery_pattern": "incremental-integration",
+                "systems": ("crm", "service-management"),
                 "points": 0,
             },
             "big_bang": {
-                "label": "Big-bang replacement and cutover",
+                "label": "Replace the current customer profile store in one coordinated cutover",
                 "structure": "legacy-modernization",
                 "delivery_pattern": "big-bang-cutover",
+                "systems": ("customer-profile-store",),
                 "points": 1,
             },
             "greenfield": {
-                "label": "New greenfield service with no legacy coupling",
+                "label": "Build a new Customer 360 profile service with independent data contracts",
                 "structure": "greenfield-service",
                 "delivery_pattern": "iterative-greenfield",
+                "systems": ("customer-profile-service",),
                 "points": 0,
             },
         },
@@ -63,52 +66,61 @@ QUESTIONS: tuple[dict[str, Any], ...] = (
     {
         "id": "data",
         "category": "Data",
-        "question": "What data movement or integration is required?",
-        "hints": ("data", "kafka", "etl", "events", "stream", "pipeline"),
+        "question": "How should customer profiles be synchronized across CRM, commerce, and service systems?",
+        "hints": ("data", "crm", "profile", "sync", "events", "batch", "source"),
         "options": {
-            "kafka_mirror": {
-                "label": "Real-time event streaming through a Kafka production mirror",
-                "systems": ("kafka",),
+            "event_sync": {
+                "label": "Near-real-time updates from CRM, commerce, and service systems",
+                "systems": ("crm", "commerce", "service-management", "event-streaming"),
+                "roles": ("data-engineer",),
                 "points": 2,
             },
-            "batch_etl": {
-                "label": "Nightly batch ETL between existing systems",
-                "systems": ("batch-etl",),
+            "batch_sync": {
+                "label": "Scheduled reconciliation of customer records across existing systems",
+                "systems": ("crm", "commerce", "service-management", "batch-integration"),
                 "roles": ("data-engineer",),
                 "points": 1,
             },
-            "none": {"label": "No data migration or new integration", "points": 0},
+            "single_source": {
+                "label": "An existing master customer record is authoritative; no new synchronization",
+                "systems": ("customer-master",),
+                "points": 0,
+            },
         },
     },
     {
         "id": "security",
         "category": "Security",
-        "question": "Which security and change-control gates apply?",
-        "hints": ("security", "pci", "compliance", "encryption", "auth", "cab"),
+        "question": "Which privacy controls are required for customer profile information?",
+        "hints": ("security", "privacy", "consent", "pii", "personal", "retention", "compliance", "audit"),
         "options": {
-            "pci_cab": {
-                "label": "PCI-scoped change that needs CAB review before production",
-                "dependencies": ("change-approval",),
+            "pii_consent": {
+                "label": "Classify PII and enforce consent, masking, retention, and audit controls",
+                "roles": ("privacy-engineer",),
+                "dependencies": ("privacy-review", "consent-management"),
                 "points": 2,
             },
-            "standard": {"label": "Standard security review; no regulated data", "points": 0},
+            "standard": {
+                "label": "Standard access review for non-sensitive customer attributes",
+                "points": 0,
+            },
         },
     },
     {
         "id": "reuse",
         "category": "Reuse",
-        "question": "Which existing components can be reused?",
-        "hints": ("reuse", "existing", "shared", "component", "library"),
+        "question": "Which customer identity or profile capabilities can be reused?",
+        "hints": ("reuse", "existing", "shared", "component", "mdm", "identity", "profile", "crm"),
         "options": {
-            "reuse_gateway": {
-                "label": "Reuse the shared API gateway and existing payment adapters",
-                "systems": ("api-gateway",),
-                "dependencies": ("shared-api-gateway",),
+            "reuse_mdm": {
+                "label": "Reuse existing CRM/MDM match rules, identity resolution, and profile APIs",
+                "systems": ("crm", "mdm", "identity-resolution", "profile-api"),
+                "dependencies": ("crm-mdm-integration",),
                 "points": 0,
             },
             "build_new": {
-                "label": "Build new components; nothing suitable to reuse",
-                "roles": ("platform-engineer",),
+                "label": "Build new identity resolution and customer profile services",
+                "roles": ("platform-engineer", "data-engineer"),
                 "points": 1,
             },
         },
@@ -117,75 +129,78 @@ QUESTIONS: tuple[dict[str, Any], ...] = (
 QUESTIONS_BY_ID = {question["id"]: question for question in QUESTIONS}
 
 _ANALOGS = (
-    ("hist-card-rewards", "Card Rewards Platform Modernization",
-     "Legacy rewards and payments platform moved behind a shared API gateway with Kafka event streaming.",
-     "legacy-modernization", "high", "api-gateway,kafka,payments-adapters",
-     "data-engineer,delivery-engineer,lead-engineer", "change-approval,shared-api-gateway",
-     "incremental-strangler", 3890, 4330, 14, 83),
-    ("hist-bill-pay", "Bill Pay Gateway Consolidation",
-     "Legacy bill pay adapters consolidated behind the shared payments API gateway.",
-     "legacy-modernization", "high", "api-gateway,payments-adapters",
-     "data-engineer,delivery-engineer,lead-engineer", "change-approval,shared-api-gateway",
-     "incremental-strangler", 3900, 4340, 14, 84),
-    ("hist-merchant-settlement", "Merchant Settlement Event Streaming",
-     "Merchant settlement payments moved from batch to event streaming on the shared gateway.",
-     "legacy-modernization", "medium", "api-gateway,kafka,payments-adapters",
-     "data-engineer,delivery-engineer,lead-engineer,platform-engineer", "shared-api-gateway",
-     "incremental-strangler", 3915, 4355, 14, 85),
-    ("hist-mobile-wallet", "Mobile Wallet App",
-     "Greenfield customer mobile wallet application with its own backend services.",
-     "greenfield-service", "medium", "mobile-app,new-service",
-     "delivery-engineer,lead-engineer,mobile-engineer", "app-store-release",
+    ("hist-card-rewards", "Customer Profile Unification",
+     "CRM and commerce customer records were unified using identity resolution and consent-aware profile APIs.",
+     "legacy-modernization", "high", "customer-data-platform,crm,commerce,service-management,identity-resolution",
+     "data-engineer,delivery-engineer,lead-engineer,privacy-engineer",
+     "privacy-review,consent-management,crm-mdm-integration",
+     "incremental-integration", 3890, 4330, 14, 83),
+    ("hist-bill-pay", "CRM and Service Profile Consolidation",
+     "Customer support and CRM records were reconciled into a governed master profile using existing match rules.",
+     "legacy-modernization", "high", "customer-data-platform,crm,service-management,mdm,identity-resolution,profile-api",
+     "data-engineer,delivery-engineer,lead-engineer,privacy-engineer",
+     "privacy-review,consent-management,crm-mdm-integration",
+     "incremental-integration", 3900, 4340, 14, 84),
+    ("hist-merchant-settlement", "Customer Identity Resolution Service",
+     "Customer profile updates from CRM, commerce, and service systems were delivered through governed events.",
+     "legacy-modernization", "high", "customer-data-platform,crm,commerce,service-management,event-streaming,identity-resolution",
+     "data-engineer,delivery-engineer,lead-engineer,privacy-engineer",
+     "privacy-review,consent-management,crm-mdm-integration",
+     "incremental-integration", 3915, 4355, 14, 85),
+    ("hist-mobile-wallet", "Customer Profile Workspace",
+     "Greenfield customer service workspace launched with a new profile API and explicit data contracts.",
+     "greenfield-service", "medium", "customer-portal,customer-profile-service",
+     "delivery-engineer,lead-engineer,customer-experience-engineer", "identity-provider",
      "iterative-greenfield", 2100, 2500, 14, 71),
-    ("hist-erp-vendor", "ERP Vendor Integration",
-     "Vendor ERP package integrated with finance systems using nightly batch loads and a cutover.",
-     "vendor-integration", "high", "batch-etl,erp",
-     "data-engineer,delivery-engineer,vendor-liaison", "vendor-contract",
+    ("hist-erp-vendor", "CRM Vendor Integration",
+     "A hosted CRM was integrated with ERP and service records using scheduled customer data loads.",
+     "vendor-integration", "high", "batch-integration,crm,erp,service-management",
+     "data-engineer,delivery-engineer,vendor-liaison", "vendor-contract,privacy-review",
      "big-bang-cutover", 5200, 6100, 14, 62),
 )
 
 # (initiative_id, category, lesson, suggested option)
 _LESSONS = (
     ("hist-card-rewards", "architecture",
-     "Strangling legacy payments adapters behind the shared API gateway avoided a risky cutover.", "strangler"),
+     "Adding customer profiles alongside CRM kept existing service teams online during migration.", "incremental"),
     ("hist-card-rewards", "data",
-     "A Kafka production mirror exposed legacy payment events without touching the source system.", "kafka_mirror"),
+     "CRM and commerce events supported timely profile updates with replay and reconciliation controls.", "event_sync"),
     ("hist-card-rewards", "security",
-     "PCI-scoped payments changes waited in CAB review; request the change early.", "pci_cab"),
+     "Consent and PII handling were reviewed before customer profiles were shared across teams.", "pii_consent"),
     ("hist-card-rewards", "reuse",
-     "Reusing existing payment adapters and the shared gateway saved significant build effort.", "reuse_gateway"),
+     "Existing MDM match rules reduced duplicate customer records without building a new identity engine.", "reuse_mdm"),
     ("hist-bill-pay", "architecture",
-     "Incremental migration of legacy bill pay adapters kept customers on stable payments flows.", "strangler"),
+     "A phased CRM and service-profile rollout kept current customer workflows available.", "incremental"),
     ("hist-bill-pay", "data",
-     "Batch reconciliation was kept for audit while payment events moved to streaming.", "kafka_mirror"),
+     "Scheduled customer-record reconciliation exposed mismatches before profiles were published.", "batch_sync"),
     ("hist-bill-pay", "security",
-     "Payments data in scope for PCI required change approval before each release.", "pci_cab"),
+     "Consent and retention checks were included in every customer-profile release review.", "pii_consent"),
     ("hist-bill-pay", "reuse",
-     "The shared API gateway and existing adapters were reused for every payments endpoint.", "reuse_gateway"),
+     "Reusing CRM and MDM identity rules avoided duplicate customer matching logic.", "reuse_mdm"),
     ("hist-merchant-settlement", "architecture",
-     "Event streaming was introduced alongside the legacy settlement flow, then cut over per merchant.", "strangler"),
+     "Customer profile consumers were moved in phases while existing CRM flows remained available.", "incremental"),
     ("hist-merchant-settlement", "data",
-     "Streaming settlement events through Kafka needed a data engineer for the entire project.", "kafka_mirror"),
+     "Event-based CRM and service updates required a data engineer to manage profile quality.", "event_sync"),
     ("hist-merchant-settlement", "security",
-     "Production access for new event consumers was reviewed through change approval.", "pci_cab"),
+     "New profile consumers required privacy and consent approval before production access.", "pii_consent"),
     ("hist-merchant-settlement", "reuse",
-     "Existing gateway authentication and adapters were reused; new connectors were avoided.", "reuse_gateway"),
+     "Existing profile APIs and identity resolution were reused instead of creating another customer store.", "reuse_mdm"),
     ("hist-mobile-wallet", "architecture",
-     "A greenfield mobile backend avoided legacy coupling and shipped in short iterations.", "greenfield"),
+     "The customer workspace used a new profile service with independent data contracts.", "greenfield"),
     ("hist-mobile-wallet", "data",
-     "No data migration was needed because the wallet launched with new customers only.", "none"),
+     "The first release used one authoritative customer source and did not synchronize other systems.", "single_source"),
     ("hist-mobile-wallet", "security",
-     "App store release and a standard security review were the only gates.", "standard"),
+     "Standard access review was sufficient because sensitive customer attributes were excluded.", "standard"),
     ("hist-mobile-wallet", "reuse",
-     "Few components were reusable, so most services were built new.", "build_new"),
+     "The team built new profile services because no suitable CRM or MDM capability existed.", "build_new"),
     ("hist-erp-vendor", "architecture",
-     "The vendor package forced a big-bang cutover on a fixed weekend.", "big_bang"),
+     "The hosted CRM integration required a coordinated cutover from the previous profile store.", "big_bang"),
     ("hist-erp-vendor", "data",
-     "Nightly batch ETL moved finance data into the vendor package.", "batch_etl"),
+     "Scheduled batch integration reconciled customer profiles between CRM and ERP.", "batch_sync"),
     ("hist-erp-vendor", "security",
-     "Vendor contract and standard security review governed the release.", "standard"),
+     "Customer data-sharing terms and standard access controls were reviewed with the vendor.", "standard"),
     ("hist-erp-vendor", "reuse",
-     "Vendor tooling replaced internal components, so little was reused.", "build_new"),
+     "The vendor supplied identity matching components, so little of the internal profile stack was reused.", "build_new"),
 )
 
 
@@ -245,7 +260,7 @@ def _clean_text(text: object) -> str:
 def _historical_count(connection: sqlite3.Connection) -> int:
     count = connection.execute("SELECT COUNT(*) FROM historical_initiatives").fetchone()[0]
     if not count:
-        raise IntakeError("No historical data is loaded. Click Simulate 5 sprints on the SENSE tab first.")
+        raise IntakeError("Customer 360 historical examples are not loaded. Seed the demo data and try again.")
     return count
 
 
@@ -362,7 +377,11 @@ def build_fingerprint(answers: dict[str, str]) -> dict[str, Any]:
     """Translate clarified answers into the 6D delivery fingerprint."""
     options = [QUESTIONS_BY_ID[key]["options"][value] for key, value in answers.items()]
     architecture = QUESTIONS_BY_ID["architecture"]["options"][answers["architecture"]]
-    systems = {"new-service"} if architecture["structure"] == "greenfield-service" else {"payments-adapters"}
+    systems = (
+        {"customer-profile-service"}
+        if architecture["structure"] == "greenfield-service"
+        else {"customer-data-platform"}
+    )
     roles = {"lead-engineer", "delivery-engineer"}
     dependencies: set[str] = set()
     points = 0
@@ -371,7 +390,7 @@ def build_fingerprint(answers: dict[str, str]) -> dict[str, Any]:
         roles.update(option.get("roles", ()))
         dependencies.update(option.get("dependencies", ()))
         points += option["points"]
-    if answers["data"] == "kafka_mirror":
+    if answers["data"] == "event_sync":
         roles.add("data-engineer")
     complexity = "high" if points >= 4 else "medium" if points >= 2 else "low"
     return {
@@ -507,7 +526,7 @@ def evaluate_intake(
     fingerprint = build_fingerprint(validated)
     matches = match_analogs(connection, fingerprint)
     if not matches:
-        raise IntakeError("No historical analogs are loaded. Click Simulate 5 sprints on the SENSE tab first.")
+        raise IntakeError("No historical analogs are loaded. Click Simulate next sprint on the SENSE tab first.")
     rom = build_rom(matches)
     commitment = build_commitment(connection, matches, rom, as_of or date.today())
     return {

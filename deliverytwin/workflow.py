@@ -83,22 +83,22 @@ def _stage_result(stage: str, report: dict[str, Any]) -> dict[str, Any]:
         {
             "id": "B",
             "title": "OPTION B · Squad reallocation",
-            "description": "Moves capacity from Audit Reporting.",
+            "description": "Moves capacity from Product Analytics.",
             "cost": "$0",
             "confidence_pct": min(95, on_time_pct + 16),
-            "tradeoff": "Audit +4 weeks",
+            "tradeoff": "Analytics +4 weeks",
         },
         {
             "id": "C",
             "title": "OPTION C · Phase + unblock",
             "description": (
-                "Defer cold archive, fast-track CAB, and shield the lead engineer."
+                "Defer historical profile enrichment, fast-track privacy review, and shield the lead engineer."
                 if has_blocker
                 else "Phase remaining scope and protect the critical delivery capacity."
             ),
             "cost": "$0",
             "confidence_pct": min(95, on_time_pct + (22 if has_blocker else 10)),
-            "tradeoff": "Cold archive deferred",
+            "tradeoff": "Historical profile enrichment deferred",
         },
     ]
     recommended_option = (
@@ -117,7 +117,7 @@ def _stage_result(stage: str, report: dict[str, Any]) -> dict[str, Any]:
     if recommended_option == "A":
         actions = {
             "milestone": (
-                f"Keep the {initiative['target_end']} API gateway target; Sprint "
+                f"Keep the Customer 360 delivery target of {initiative['target_end']}; Sprint "
                 f"{sprint_number} is forecast at {on_time_pct}% on-time confidence."
             ),
             "azure_devops": (
@@ -125,9 +125,9 @@ def _stage_result(stage: str, report: dict[str, Any]) -> dict[str, Any]:
                 "capacity without dropping committed scope."
             ),
             "servicenow": (
-                f"Confirm the Kafka mirror CAB decision date; the blocker is "
+                f"Confirm the customer identity-matching CAB decision date; the blocker is "
                 f"{blocker_age} days old."
-                if has_blocker else "No active Kafka CAB blocker; monitor new dependencies."
+                if has_blocker else "No active customer profile change blocker; monitor new dependencies."
             ),
             "workforce": (
                 f"Onboard contractors to cover {support_hours:g}h/week of production "
@@ -137,7 +137,7 @@ def _stage_result(stage: str, report: dict[str, Any]) -> dict[str, Any]:
     elif recommended_option == "B":
         actions = {
             "milestone": (
-                f"Reforecast the API gateway for Sprint {sprint_number}: "
+                f"Reforecast the Customer 360 profile target for Sprint {sprint_number}: "
                 f"{projected_slip_days} days of projected slip."
             ),
             "azure_devops": (
@@ -145,37 +145,37 @@ def _stage_result(stage: str, report: dict[str, Any]) -> dict[str, Any]:
                 "unplanned points against committed scope."
             ),
             "servicenow": (
-                f"Get a dated CAB decision for the Kafka mirror ({blocker_age} days open)."
-                if has_blocker else "No active Kafka CAB blocker; monitor for new dependencies."
+                f"Get a dated CAB decision for customer identity matching ({blocker_age} days open)."
+                if has_blocker else "No active customer profile change blocker; monitor new dependencies."
             ),
             "workforce": (
-                f"Move capacity from Audit Reporting and cover {support_hours:g}h/week "
-                "of production support outside the Auto-Pay squad."
+                f"Move capacity from Product Analytics and cover {support_hours:g}h/week "
+                "of production support outside the Customer 360 squad."
             ),
         }
     else:
         if unplanned_points >= 64:
             scope_action = (
-                f"Freeze new intake and defer cold archive; {unplanned_points:g} "
+                f"Freeze new source intake and defer historical enrichment; {unplanned_points:g} "
                 "unplanned points are beyond the sprint's delivery capacity."
             )
         else:
             scope_action = (
-                f"Defer cold archive and prioritize the {unplanned_points:g} "
+                f"Defer historical enrichment and prioritize the {unplanned_points:g} "
                 "unplanned points on the critical delivery path."
             )
         if blocker_age >= 14:
             blocker_action = (
-                f"Escalate the Kafka production-mirror CAB blocker ({blocker_age} days) "
+                f"Escalate the customer identity-matching CAB blocker ({blocker_age} days) "
                 "to its sponsor for a decision before the next sprint."
             )
         elif has_blocker:
             blocker_action = (
-                f"Secure an owner and decision date for the Kafka production-mirror "
+                f"Secure an owner and decision date for the customer identity-matching "
                 f"CAB request ({blocker_age} days open)."
             )
         else:
-            blocker_action = "No active Kafka CAB blocker; monitor for new dependencies."
+            blocker_action = "No active customer profile change blocker; monitor new dependencies."
         if support_hours >= 16 or incident_count >= 3:
             workforce_action = (
                 f"Start a dedicated P1 rotation for {incident_count} incidents and "
@@ -190,7 +190,7 @@ def _stage_result(stage: str, report: dict[str, Any]) -> dict[str, Any]:
             workforce_action += f" Reserve {pto_hours:g}h for approved PTO."
         actions = {
             "milestone": (
-                f"Rebaseline the shared API gateway for Sprint {sprint_number}: "
+                f"Rebaseline the Customer 360 delivery target for Sprint {sprint_number}: "
                 f"{on_time_pct}% on-time confidence and {projected_slip_days} projected "
                 "slip days."
             ),

@@ -68,7 +68,7 @@ def _upsert_many(
 
 
 def seed_demo(connection: sqlite3.Connection, as_of: date | None = None) -> dict[str, Any]:
-    """Load the pitch's synthetic five-system scenario; no live connectors or write-back."""
+    """Load the synthetic Customer 360 source-system scenario."""
     initialize_database(connection)
     demo_date = as_of or date.today()
     opened_nine_days_ago = (demo_date - timedelta(days=9)).isoformat()
@@ -81,7 +81,7 @@ def seed_demo(connection: sqlite3.Connection, as_of: date | None = None) -> dict
             "delivery_initiatives",
             ("id", "name", "portfolio", "planned_start", "target_end", "baseline_p50_hours",
              "baseline_p80_hours", "integration_buffer_pct", "initial_confidence_pct"),
-            [(INITIATIVE_ID, "Auto-Pay Modernization", "Q2 Auto-Pay Modernization",
+            [(INITIATIVE_ID, "Customer 360", "Q4 value stream",
               demo_date.isoformat(), target_date, 4450, 4950, 14, 84)],
             ("name", "portfolio", "planned_start", "target_end", "baseline_p50_hours",
              "baseline_p80_hours", "integration_buffer_pct", "initial_confidence_pct"),
@@ -90,16 +90,25 @@ def seed_demo(connection: sqlite3.Connection, as_of: date | None = None) -> dict
             connection,
             "people",
             ("id", "display_name", "active"),
-            [("lead-engineer", "Lead Engineer", 1),
-             ("data-engineer", "Data Engineer", 1),
-             ("delivery-engineer", "Delivery Engineer", 1)],
+            [("lead-engineer", "Customer 360 Lead", 1),
+             ("data-engineer", "Customer Data Engineer", 1),
+             ("delivery-engineer", "CRM Integration Engineer", 1),
+             ("privacy-engineer", "Customer Privacy Engineer", 1)],
             ("display_name", "active"),
         )
+        connection.execute("DELETE FROM person_skills WHERE skill_id = 'kafka'")
+        connection.execute("DELETE FROM oracle_worker_skills WHERE skill_id = 'kafka'")
+        connection.execute("DELETE FROM skills WHERE id = 'kafka'")
         _upsert_many(
             connection,
             "skills",
             ("id", "name"),
-            [("data-engineering", "Data Engineering"), ("kafka", "Kafka"), ("azure", "Azure")],
+            [("data-engineering", "Data Engineering"),
+             ("customer-data-management", "Customer Data Management"),
+             ("identity-resolution", "Identity Resolution"),
+             ("crm-integration", "CRM Integration"),
+             ("privacy-review", "Customer Privacy Review"),
+             ("azure", "Azure")],
             ("name",),
         )
         connection.executemany(
@@ -108,14 +117,18 @@ def seed_demo(connection: sqlite3.Connection, as_of: date | None = None) -> dict
             ON CONFLICT(person_id, skill_id) DO UPDATE SET proficiency=excluded.proficiency
             """,
             [("data-engineer", "data-engineering", "senior"),
-             ("data-engineer", "kafka", "senior"),
+             ("data-engineer", "customer-data-management", "senior"),
+             ("data-engineer", "identity-resolution", "senior"),
+             ("delivery-engineer", "crm-integration", "senior"),
+             ("privacy-engineer", "privacy-review", "senior"),
+             ("privacy-engineer", "customer-data-management", "intermediate"),
              ("lead-engineer", "azure", "senior")],
         )
         _upsert_many(
             connection,
             "delivery_milestones",
             ("id", "initiative_id", "name", "target_date", "status"),
-            [("shared-api-gateway", INITIATIVE_ID, "Shared API gateway", target_date, "at_risk")],
+            [("shared-api-gateway", INITIATIVE_ID, "", target_date, "at_risk")],
             ("name", "target_date", "status"),
         )
 
@@ -130,16 +143,16 @@ def seed_demo(connection: sqlite3.Connection, as_of: date | None = None) -> dict
             connection,
             "planview_milestones",
             ("external_id", "initiative_id", "name", "baseline_date", "status"),
-            [("PV-MS-API", INITIATIVE_ID, "Shared API gateway", target_date, "at_risk")],
+            [("PV-MS-API", INITIATIVE_ID, "", target_date, "at_risk")],
             ("name", "baseline_date", "status"),
         )
         _upsert_many(
             connection,
             "planview_resource_assignments",
             ("external_id", "initiative_id", "person_id", "role_name", "allocated_fte"),
-            [("PV-RES-LEAD", INITIATIVE_ID, "lead-engineer", "Lead Engineer", 2.5),
-             ("PV-RES-DATA", INITIATIVE_ID, "data-engineer", "Data Engineer", 2.5),
-             ("PV-RES-DELIVERY", INITIATIVE_ID, "delivery-engineer", "Delivery Engineer", 2.5)],
+            [("PV-RES-LEAD", INITIATIVE_ID, "lead-engineer", "Customer 360 Lead", 2.5),
+             ("PV-RES-DATA", INITIATIVE_ID, "data-engineer", "Customer Data Engineer", 2.5),
+             ("PV-RES-DELIVERY", INITIATIVE_ID, "delivery-engineer", "CRM Integration Engineer", 2.5)],
             ("person_id", "role_name", "allocated_fte"),
         )
 
@@ -147,7 +160,7 @@ def seed_demo(connection: sqlite3.Connection, as_of: date | None = None) -> dict
             connection,
             "ado_projects",
             ("external_id", "initiative_id", "name"),
-            [("ADO-AUTO", INITIATIVE_ID, "Auto-Pay Modernization")],
+            [("ADO-AUTO", INITIATIVE_ID, "Customer 360")],
             ("initiative_id", "name"),
         )
         sprint_start = (demo_date - timedelta(days=7)).isoformat()
@@ -161,7 +174,7 @@ def seed_demo(connection: sqlite3.Connection, as_of: date | None = None) -> dict
         )
         unplanned_items = [
             (f"ADO-WI-{index:03d}", "ADO-AUTO", "ADO-SPRINT-DEMO",
-             f"Legacy adapter work item {index}", "User Story", "New",
+             f"Customer profile source integration work item {index}", "User Story", "New",
              5 if index <= 8 else 4, 1)
             for index in range(1, 15)
         ]
@@ -181,7 +194,7 @@ def seed_demo(connection: sqlite3.Connection, as_of: date | None = None) -> dict
             ("external_id", "initiative_id", "assignee_person_id", "priority", "state",
              "short_description", "opened_at"),
             [("INC-P1-001", INITIATIVE_ID, "lead-engineer", 1, "in_progress",
-              "Recurring P1 production support", opened_nine_days_ago)],
+              "Customer profile reconciliation P1 incident", opened_nine_days_ago)],
             ("assignee_person_id", "priority", "state", "short_description", "opened_at"),
         )
         _upsert_many(
@@ -189,7 +202,7 @@ def seed_demo(connection: sqlite3.Connection, as_of: date | None = None) -> dict
             "servicenow_change_requests",
             ("external_id", "initiative_id", "short_description", "state", "opened_at",
              "planned_start", "is_blocking"),
-            [("CHG-KAFKA-001", INITIATIVE_ID, "Kafka production mirror", "cab_review",
+            [("CHG-C360-001", INITIATIVE_ID, "Customer identity matching rules deployment", "cab_review",
               opened_nine_days_ago, None, 1)],
             ("short_description", "state", "opened_at", "planned_start", "is_blocking"),
         )
@@ -198,9 +211,10 @@ def seed_demo(connection: sqlite3.Connection, as_of: date | None = None) -> dict
             connection,
             "oracle_workers",
             ("external_id", "person_id", "department", "job_title", "worker_status"),
-            [("ORCL-EMP-1001", "lead-engineer", "Engineering", "Lead Engineer", "active"),
-             ("ORCL-EMP-1002", "data-engineer", "Engineering", "Data Engineer", "active"),
-             ("ORCL-EMP-1003", "delivery-engineer", "Engineering", "Delivery Engineer", "active")],
+            [("ORCL-EMP-1001", "lead-engineer", "Customer 360", "Customer 360 Lead", "active"),
+             ("ORCL-EMP-1002", "data-engineer", "Customer Data", "Customer Data Engineer", "active"),
+             ("ORCL-EMP-1003", "delivery-engineer", "Customer Platforms", "CRM Integration Engineer", "active"),
+             ("ORCL-EMP-1004", "privacy-engineer", "Data Governance", "Customer Privacy Engineer", "active")],
             ("person_id", "department", "job_title", "worker_status"),
         )
         connection.executemany(
@@ -210,7 +224,11 @@ def seed_demo(connection: sqlite3.Connection, as_of: date | None = None) -> dict
             ON CONFLICT(worker_external_id, skill_id) DO UPDATE SET proficiency=excluded.proficiency
             """,
             [("ORCL-EMP-1002", "data-engineering", "senior"),
-             ("ORCL-EMP-1002", "kafka", "senior"),
+             ("ORCL-EMP-1002", "customer-data-management", "senior"),
+             ("ORCL-EMP-1002", "identity-resolution", "senior"),
+             ("ORCL-EMP-1003", "crm-integration", "senior"),
+             ("ORCL-EMP-1004", "privacy-review", "senior"),
+             ("ORCL-EMP-1004", "customer-data-management", "intermediate"),
              ("ORCL-EMP-1001", "azure", "senior")],
         )
         connection.executemany(
@@ -224,7 +242,8 @@ def seed_demo(connection: sqlite3.Connection, as_of: date | None = None) -> dict
              ("azure_devops", "initiative", "ADO-AUTO", INITIATIVE_ID),
              ("oracle_hcm", "person", "ORCL-EMP-1001", "lead-engineer"),
              ("oracle_hcm", "person", "ORCL-EMP-1002", "data-engineer"),
-             ("oracle_hcm", "person", "ORCL-EMP-1003", "delivery-engineer")],
+             ("oracle_hcm", "person", "ORCL-EMP-1003", "delivery-engineer"),
+             ("oracle_hcm", "person", "ORCL-EMP-1004", "privacy-engineer")],
         )
 
         _upsert_many(
@@ -293,7 +312,7 @@ def _seed_simulated_sprints(
         connection.execute(
             """
             UPDATE servicenow_change_requests SET state = 'closed', is_blocking = 0
-            WHERE external_id = 'CHG-KAFKA-001'
+            WHERE external_id = 'CHG-C360-001'
             """
         )
 
@@ -317,7 +336,7 @@ def _seed_simulated_sprints(
                  "work_item_type", "state", "story_points", "is_unplanned"),
                 [
                     (f"ADO-SIM-WI-{sprint_number:03d}-{index:03d}", "ADO-AUTO", sprint_id,
-                     f"Sprint {sprint_number} unplanned adapter item {index}",
+                     f"Sprint {sprint_number} customer profile work item {index}",
                      "User Story", "Done" if sprint_number < sprints else "New", 4, 1)
                     for index in range(1, sprint_number * 4 + 1)
                 ],
@@ -341,7 +360,7 @@ def _seed_simulated_sprints(
                 [
                     (f"INC-SIM-SPRINT-{sprint_number:03d}-{index:02d}", INITIATIVE_ID,
                      "lead-engineer", 1, "in_progress",
-                     f"Sprint {sprint_number} simulated production incident {index}",
+                     f"Sprint {sprint_number} customer profile sync incident {index}",
                      (sprint_start + timedelta(days=2)).isoformat())
                     for index in range(1, incident_count + 1)
                 ],
@@ -355,7 +374,7 @@ def _seed_simulated_sprints(
                 ("external_id", "initiative_id", "short_description", "state", "opened_at",
                  "planned_start", "is_blocking"),
                 [(f"CHG-SIM-SPRINT-{sprint_number:03d}", INITIATIVE_ID,
-                  f"Sprint {sprint_number} Kafka production mirror",
+                  f"Sprint {sprint_number} customer identity matching rules",
                   "cab_review",
                   (sprint_end - timedelta(days=change_age_days)).isoformat(),
                   None, 1)],
@@ -617,6 +636,7 @@ def build_report(connection: sqlite3.Connection, as_of: date | None = None) -> d
         "initiative": {
             "id": initiative["id"],
             "name": initiative["name"],
+            "portfolio": initiative["portfolio"],
             "baseline_p50_hours": initiative["baseline_p50_hours"],
             "baseline_p80_hours": initiative["baseline_p80_hours"],
             "integration_buffer_pct": initiative["integration_buffer_pct"],

@@ -239,9 +239,9 @@
   <main>
     <div class="heading">
       <div>
-        <div class="eyebrow">Portfolio / Q2 value stream</div>
-        <h1 id="initiative-name">Auto-Pay Modernization</h1>
-        <div class="subtitle">Delivery outlook · Shared API gateway milestone</div>
+        <div class="eyebrow" id="portfolio-label">Portfolio</div>
+        <h1 id="initiative-name">Delivery Twin</h1>
+        <div class="subtitle"></div>
       </div>
       <div class="date-pill" id="as-of">Loading report…</div>
     </div>
@@ -262,12 +262,11 @@
     </div>
     <section id="panel-shape" class="stage-panel" role="tabpanel" aria-labelledby="tab-shape" tabindex="0">
       <div class="stage-intro"><div><h2>Shape the commitment</h2><p>Approved baseline, effort range, assumptions, and delivery capacity.</p></div><div class="shape-actions"><button id="clear-all-data" class="intake-btn danger" type="button">Clear all demo data</button><span id="clear-data-status" class="sim-status" role="status"></span><span class="badge" id="shape-stage-status">INTAKE IN PROGRESS</span></div></div>
-      <div class="awaiting" role="status">Delivery metrics are blank until you click <strong>Simulate next sprint</strong> on the SENSE tab. The intake form below works at any time.</div>
       <section class="card intake" id="intake" aria-labelledby="intake-title">
-        <div class="card-head"><div><h3 class="card-title" id="intake-title">New project intake</h3><div class="card-kicker">Messy request → clarified fingerprint → explainable ROM → approved baseline</div></div><span class="badge" id="intake-step-badge">STEP 1 OF 5</span></div>
+        <div class="card-head"><div><h3 class="card-title" id="intake-title">Intake request</h3><div class="card-kicker">Intake request → clarified fingerprint → explainable ROM → approved baseline</div></div><span class="badge" id="intake-step-badge">STEP 1 OF 5</span></div>
         <div class="intake-body">
           <div class="intake-step" id="intake-step-1">
-            <h4 class="step-title"><span class="step-num">1</span>Messy intake</h4>
+            <h4 class="step-title"><span class="step-num">1</span>Intake request</h4>
             <p class="step-help">Paste a vague request the way it arrives from the business.</p>
             <textarea id="intake-text" class="intake-text" maxlength="2000" aria-label="Project request" placeholder="Describe the project request…"></textarea>
             <div class="intake-actions">
@@ -332,8 +331,8 @@
         <section class="card full">
           <div class="card-head"><div><h3 class="card-title">Commitment assumptions</h3><div class="card-kicker">Visible inputs used to shape the plan</div></div></div>
           <div class="detail-list">
-            <div class="detail-row"><span>Scope pattern</span><strong>Legacy adapters and shared API gateway</strong></div>
-            <div class="detail-row"><span>Critical capability</span><strong>Data engineering / Kafka</strong></div>
+            <div class="detail-row"><span>Scope pattern</span><strong>Customer profiles across CRM, commerce, and service</strong></div>
+            <div class="detail-row"><span>Critical capability</span><strong>Identity resolution / privacy controls</strong></div>
             <div class="detail-row"><span>Delivery guardrail</span><strong>Approve only with visible capacity and confidence</strong></div>
           </div>
         </section>
@@ -353,7 +352,7 @@
           <div class="risk-list">
             <div class="risk-row"><span class="risk-dot"></span><div><strong>Capacity drain · UKG / ServiceNow</strong><span><b id="support-hours">16h</b> / week pulled into P1 production support</span></div></div>
             <div class="risk-row"><span class="risk-dot"></span><div><strong>Scope growth · Azure DevOps</strong><span><b id="story-count">14 stories</b> and <b id="scope-points">64 pts</b> added outside the baseline</span></div></div>
-            <div class="risk-row"><span class="risk-dot"></span><div><strong>Environment blocker · ServiceNow</strong><span>Kafka production mirror in CAB for <b id="change-age">9 days</b></span></div></div>
+            <div class="risk-row"><span class="risk-dot"></span><div><strong>Environment blocker · ServiceNow</strong><span>Customer identity-matching change in CAB for <b id="change-age">9 days</b></span></div></div>
             <div class="risk-row"><span class="risk-dot"></span><div><strong>Approved time away · UKG</strong><span><b id="pto-hours">40h</b> PTO recorded for lead engineer</span></div></div>
           </div>
         </section>
@@ -393,14 +392,14 @@
               <div class="mini-metric"><strong id="forecast-capacity">—</strong><span>Allocated / available FTE</span></div>
             </div>
           </div>
-          <div class="forecast-callout"><strong>Portfolio ripple · Shared API gateway</strong><p id="forecast-ripple">The projected slip is reflected in the shared API gateway outlook.</p></div>
+          <div class="forecast-callout"><strong>Portfolio ripple · Customer profile delivery</strong><p id="forecast-ripple">The projected slip is reflected in the Customer 360 delivery outlook.</p></div>
         </section>
         <section class="card narrow">
           <div class="card-head"><div><h3 class="card-title">Explainable drivers</h3><div class="card-kicker">Signals propagated into outlook</div></div></div>
           <div class="risk-list">
             <div class="risk-row"><span class="risk-dot"></span><div><strong>Workforce drain</strong><span>Support load and approved time off reduce effective capacity.</span></div></div>
-            <div class="risk-row"><span class="risk-dot"></span><div><strong>Scope growth</strong><span>Unplanned legacy adapters consume sprint capacity.</span></div></div>
-            <div class="risk-row"><span class="risk-dot"></span><div><strong>CAB delay</strong><span>Kafka environment dependency remains unresolved.</span></div></div>
+            <div class="risk-row"><span class="risk-dot"></span><div><strong>Scope growth</strong><span>Unplanned customer profile integrations consume sprint capacity.</span></div></div>
+            <div class="risk-row"><span class="risk-dot"></span><div><strong>Change approval delay</strong><span>Customer identity-matching rules are awaiting CAB review.</span></div></div>
           </div>
         </section>
         <section class="card full">
@@ -427,16 +426,16 @@
               <div class="option-metric"><span>Trade-off</span><strong id="act-tradeoff-a">One-sprint onboarding</strong></div>
             </div>
             <div class="option" id="act-option-b">
-              <div class="option-name"><strong id="act-title-b">OPTION B · Squad reallocation</strong><span id="act-description-b">Moves capacity from Audit Reporting.</span></div>
+              <div class="option-name"><strong id="act-title-b">OPTION B · Squad reallocation</strong><span id="act-description-b">Moves capacity from Product Analytics.</span></div>
               <div class="option-metric"><span>Incremental cost</span><strong id="act-cost-b">$0</strong></div>
               <div class="option-metric"><span>Confidence</span><strong id="act-confidence-b">—</strong></div>
-              <div class="option-metric"><span>Trade-off</span><strong id="act-tradeoff-b">Audit +4 weeks</strong></div>
+              <div class="option-metric"><span>Trade-off</span><strong id="act-tradeoff-b">Analytics +4 weeks</strong></div>
             </div>
             <div class="option" id="act-option-c">
-              <div class="option-name"><strong id="act-title-c">OPTION C · Phase + unblock</strong><span id="act-description-c">Phase remaining scope and protect critical capacity.</span></div>
+              <div class="option-name"><strong id="act-title-c">OPTION C · Phase + unblock</strong><span id="act-description-c">Defer historical profile enrichment and protect critical capacity.</span></div>
               <div class="option-metric"><span>Incremental cost</span><strong id="act-cost-c">$0</strong></div>
               <div class="option-metric"><span>Confidence</span><strong id="act-confidence-c">—</strong></div>
-              <div class="option-metric"><span>Trade-off</span><strong id="act-tradeoff-c">Cold archive deferred</strong></div>
+              <div class="option-metric"><span>Trade-off</span><strong id="act-tradeoff-c">Historical profile enrichment deferred</strong></div>
             </div>
           </div>
           <p class="approval-note" id="act-note">The recommendation is advisory. No option is approved and no source-system write-back occurs.</p>
@@ -522,6 +521,7 @@
         const act = report.workflow.stages.act;
         const sprintNumber = report.simulation.sprints_advanced;
         byId("initiative-name").textContent = initiative.name;
+        byId("portfolio-label").textContent = `Portfolio / ${initiative.portfolio}`;
         byId("as-of").textContent = `AS OF ${report.as_of} · +${report.simulation.sprints_advanced} SPRINTS`;
         byId("workflow-status").textContent = `AGENT FRAMEWORK · ${report.workflow.completed_stages.length}/4 STAGES`;
         byId("forecast-title").textContent = `Sprint ${sprintNumber} delivery outlook`;
@@ -530,8 +530,8 @@
         byId("confidence-ring").style.setProperty("--value", `${forecast.on_time_pct}%`);
         byId("forecast-slip").textContent = `+${forecast.projected_slip_days} days`;
         byId("forecast-ripple").textContent = forecast.projected_slip_days
-          ? `The current estimate moves the shared API gateway milestone by about ${forecast.projected_slip_days} days.`
-          : "Current signals keep the shared API gateway milestone on its baseline date.";
+          ? `The current estimate puts the Customer 360 delivery target about ${forecast.projected_slip_days} days at risk.`
+          : "Current signals support the Customer 360 delivery target date.";
         byId("scope-points").textContent = `${signals.unplanned_story_points} pts`;
         byId("forecast-p50").textContent = `${initiative.baseline_p50_hours.toLocaleString()} h`;
         byId("forecast-scope").textContent = `${signals.unplanned_story_points} pts`;
@@ -621,7 +621,7 @@
         button.disabled = false;
       }
     });
-    const SAMPLE_REQUEST = "We need to modernize the auto-pay platform so customers can schedule payments faster. The legacy stuff is slow and we need it done by end of Q1.";
+    const SAMPLE_REQUEST = "We need one view of every customer across the business. Teams get different answers, and leadership wants this fixed soon.";
     const intake = { text: "", analysis: null, result: null };
     const intakeSteps = [1, 2, 3, 4, 5].map((n) => byId(`intake-step-${n}`));
 
