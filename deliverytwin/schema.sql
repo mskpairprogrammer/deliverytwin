@@ -211,6 +211,41 @@ CREATE TABLE IF NOT EXISTS historical_lessons (
     suggested_option TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS historical_projects (
+    project_id TEXT PRIMARY KEY,
+    project_name TEXT NOT NULL,
+    description TEXT NOT NULL,
+    technologies TEXT NOT NULL,
+    integrations INTEGER NOT NULL CHECK (integrations >= 0),
+    team_size INTEGER NOT NULL CHECK (team_size > 0),
+    planned_duration_weeks INTEGER NOT NULL CHECK (planned_duration_weeks > 0),
+    actual_duration_weeks INTEGER NOT NULL CHECK (actual_duration_weeks > 0),
+    planned_effort_hours INTEGER NOT NULL CHECK (planned_effort_hours > 0),
+    actual_effort_hours INTEGER NOT NULL CHECK (actual_effort_hours > 0),
+    outcome TEXT NOT NULL,
+    lessons_learned TEXT NOT NULL,
+    structure TEXT,
+    complexity TEXT CHECK (complexity IS NULL OR complexity IN ('low', 'medium', 'high')),
+    systems TEXT,
+    roles TEXT,
+    dependencies TEXT,
+    delivery_pattern TEXT,
+    base_p50_hours REAL CHECK (base_p50_hours IS NULL OR base_p50_hours >= 0),
+    base_p80_hours REAL CHECK (base_p80_hours IS NULL OR base_p80_hours >= base_p50_hours),
+    integration_buffer_pct REAL CHECK (integration_buffer_pct IS NULL OR integration_buffer_pct >= 0),
+    on_time_confidence_pct REAL CHECK (
+        on_time_confidence_pct IS NULL OR on_time_confidence_pct BETWEEN 0 AND 100
+    )
+);
+
+CREATE TABLE IF NOT EXISTS historical_project_lessons (
+    id TEXT PRIMARY KEY,
+    project_id TEXT NOT NULL REFERENCES historical_projects(project_id),
+    category TEXT NOT NULL CHECK (category IN ('architecture', 'data', 'security', 'reuse')),
+    lesson TEXT NOT NULL,
+    suggested_option TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS baseline_approvals (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     request_text TEXT NOT NULL,
@@ -224,6 +259,25 @@ CREATE TABLE IF NOT EXISTS baseline_approvals (
     target_date TEXT NOT NULL,
     confidence_pct REAL NOT NULL,
     approved_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS recovery_scenarios (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    initiative_id TEXT NOT NULL REFERENCES delivery_initiatives(id),
+    recommended_option TEXT NOT NULL,
+    allocated_fte REAL NOT NULL CHECK (allocated_fte >= 0),
+    scope_defer_pct INTEGER NOT NULL CHECK (scope_defer_pct BETWEEN 0 AND 100),
+    target_date TEXT NOT NULL,
+    incremental_cost_k REAL NOT NULL CHECK (incremental_cost_k >= 0),
+    confidence_pct INTEGER NOT NULL CHECK (confidence_pct BETWEEN 0 AND 100),
+    saved_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS recovery_target_updates (
+    scenario_id INTEGER NOT NULL REFERENCES recovery_scenarios(id) ON DELETE CASCADE,
+    source_key TEXT NOT NULL REFERENCES source_systems(source_key),
+    payload_json TEXT NOT NULL,
+    PRIMARY KEY (scenario_id, source_key)
 );
 
 CREATE INDEX IF NOT EXISTS idx_ingestion_runs_source_time

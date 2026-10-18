@@ -22,7 +22,12 @@ SOURCE_SYSTEMS = {
     "ukg_wfm": ("UKG Pro WFM", ("ukg_shifts", "ukg_time_entries", "ukg_pto_requests")),
 }
 MAX_CHAT_REQUEST_BYTES = 16_384
-INTAKE_POST_ROUTES = ("/api/intake/analyze", "/api/intake/evaluate", "/api/intake/approve")
+MAX_INTAKE_REQUEST_BYTES = 7_500_000
+INTAKE_POST_ROUTES = (
+    "/api/intake/analyze", "/api/intake/evaluate", "/api/intake/approve", "/api/intake/what-if",
+    "/api/intake/forecast",
+)
+ACT_POST_ROUTES = ("/api/act/what-if", "/api/act/apply")
 MAX_CHAT_QUESTION_LENGTH = 1_200
 logger = logging.getLogger(__name__)
 
@@ -653,6 +658,7 @@ def build_report(connection: sqlite3.Connection, as_of: date | None = None) -> d
         "collision_detected": collision_detected,
         "connectors": source_modes,
         "writeback_performed": False,
+        "recovery_scenario": _latest_recovery_scenario(connection),
         **({"simulation": simulation} if simulation else {}),
     }
 
@@ -668,6 +674,71 @@ def build_workflow_report(
 
 def _write_json(payload: dict[str, Any]) -> None:
     print(json.dumps(payload, indent=2))
+
+
+def _latest_recovery_scenario(connection: sqlite3.Connection) -> dict[str, Any] | None:
+    row = connection.execute(
+        "SELECT * FROM recovery_scenarios ORDER BY id DESC LIMIT 1"
+    ).fetchone()
+    if row is None:
+        return None
+    scenario = dict(row)
+    scenario["target_updates"] = [
+        {
+            "source_key": update["source_key"],
+            "system_name": SOURCE_SYSTEMS[update["source_key"]][0],
+            "payload": json.loads(update["payload_json"]),
+        }
+        for update in connection.execute(
+            "SELECT source_key, payload_json FROM recovery_target_updates "
+            "WHERE scenario_id = ? ORDER BY source_key",
+            (row["id"],),
+        )
+    ]
+    scenario["confidence_method"] = (
+        "Illustrative adjustment to the current forecast: +5 points per additional FTE, "
+        "+0.2 per deferred scope point, and +0.15 per target-date day moved later; bounded to 5–95%."
+    )
+    scenario["status"] = "simulated_updates_persisted"
+    scenario["writeback_performed"] = False
+    return scenario
+
+
+def save_recovery_scenario(
+    connection: sqlite3.Connection, scenario: dict[str, Any]
+) -> dict[str, Any]:
+    """Persist a recovery what-if and its simulated per-system update records in SQLite."""
+    saved_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    with connection:
+        cursor = connection.execute(
+            """
+            INSERT INTO recovery_scenarios
+                (initiative_id, recommended_option, allocated_fte, scope_defer_pct,
+                 target_date, incremental_cost_k, confidence_pct, saved_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                scenario["initiative_id"],
+                scenario["recommended_option"],
+                scenario["allocated_fte"],
+                scenario["scope_defer_pct"],
+                scenario["target_date"],
+                scenario["incremental_cost_k"],
+                scenario["confidence_pct"],
+                saved_at,
+            ),
+        )
+        connection.executemany(
+            """
+            INSERT INTO recovery_target_updates (scenario_id, source_key, payload_json)
+            VALUES (?, ?, ?)
+            """,
+            [
+                (cursor.lastrowid, update["source_key"], json.dumps(update["payload"]))
+                for update in scenario["target_updates"]
+            ],
+        )
+    return _latest_recovery_scenario(connection) or {}
 
 
 def serve_dashboard(database: str | Path, host: str, port: int) -> None:
@@ -751,7 +822,7 @@ def serve_dashboard(database: str | Path, host: str, port: int) -> None:
             self.end_headers()
             self.wfile.write(body)
 
-        def read_json_object(self) -> dict[str, Any] | None:
+        def read_json_object(self, max_bytes: int = MAX_CHAT_REQUEST_BYTES) -> dict[str, Any] | None:
             """Validate and parse a JSON object body; sends the error response and returns None on failure."""
             if self.headers.get_content_type() != "application/json":
                 self.send_json(415, {"error": "Content-Type must be application/json."})
@@ -768,7 +839,7 @@ def serve_dashboard(database: str | Path, host: str, port: int) -> None:
             if body_length <= 0:
                 self.send_json(400, {"error": "Request body must not be empty."})
                 return None
-            if body_length > MAX_CHAT_REQUEST_BYTES:
+            if body_length > max_bytes:
                 self.send_json(413, {"error": "Request is too large."})
                 return None
             try:
@@ -782,22 +853,56 @@ def serve_dashboard(database: str | Path, host: str, port: int) -> None:
             return payload
 
         def handle_intake(self, route: str, payload: dict[str, Any]) -> None:
-            from .intake import analyze_intake, approve_baseline, evaluate_intake
+            from .intake import (
+                analyze_intake, approve_baseline, evaluate_intake, forecast_from_history, simulate_rom,
+            )
 
             try:
                 with connect(database) as connection:
                     # Intake needs reference history and capacity; load them on demand after a clear.
                     if not connection.execute(
-                        "SELECT EXISTS(SELECT 1 FROM historical_initiatives) "
+                        "SELECT EXISTS(SELECT 1 FROM historical_projects) "
+                        "AND EXISTS(SELECT 1 FROM historical_project_lessons) "
                         "AND EXISTS(SELECT 1 FROM planview_projects)"
                     ).fetchone()[0]:
                         seed_demo(connection)
                     if route == "/api/intake/analyze":
-                        result = analyze_intake(connection, payload.get("text"))
+                        result = analyze_intake(connection, payload.get("text"), payload.get("documents"))
+                    elif route == "/api/intake/forecast":
+                        result = forecast_from_history(
+                            connection, payload.get("text"), payload.get("answers"),
+                            documents=payload.get("documents"),
+                        )
+                    elif route == "/api/intake/what-if":
+                        evaluation = evaluate_intake(
+                            connection, payload.get("text"), payload.get("answers"),
+                            documents=payload.get("documents"),
+                        )
+                        commitment = evaluation["commitment"]
+                        available_hours = (
+                            commitment["allocated_fte"]
+                            * commitment["weeks_to_target"]
+                            * commitment["hours_per_fte_week"]
+                        )
+                        result = {
+                            "simulation": simulate_rom(
+                                evaluation["matches"],
+                                payload.get("scope_change_pct", 0),
+                                available_hours,
+                            )
+                        }
                     elif route == "/api/intake/evaluate":
-                        result = evaluate_intake(connection, payload.get("text"), payload.get("answers"))
+                        result = evaluate_intake(
+                            connection, payload.get("text"), payload.get("answers"),
+                            documents=payload.get("documents"),
+                            adjustments=payload.get("adjustments"),
+                        )
                     else:
-                        result = approve_baseline(connection, payload.get("text"), payload.get("answers"))
+                        result = approve_baseline(
+                            connection, payload.get("text"), payload.get("answers"),
+                            documents=payload.get("documents"),
+                            adjustments=payload.get("adjustments"),
+                        )
             except ValueError as error:
                 self.send_json(400, {"error": str(error)})
                 return
@@ -808,10 +913,15 @@ def serve_dashboard(database: str | Path, host: str, port: int) -> None:
 
         def do_POST(self) -> None:
             route = urlsplit(self.path).path
-            if route not in ("/api/chat", "/api/simulate", "/api/reset-all", *INTAKE_POST_ROUTES):
+            if route not in (
+                "/api/chat", "/api/simulate", "/api/reset-all",
+                *INTAKE_POST_ROUTES, *ACT_POST_ROUTES,
+            ):
                 self.send_error(404, "Not found")
                 return
-            payload = self.read_json_object()
+            payload = self.read_json_object(
+                MAX_INTAKE_REQUEST_BYTES if route in INTAKE_POST_ROUTES else MAX_CHAT_REQUEST_BYTES
+            )
             if payload is None:
                 return
             if route == "/api/reset-all":
@@ -851,6 +961,25 @@ def serve_dashboard(database: str | Path, host: str, port: int) -> None:
                     return
                 except (OSError, sqlite3.Error, RuntimeError) as error:
                     self.send_json(500, {"error": f"Unable to run simulation: {error}"})
+                    return
+                self.send_json(200, result)
+                return
+            if route in ACT_POST_ROUTES:
+                from .recovery import preview_recovery_scenario
+
+                try:
+                    with connect(database) as connection:
+                        if simulation_state(connection) is None:
+                            raise ValueError("Simulate a sprint before creating an ACT recovery scenario.")
+                        report = build_workflow_report(connection)
+                        result = preview_recovery_scenario(report, payload)
+                        if route == "/api/act/apply":
+                            result = save_recovery_scenario(connection, result)
+                except ValueError as error:
+                    self.send_json(400, {"error": str(error)})
+                    return
+                except (OSError, sqlite3.Error, RuntimeError) as error:
+                    self.send_json(500, {"error": f"Unable to process recovery scenario: {error}"})
                     return
                 self.send_json(200, result)
                 return

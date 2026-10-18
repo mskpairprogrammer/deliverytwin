@@ -1,8 +1,16 @@
 import asyncio
+import base64
+import io
+import json
 import os
+import random
 import sqlite3
 import unittest
+from docx import Document
 from datetime import date
+from openpyxl import Workbook
+from pypdf import PdfWriter
+from pypdf.generic import DecodedStreamObject, DictionaryObject, NameObject
 from unittest.mock import patch
 
 from deliverytwin.chat import (
@@ -17,6 +25,10 @@ from deliverytwin.intake import (
     approve_baseline,
     evaluate_intake,
     latest_baseline,
+    forecast_from_history,
+    _llm_rank_projects,
+    retrieve_similar_projects,
+    simulate_rom,
 )
 from deliverytwin import (
     build_report,
@@ -187,6 +199,294 @@ class DeliveryTwinTests(unittest.TestCase):
         self.assertEqual(commitment["confidence_pct"], 84)
         self.assertTrue(commitment["feasible"])
 
+    def test_intake_uses_uploaded_documents_to_rank_analogs(self) -> None:
+        demo_day = date(2026, 10, 17)
+        seed_demo(self.connection, demo_day)
+        docs = [{"name": "notes.md", "kind": "meeting_notes", "text": "Customer identity resolution via CRM events and consent review"}]
+        analysis = analyze_intake(self.connection, VAGUE_REQUEST, docs)
+        self.assertEqual(analysis["retrieval"]["documents_used"], [{"name": "notes.md", "kind": "meeting_notes"}])
+        result = evaluate_intake(self.connection, VAGUE_REQUEST, self._intake_answers(), demo_day, docs)
+        self.assertTrue(any(match["document_terms"] for match in result["matches"]))
+        with self.assertRaises(IntakeError):
+            analyze_intake(self.connection, VAGUE_REQUEST, [{"name": "x", "kind": "bogus", "text": "t"}])
+
+    def test_intake_extracts_pdf_word_and_excel_documents(self) -> None:
+        seed_demo(self.connection, date(2026, 10, 17))
+
+        pdf_writer = PdfWriter()
+        page = pdf_writer.add_blank_page(width=612, height=792)
+        font = pdf_writer._add_object(DictionaryObject({
+            NameObject("/Type"): NameObject("/Font"),
+            NameObject("/Subtype"): NameObject("/Type1"),
+            NameObject("/BaseFont"): NameObject("/Helvetica"),
+        }))
+        page[NameObject("/Resources")] = DictionaryObject({
+            NameObject("/Font"): DictionaryObject({NameObject("/F1"): font})
+        })
+        stream = DecodedStreamObject()
+        stream.set_data(b"BT /F1 12 Tf 72 720 Td (CRM customer identity resolution) Tj ET")
+        page[NameObject("/Contents")] = pdf_writer._add_object(stream)
+        pdf_buffer = io.BytesIO()
+        pdf_writer.write(pdf_buffer)
+
+        word = Document()
+        word.add_paragraph("CRM customer profile consent review")
+        word_buffer = io.BytesIO()
+        word.save(word_buffer)
+
+        workbook = Workbook()
+        workbook.active.append(["CRM", "customer", "event synchronization"])
+        excel_buffer = io.BytesIO()
+        workbook.save(excel_buffer)
+
+        docs = [
+            {"name": "rom.pdf", "kind": "rom", "content_base64": base64.b64encode(pdf_buffer.getvalue()).decode()},
+            {"name": "notes.docx", "kind": "meeting_notes", "content_base64": base64.b64encode(word_buffer.getvalue()).decode()},
+            {"name": "estimate.xlsx", "kind": "rom", "content_base64": base64.b64encode(excel_buffer.getvalue()).decode()},
+        ]
+        analysis = analyze_intake(self.connection, VAGUE_REQUEST, docs)
+        self.assertEqual(
+            analysis["retrieval"]["documents_used"],
+            [
+                {"name": "rom.pdf", "kind": "rom"},
+                {"name": "notes.docx", "kind": "meeting_notes"},
+                {"name": "estimate.xlsx", "kind": "rom"},
+            ],
+        )
+        with self.assertRaisesRegex(IntakeError, "password-protected"):
+            encrypted_writer = PdfWriter()
+            encrypted_writer.add_blank_page(width=612, height=792)
+            encrypted_writer.encrypt("secret")
+            encrypted_buffer = io.BytesIO()
+            encrypted_writer.write(encrypted_buffer)
+            analyze_intake(
+                self.connection,
+                VAGUE_REQUEST,
+                [{"name": "locked.pdf", "kind": "rom", "content_base64": base64.b64encode(encrypted_buffer.getvalue()).decode()}],
+            )
+
+    def test_what_if_simulation_returns_probabilistic_range_and_scope_sensitivity(self) -> None:
+        seed_demo(self.connection, date(2026, 10, 17))
+        matches = evaluate_intake(
+            self.connection, VAGUE_REQUEST, self._intake_answers(), date(2026, 10, 17)
+        )["matches"]
+        baseline = simulate_rom(matches, capacity_hours=6_000, rng=random.Random(17))
+        expanded_scope = simulate_rom(matches, 20, capacity_hours=6_000, rng=random.Random(17))
+
+        self.assertEqual(baseline["runs"], 10_000)
+        self.assertLessEqual(baseline["p10_hours"], baseline["p50_hours"])
+        self.assertLessEqual(baseline["p50_hours"], baseline["p80_hours"])
+        self.assertLessEqual(baseline["p80_hours"], baseline["p90_hours"])
+        self.assertGreater(expanded_scope["p50_hours"], baseline["p50_hours"])
+        self.assertGreaterEqual(baseline["probability_within_capacity_pct"], 0)
+        self.assertLessEqual(baseline["probability_within_capacity_pct"], 100)
+        with self.assertRaises(IntakeError):
+            simulate_rom(matches, 51)
+
+    def test_adjusted_commitment_changes_confidence_and_is_what_gets_approved(self) -> None:
+        demo_day = date(2026, 10, 17)
+        seed_demo(self.connection, demo_day)
+        default = evaluate_intake(self.connection, VAGUE_REQUEST, self._intake_answers(), demo_day)["commitment"]
+        self.assertFalse(default["adjusted"])
+        self.assertEqual(default["confidence_pct"], 84)
+
+        reduced_capacity = evaluate_intake(
+            self.connection,
+            VAGUE_REQUEST,
+            self._intake_answers(),
+            demo_day,
+            adjustments={"allocated_fte": 7.0},
+        )["commitment"]
+        self.assertLess(reduced_capacity["fit_probability_pct"], 100)
+        self.assertLess(reduced_capacity["confidence_pct"], default["confidence_pct"])
+        self.assertEqual(
+            reduced_capacity["confidence_pct"],
+            round(
+                reduced_capacity["historical_confidence_pct"]
+                * reduced_capacity["fit_probability_pct"]
+                / 100,
+                1,
+            ),
+        )
+
+        tight = {"allocated_fte": 3.0, "target_date": "2027-01-15", "scope_change_pct": 30}
+        stressed = evaluate_intake(
+            self.connection, VAGUE_REQUEST, self._intake_answers(), demo_day, adjustments=tight
+        )["commitment"]
+        self.assertTrue(stressed["adjusted"])
+        self.assertLess(stressed["confidence_pct"], default["confidence_pct"])
+        self.assertFalse(stressed["feasible"])
+        with self.assertRaises(IntakeError):
+            approve_baseline(
+                self.connection, VAGUE_REQUEST, self._intake_answers(), demo_day, adjustments=tight
+            )
+
+        relaxed = {"allocated_fte": 6.0, "target_date": "2027-06-30", "scope_change_pct": 10}
+        approved = approve_baseline(
+            self.connection, VAGUE_REQUEST, self._intake_answers(), demo_day, adjustments=relaxed
+        )["baseline"]
+        self.assertEqual(approved["allocated_fte"], 6.0)
+        self.assertEqual(approved["target_date"], "2027-06-30")
+        self.assertGreater(approved["p80_hours"], 4950)
+
+        for bad in (
+            {"allocated_fte": 99}, {"allocated_fte": 0}, {"target_date": "2026-10-18"},
+            {"target_date": "nope"}, {"scope_change_pct": 80}, {"scope_change_pct": 2.5},
+        ):
+            with self.assertRaises(IntakeError):
+                evaluate_intake(
+                    self.connection, VAGUE_REQUEST, self._intake_answers(), demo_day, adjustments=bad
+                )
+
+    def test_history_forecast_is_probabilistic_grounded_and_falls_back_without_llm(self) -> None:
+        seed_demo(self.connection, date(2026, 10, 17))
+        with patch("deliverytwin.intake.openai_configured", return_value=False):
+            result = forecast_from_history(
+                self.connection, VAGUE_REQUEST, self._intake_answers(), date(2026, 10, 17)
+            )
+        forecast = result["forecast"]
+        self.assertEqual(result["source"], "statistical")
+        self.assertEqual(len(result["similar_projects"]), 10)
+        self.assertLessEqual(forecast["p50_effort_hours"], forecast["p80_effort_hours"])
+        self.assertLessEqual(forecast["p80_effort_hours"], forecast["p90_effort_hours"])
+        self.assertTrue(0 <= forecast["on_time_probability"] <= 1)
+        self.assertTrue(0 < forecast["confidence"] <= 1)
+        names = {project["project_name"] for project in result["similar_projects"]}
+        self.assertTrue(set(forecast["historical_projects_used"]) <= names)
+        # The deterministic ROM and approval path are untouched.
+        self.assertEqual(
+            evaluate_intake(
+                self.connection, VAGUE_REQUEST, self._intake_answers(), date(2026, 10, 17)
+            )["rom"]["p50_hours"],
+            4450,
+        )
+
+    def test_history_forecast_accepts_valid_llm_reply_and_rejects_invalid_ones(self) -> None:
+        seed_demo(self.connection, date(2026, 10, 17))
+        base = {
+            "p50_effort_hours": 4600, "p80_effort_hours": 5500, "p90_effort_hours": 6000,
+            "on_time_probability": 0.74, "confidence": 0.81,
+            "key_risks": ["shared integration team"], "recommendations": ["Phase scope"],
+            "historical_projects_used": ["Customer Profile Unification"],
+        }
+
+        def run(reply: dict) -> dict:
+            with patch("deliverytwin.intake.openai_configured", return_value=True), \
+                    patch("deliverytwin.intake.complete", return_value=json.dumps(reply)):
+                return forecast_from_history(
+                    self.connection, VAGUE_REQUEST, self._intake_answers(), date(2026, 10, 17)
+                )
+
+        accepted = run(base)
+        self.assertEqual(accepted["source"], "llm")
+        self.assertEqual(accepted["forecast"]["p80_effort_hours"], 5500)
+        for bad in (
+            {**base, "p50_effort_hours": 6000, "p80_effort_hours": 5500},
+            {**base, "on_time_probability": 1.4},
+            {**base, "historical_projects_used": ["Invented Project"]},
+            {**base, "p90_effort_hours": 900_000},
+            {**base, "confidence": "high"},
+        ):
+            self.assertEqual(run(bad)["source"], "statistical")
+
+    def test_retrieve_similar_projects_favors_matching_technologies(self) -> None:
+        seed_demo(self.connection, date(2026, 10, 17))
+        fingerprint = evaluate_intake(
+            self.connection, VAGUE_REQUEST, self._intake_answers(), date(2026, 10, 17)
+        )["fingerprint"]
+        projects = retrieve_similar_projects(self.connection, fingerprint, 7.5)
+        self.assertEqual(projects[0]["similarity_pct"], max(p["similarity_pct"] for p in projects))
+        self.assertIn(projects[0]["project_id"], {"proj-service-consolidation", "proj-profile-unification", "proj-identity-service"})
+
+    def test_rom_matches_and_forecast_share_completed_project_records(self) -> None:
+        seed_demo(self.connection, date(2026, 10, 17))
+        evaluation = evaluate_intake(
+            self.connection, VAGUE_REQUEST, self._intake_answers(), date(2026, 10, 17)
+        )
+        with patch("deliverytwin.intake.openai_configured", return_value=False):
+            forecast = forecast_from_history(
+                self.connection, VAGUE_REQUEST, self._intake_answers(), date(2026, 10, 17)
+            )
+
+        project_names = {project["project_name"] for project in forecast["similar_projects"]}
+        self.assertTrue(set(evaluation["rom"]["analogs"]) <= project_names)
+        self.assertEqual(
+            {
+                project["project_name"]
+                for project in forecast["similar_projects"]
+                if project["rom_input"]
+            },
+            set(evaluation["rom"]["analogs"]),
+        )
+        self.assertEqual(forecast["matching_source"], "similarity")
+        self.assertEqual(
+            self.connection.execute("SELECT COUNT(*) FROM historical_project_lessons").fetchone()[0],
+            20,
+        )
+
+    def test_llm_reranks_only_retrieved_projects_and_returns_match_reasons(self) -> None:
+        seed_demo(self.connection, date(2026, 10, 17))
+        evaluation = evaluate_intake(
+            self.connection, VAGUE_REQUEST, self._intake_answers(), date(2026, 10, 17)
+        )
+        candidates = retrieve_similar_projects(
+            self.connection,
+            evaluation["fingerprint"],
+            evaluation["commitment"]["allocated_fte"],
+            required_project_ids={match["project_id"] for match in evaluation["matches"]},
+        )
+        ids = [project["project_id"] for project in candidates]
+        ranking = {
+            "ranked_project_ids": list(reversed(ids)),
+            "match_reasons": [
+                {
+                    "project_id": project_id,
+                    "reason": "Shares the CRM and event integration pattern.",
+                }
+                for project_id in ids
+            ],
+        }
+        with patch("deliverytwin.intake.openai_configured", return_value=True), patch(
+            "deliverytwin.intake.complete", return_value=json.dumps(ranking)
+        ):
+            ranked = _llm_rank_projects(VAGUE_REQUEST, evaluation["fingerprint"], candidates)
+        self.assertIsNotNone(ranked)
+        self.assertEqual(ranked[0]["project_id"], ids[-1])
+        self.assertEqual(
+            ranked[0]["match_reason"], "Shares the CRM and event integration pattern."
+        )
+
+        invalid = {**ranking, "ranked_project_ids": ["not-in-the-retrieved-projects"]}
+        with patch("deliverytwin.intake.openai_configured", return_value=True), patch(
+            "deliverytwin.intake.complete", return_value=json.dumps(invalid)
+        ):
+            self.assertIsNone(_llm_rank_projects(VAGUE_REQUEST, evaluation["fingerprint"], candidates))
+
+        forecast_reply = {
+            "p50_effort_hours": 4600,
+            "p80_effort_hours": 5500,
+            "p90_effort_hours": 6000,
+            "on_time_probability": 0.74,
+            "confidence": 0.81,
+            "key_risks": ["shared integration team"],
+            "recommendations": ["Phase scope"],
+            "historical_projects_used": [candidates[-1]["project_name"]],
+        }
+        with patch("deliverytwin.intake.openai_configured", return_value=True), patch(
+            "deliverytwin.intake.complete",
+            side_effect=[json.dumps(ranking), json.dumps(forecast_reply)],
+        ):
+            result = forecast_from_history(
+                self.connection, VAGUE_REQUEST, self._intake_answers(), date(2026, 10, 17)
+            )
+        self.assertEqual(result["matching_source"], "llm")
+        self.assertEqual(result["source"], "llm")
+        self.assertEqual(result["similar_projects"][0]["project_id"], ids[-1])
+        self.assertEqual(
+            {project["project_id"] for project in result["similar_projects"] if project["rom_input"]},
+            {project["project_id"] for project in candidates if project["rom_input"]},
+        )
+
     def test_intake_rejects_invalid_text_and_answers(self) -> None:
         seed_demo(self.connection, date(2026, 2, 20))
         with self.assertRaises(IntakeError):
@@ -326,6 +626,52 @@ class DeliveryTwinTests(unittest.TestCase):
         self.assertIn("Escalate", sprint_four_actions["servicenow"])
         self.assertIn("16h/week", sprint_four_actions["workforce"])
         self.assertNotEqual(sprint_three_actions, sprint_four_actions)
+
+    def test_act_recovery_what_if_previews_and_persists_local_target_updates(self) -> None:
+        from deliverytwin.app import save_recovery_scenario, simulate_sprints
+        from deliverytwin.recovery import preview_recovery_scenario
+
+        start = date(2026, 10, 17)
+        seed_demo(self.connection, start)
+        simulate_sprints(self.connection, 1, start)
+        report = build_workflow_report(self.connection)
+        payload = {
+            "allocated_fte": 8,
+            "scope_defer_pct": 25,
+            "target_date": "2027-04-30",
+            "incremental_cost_k": 200.5,
+        }
+
+        preview = preview_recovery_scenario(report, payload)
+        self.assertEqual(preview["status"], "preview")
+        self.assertGreater(preview["confidence_pct"], report["workflow"]["stages"]["forecast"]["on_time_pct"])
+        self.assertEqual(preview["deferred_scope_points"], 4)
+        self.assertEqual(len(preview["target_updates"]), 5)
+        self.assertIsNone(report["recovery_scenario"])
+
+        saved = save_recovery_scenario(self.connection, preview)
+        self.assertEqual(saved["status"], "simulated_updates_persisted")
+        self.assertEqual(len(saved["target_updates"]), 5)
+        self.assertEqual(
+            self.connection.execute("SELECT COUNT(*) FROM recovery_target_updates").fetchone()[0],
+            5,
+        )
+        self.assertEqual(
+            self.connection.execute(
+                "SELECT allocated_fte FROM planview_projects"
+            ).fetchone()["allocated_fte"],
+            7.5,
+        )
+        self.assertIsNotNone(build_report(self.connection)["recovery_scenario"])
+
+        for invalid in (
+            {**payload, "allocated_fte": 99},
+            {**payload, "scope_defer_pct": 101},
+            {**payload, "target_date": "2026-10-01"},
+            {**payload, "incremental_cost_k": -1},
+        ):
+            with self.assertRaises(ValueError):
+                preview_recovery_scenario(report, invalid)
 
     def test_clear_demo_data_removes_all_rows_and_preserves_schema(self) -> None:
         from deliverytwin.app import clear_demo_data, simulate_sprints, simulation_state

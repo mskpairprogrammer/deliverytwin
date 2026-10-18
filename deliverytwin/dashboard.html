@@ -190,6 +190,31 @@
     .intake-btn:disabled { opacity: .55; cursor: not-allowed; }
     .intake-error { margin: 0 19px; padding: 9px 12px; border-radius: 8px; background: #fbeceb; color: #8a2f2e; font-size: 11px; }
     .intake-error[hidden] { display: none; }
+    .intake-docs { margin-top: 10px; }
+    .intake-file { display: none; }
+    label.intake-btn:focus-within { outline: 3px solid #80cfc0; outline-offset: 2px; }
+    .intake-doc-list { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 4px; font-size: 11px; }
+    .intake-doc-list button { border: 0; background: none; color: #8a2f2e; cursor: pointer; font: inherit; font-weight: 700; }
+    .history-forecast { margin-top: 14px; padding: 12px; border: 1px solid var(--line); border-radius: 9px; background: white; }
+    .history-results { margin-top: 10px; }
+    .tune-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 8px; }
+    .tune-grid label { display: grid; gap: 4px; font-size: 11px; font-weight: 700; }
+    .tune-grid input[type="number"], .tune-grid input[type="date"] { padding: 7px 8px; border: 1px solid var(--line); border-radius: 7px; font: inherit; }
+    .tune-grid input[type="range"] { accent-color: var(--teal); }
+    .commit-tune { margin: 0 0 12px; }
+    .history-results:empty { display: none; }
+    .history-table-wrap { max-width: 100%; overflow-x: auto; }
+    .history-table { width: 100%; min-width: 1000px; margin-top: 10px; border-collapse: collapse; font-size: 11px; }
+    .history-table th, .history-table td { padding: 6px 8px; border: 1px solid #e6e6e6; text-align: left; vertical-align: top; }
+    .history-table th { background-color: #f5f5f5; }
+    .history-table td:last-child { min-width: 220px; overflow-wrap: anywhere; }
+    .history-list { margin: 6px 0 0 18px; padding: 0; font-size: 11px; }
+    .act-what-if { margin-top: 14px; }
+    .act-what-if-results { margin-top: 12px; }
+    .act-what-if-results[hidden] { display: none; }
+    .act-target-updates { margin-top: 10px; }
+    .act-target-updates strong { display: block; overflow-wrap: anywhere; font-size: 10px; }
+    .act-scenario-status { min-height: 1.4em; margin-top: 8px; font-size: 11px; color: var(--muted); }
     .q-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
     .q-card { border: 1px solid var(--line); border-radius: 9px; background: white; padding: 12px; margin: 0; min-width: 0; }
     .q-card legend { padding: 0 4px; font-size: 9px; font-weight: 800; letter-spacing: .1em; color: var(--teal); text-transform: uppercase; }
@@ -228,7 +253,10 @@
     .shape-actions { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
     .intake-btn.danger { border-color: #e6b8b8; color: #8a2f2e; }
     .intake-btn.danger:hover { background: #fff5f4; }
-    @media (max-width: 900px) { .q-grid, .fp-grid, .rom-hero { grid-template-columns: 1fr; } }
+    @media (max-width: 900px) {
+      .q-grid, .fp-grid, .rom-hero { grid-template-columns: 1fr; }
+      .history-results .rom-hero { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
   </style>
 </head>
 <body data-sim="false">
@@ -269,6 +297,14 @@
             <h4 class="step-title"><span class="step-num">1</span>Intake request</h4>
             <p class="step-help">Paste a vague request the way it arrives from the business.</p>
             <textarea id="intake-text" class="intake-text" maxlength="2000" aria-label="Project request" placeholder="Describe the project request…"></textarea>
+            <div class="intake-docs">
+              <label class="step-help">Optional: attach PDF, Word (.docx), Excel (.xlsx), or text documents to better identify the most similar prior project. Scanned PDFs need OCR. Limit: 2 MB per file, 5 MB combined.</label>
+              <div class="intake-actions">
+                <label class="intake-btn">Attach ROM document<input id="intake-rom-file" class="intake-file" type="file" multiple accept=".pdf,.docx,.xlsx,.txt,.md,.csv,.json,.log,text/*"></label>
+                <label class="intake-btn">Attach meeting notes<input id="intake-notes-file" class="intake-file" type="file" multiple accept=".pdf,.docx,.xlsx,.txt,.md,.csv,.json,.log,text/*"></label>
+              </div>
+              <ul id="intake-doc-list" class="intake-doc-list"></ul>
+            </div>
             <div class="intake-actions">
               <button id="intake-sample" class="intake-btn" type="button">Use sample request</button>
               <button id="intake-analyze" class="intake-btn primary" type="button">Analyze request</button>
@@ -282,7 +318,7 @@
           </div>
           <div class="intake-step" id="intake-step-3" hidden>
             <h4 class="step-title"><span class="step-num">3</span>6D delivery fingerprint</h4>
-            <p class="step-help">The new project is matched to past initiatives on six dimensions.</p>
+            <p class="step-help">The six dimensions describe this initiative and drive matching against the shared completed-project history. Review the matched projects in the evidence section below.</p>
             <div id="intake-fingerprint" class="fp-grid"></div>
             <div id="intake-analogs"></div>
             <div class="intake-actions"><button id="intake-rom-btn" class="intake-btn primary" type="button">Generate explainable ROM</button></div>
@@ -291,10 +327,29 @@
             <h4 class="step-title"><span class="step-num">4</span>Explainable ROM</h4>
             <div id="intake-rom" class="rom-hero"></div>
             <p id="intake-rom-explain" class="rom-explain"></p>
+            <section class="history-forecast" aria-labelledby="history-title">
+              <h4 class="step-title" id="history-title">Shared historical project evidence</h4>
+              <p class="step-help">The completed-project list supports both estimates: the three projects marked ROM input drive the deterministic baseline, and up to ten inform the probabilistic forecast. When configured, an LLM reranks these retrieved projects and explains the matches; otherwise SQLite similarity ranking is used. The forecast is advisory and does not change the approval baseline.</p>
+              <div class="intake-actions"><button id="intake-history-forecast" class="intake-btn" type="button">Forecast from historical projects</button></div>
+              <div id="history-results" class="history-results" aria-live="polite"></div>
+            </section>
             <div class="intake-actions"><button id="intake-commit-btn" class="intake-btn primary" type="button">Check feasible commitment</button></div>
           </div>
           <div class="intake-step" id="intake-step-5" hidden>
             <h4 class="step-title"><span class="step-num">5</span>Feasible commitment · decision gate</h4>
+            <section class="what-if commit-tune" aria-labelledby="tune-title">
+              <h4 class="step-title" id="tune-title">Adjust the commitment</h4>
+              <p class="step-help">Tweak capacity, target date, and scope to see how confidence and feasibility change. The approved baseline uses these values.</p>
+              <div class="tune-grid">
+                <label for="tune-fte"><span>Allocated FTE</span><input id="tune-fte" type="number" min="0.5" step="0.5"></label>
+                <label for="tune-date"><span>Target date</span><input id="tune-date" type="date"></label>
+                <label for="tune-scope"><span>Scope change <output id="tune-scope-value" for="tune-scope">0%</output></span><input id="tune-scope" type="range" min="0" max="50" step="5" value="0"></label>
+              </div>
+              <div class="intake-actions">
+                <button id="tune-apply" class="intake-btn" type="button">Recalculate confidence</button>
+                <button id="tune-reset" class="intake-btn" type="button">Reset to defaults</button>
+              </div>
+            </section>
             <div id="intake-commitment" class="rom-hero"></div>
             <p id="intake-commit-explain" class="rom-explain"></p>
             <div class="intake-actions">
@@ -440,8 +495,23 @@
           </div>
           <p class="approval-note" id="act-note">The recommendation is advisory. No option is approved and no source-system write-back occurs.</p>
         </section>
+        <section class="card full act-what-if">
+          <div class="card-head"><div><h3 class="card-title">Recovery what-if</h3><div class="card-kicker">Adjust the recommended path, preview impacts, then persist simulated target updates.</div></div><span class="badge">LOCAL SIMULATION</span></div>
+          <div class="tune-grid">
+            <label for="act-fte"><span>Team allocation (FTE)</span><input id="act-fte" type="number" min="0.5" step="0.5"></label>
+            <label for="act-target-date"><span>Target date</span><input id="act-target-date" type="date"></label>
+            <label for="act-cost"><span>Incremental budget (USD $K)</span><input id="act-cost" type="number" min="0" max="100000" step="0.5" value="0"></label>
+            <label for="act-scope-defer"><span>Scope to defer <output id="act-scope-defer-value" for="act-scope-defer">0%</output></span><input id="act-scope-defer" type="range" min="0" max="100" step="5" value="0"></label>
+          </div>
+          <div class="intake-actions">
+            <button id="act-preview" class="intake-btn" type="button">Preview what-if</button>
+            <button id="act-apply" class="intake-btn primary" type="button" disabled>Apply simulated updates</button>
+          </div>
+          <div id="act-scenario-status" class="act-scenario-status" role="status" aria-live="polite"></div>
+          <div id="act-what-if-results" class="act-what-if-results" hidden></div>
+        </section>
         <section class="card full">
-          <div class="card-head"><div><h3 class="card-title">If approved · proposed synchronization</h3><div class="card-kicker">The production design routes an approved action to the owning systems</div></div><span class="badge">SIMULATED · NO WRITE-BACK</span></div>
+          <div class="card-head"><div><h3 class="card-title">If approved · proposed synchronization</h3><div class="card-kicker">The production design routes an approved action to the owning systems</div></div><span class="badge">SIMULATED · NO REAL WRITE-BACK</span></div>
           <div class="detail-list">
             <div class="detail-row"><span>Milestone</span><strong id="act-sync-milestone">Awaiting simulation</strong></div>
             <div class="detail-row"><span>Azure DevOps</span><strong id="act-sync-ado">Awaiting simulation</strong></div>
@@ -498,6 +568,73 @@
     });
     const initialStage = stageTabs.find((tab) => tab.dataset.stage === location.hash.slice(1));
     if (initialStage) selectStage(initialStage);
+
+    function renderActScenario(scenario, persisted = false) {
+      const root = byId("act-what-if-results");
+      const updates = scenario.target_updates || [];
+      const adoUpdate = updates.find((update) => update.source_key === "azure_devops")?.payload || {};
+      const deferredPoints = adoUpdate.deferred_scope_points ?? scenario.deferred_scope_points ?? 0;
+      const remainingPoints = adoUpdate.remaining_unplanned_scope_points ?? scenario.remaining_unplanned_scope_points ?? 0;
+      const rootElement = el("div");
+      const hero = el("div", "rom-hero");
+      hero.replaceChildren(
+        metric(`${scenario.confidence_pct}%`, "Adjusted on-time confidence"),
+        metric(`${scenario.allocated_fte.toFixed(1)} FTE`, "Team allocation"),
+        metric(`${deferredPoints} pts`, "Scope deferred"),
+        metric(scenario.target_date, "Target date"),
+        metric(`$${scenario.incremental_cost_k.toLocaleString()}K`, "Incremental budget"),
+      );
+      const list = el("div", "detail-list act-target-updates");
+      updates.forEach((update) => {
+        const row = el("div", "detail-row");
+        const detail = Object.entries(update.payload)
+          .map(([key, value]) => `${key.replaceAll("_", " ")}: ${typeof value === "number" ? value.toLocaleString() : value}`)
+          .join(" · ");
+        row.append(el("span", "", update.system_name), el("strong", "", detail));
+        list.append(row);
+      });
+      rootElement.append(
+        hero,
+        el("p", "rom-explain", scenario.confidence_method || "Illustrative forecast adjustment; cost is a budget assumption and is not included in confidence."),
+        el("h4", "step-title", "Simulated target-system updates"),
+        el("p", "step-help",
+          `${adoUpdate.unplanned_scope_points ?? 0} unplanned points considered; ${deferredPoints} deferred and ${remainingPoints} remain active.`),
+        list,
+      );
+      root.replaceChildren(rootElement);
+      root.hidden = false;
+      byId("act-apply").disabled = persisted;
+      byId("act-scenario-status").textContent = persisted
+        ? `Scenario #${scenario.id} saved ${scenario.saved_at}. Simulated update records are stored locally; real external systems are unchanged.`
+        : "Preview only — no records have changed. Apply to persist these simulated updates in SQLite.";
+    }
+
+    async function submitActScenario(path, button) {
+      button.disabled = true;
+      let persisted = false;
+      byId("act-scenario-status").textContent = "Calculating…";
+      if (!byId("act-fte").value || !byId("act-target-date").value || !byId("act-cost").value) {
+        byId("act-scenario-status").textContent = "Enter FTE, a target date, and a budget before previewing.";
+        button.disabled = false;
+        return;
+      }
+      const body = {
+        allocated_fte: Number(byId("act-fte").value),
+        target_date: byId("act-target-date").value,
+        scope_defer_pct: Number(byId("act-scope-defer").value),
+        incremental_cost_k: Number(byId("act-cost").value),
+      };
+      try {
+        const data = await intakePost(path, body);
+        persisted = data.status === "simulated_updates_persisted";
+        renderActScenario(data, persisted);
+        if (persisted) await refreshReport();
+      } catch (error) {
+        byId("act-scenario-status").textContent = `Recovery scenario failed: ${error.message}`;
+      } finally {
+        button.disabled = persisted;
+      }
+    }
 
     async function refreshReport() {
       try {
@@ -557,6 +694,25 @@
         byId("act-sync-workforce").textContent = act.actions.workforce;
         byId("act-note").textContent =
           `Option ${act.recommended_option} is recommended for the simulated signals. No option is approved; source-system write-back remains disabled.`;
+        byId("act-fte").max = signals.capacity_fte;
+        if (report.recovery_scenario) {
+          const saved = report.recovery_scenario;
+          byId("act-fte").value = saved.allocated_fte;
+          byId("act-target-date").value = saved.target_date;
+          byId("act-cost").value = saved.incremental_cost_k;
+          byId("act-scope-defer").value = saved.scope_defer_pct;
+          byId("act-scope-defer-value").textContent = `${saved.scope_defer_pct}%`;
+          renderActScenario(saved, true);
+        } else {
+          byId("act-fte").value = signals.allocated_fte;
+          byId("act-target-date").value = initiative.target_end;
+          byId("act-cost").value = 0;
+          byId("act-scope-defer").value = 0;
+          byId("act-scope-defer-value").textContent = "0%";
+          byId("act-what-if-results").hidden = true;
+          byId("act-apply").disabled = true;
+          byId("act-scenario-status").textContent = "";
+        }
         byId("sense-capacity").textContent = `${signals.allocated_fte.toFixed(1)} / ${signals.capacity_fte.toFixed(1)} FTE`;
         byId("sense-support").textContent = `${signals.lead_production_support_hours_per_week} h / week`;
         byId("sense-pto").textContent = `${signals.lead_approved_pto_hours} h`;
@@ -573,6 +729,24 @@
       }
     }
     refreshReport();
+
+    byId("act-scope-defer").addEventListener("input", (event) => {
+      byId("act-scope-defer-value").textContent = `${event.currentTarget.value}%`;
+      byId("act-apply").disabled = true;
+      byId("act-what-if-results").hidden = true;
+      byId("act-scenario-status").textContent = "Inputs changed — preview the scenario again.";
+    });
+    ["act-fte", "act-target-date", "act-cost"].forEach((id) => {
+      byId(id).addEventListener("input", () => {
+        byId("act-apply").disabled = true;
+        byId("act-what-if-results").hidden = true;
+        byId("act-scenario-status").textContent = "Inputs changed — preview the scenario again.";
+      });
+    });
+    byId("act-preview").addEventListener("click", (event) =>
+      submitActScenario("/api/act/what-if", event.currentTarget));
+    byId("act-apply").addEventListener("click", (event) =>
+      submitActScenario("/api/act/apply", event.currentTarget));
 
     async function runSimulation(body, doneMessage) {
       const status = byId("sim-status");
@@ -622,7 +796,69 @@
       }
     });
     const SAMPLE_REQUEST = "We need one view of every customer across the business. Teams get different answers, and leadership wants this fixed soon.";
-    const intake = { text: "", analysis: null, result: null };
+    const intake = { text: "", analysis: null, result: null, documents: [] };
+    const MAX_DOC_FILES = 5, MAX_DOC_CHARS = 100000;
+    const MAX_DOC_FILE_BYTES = 2000000, MAX_DOC_TOTAL_BYTES = 5000000;
+    function renderDocList() {
+      const list = byId("intake-doc-list");
+      list.replaceChildren(...intake.documents.map((doc, index) => {
+        const item = el("li", "", `${doc.kind === "rom" ? "ROM" : "Meeting notes"}: ${doc.name} `);
+        const remove = el("button", "", "Remove");
+        remove.type = "button";
+        remove.addEventListener("click", () => {
+          intake.documents.splice(index, 1);
+          renderDocList();
+          resetIntakeResult();
+        });
+        item.append(remove);
+        return item;
+      }));
+    }
+    function resetIntakeResult() {
+      intake.result = null;
+      clearCommitmentSummary();
+      intakeShowUpTo(1);
+      intakeError("");
+    }
+    async function attachDocuments(input, kind) {
+      const files = Array.from(input.files);
+      input.value = "";
+      resetIntakeResult();
+      try {
+        for (const file of files) {
+          if (intake.documents.length >= MAX_DOC_FILES) throw new Error(`At most ${MAX_DOC_FILES} documents can be attached.`);
+          if (file.size > MAX_DOC_FILE_BYTES) throw new Error(`${file.name} is too large (limit 2 MB).`);
+          const totalBytes = intake.documents.reduce((sum, document) => sum + document.size, 0);
+          if (totalBytes + file.size > MAX_DOC_TOTAL_BYTES) throw new Error("Supporting documents exceed the 5 MB combined upload limit.");
+          const extension = file.name.includes(".") ? file.name.split(".").pop().toLowerCase() : "";
+          if (["pdf", "docx", "xlsx"].includes(extension)) {
+            const bytes = new Uint8Array(await file.arrayBuffer());
+            const chunks = [];
+            for (let offset = 0; offset < bytes.length; offset += 0x8000) {
+              chunks.push(String.fromCharCode(...bytes.subarray(offset, offset + 0x8000)));
+            }
+            intake.documents.push({
+              name: file.name, kind, size: file.size, content_base64: btoa(chunks.join("")),
+            });
+          } else {
+            if (!(file.type.startsWith("text/") || ["txt", "md", "csv", "json", "log"].includes(extension))) {
+              throw new Error(`${file.name} is not a supported file. Use PDF, DOCX, XLSX, or a text file.`);
+            }
+            const text = (await file.text()).slice(0, MAX_DOC_CHARS);
+            if (text.includes("\u0000")) throw new Error(`${file.name} is not a text file.`);
+            intake.documents.push({ name: file.name, kind, size: file.size, text });
+          }
+        }
+      } catch (error) {
+        intakeError(error.message);
+      }
+      renderDocList();
+    }
+    function docsPayload() {
+      return intake.documents.map(({ name, kind, text, content_base64 }) => ({
+        name, kind, ...(text !== undefined ? { text } : { content_base64 }),
+      }));
+    }
     const intakeSteps = [1, 2, 3, 4, 5].map((n) => byId(`intake-step-${n}`));
 
     function el(tag, className, text) {
@@ -663,6 +899,7 @@
       try { await task(); } catch (error) { intakeError(error.message); } finally { button.disabled = false; }
     }
     const hours = (value) => `${Number(value).toLocaleString()} h`;
+    const percent = (value) => Number.isInteger(Number(value)) ? String(value) : Number(value).toFixed(1);
     const list = (value) => (Array.isArray(value) ? (value.length ? value.join(", ") : "none") : String(value));
 
     function selectedAnswers() {
@@ -674,7 +911,7 @@
       const container = byId("intake-questions");
       container.replaceChildren();
       byId("intake-clarity").textContent = `· ${analysis.clarity.specified} of ${analysis.clarity.total} areas specified in the request`;
-      byId("intake-retrieval").textContent = `${analysis.retrieval.method} · ${analysis.retrieval.initiatives_searched} historical initiatives searched. Suggested answers come from the best-matching lesson; change any of them.`;
+      byId("intake-retrieval").textContent = `${analysis.retrieval.method} · ${analysis.retrieval.projects_searched} completed projects searched. Suggested answers come from the best-matching lesson; change any of them.`;
       analysis.clarifications.forEach((item) => {
         const card = el("fieldset", "q-card");
         card.append(el("legend", "", item.category), el("div", "q-text", item.question));
@@ -698,7 +935,7 @@
         const evidence = el("div", "evidence");
         evidence.append(el("strong", "", "Historical evidence"));
         item.evidence.forEach((entry) => {
-          const line = el("div", "", `${entry.initiative}: ${entry.lesson}`);
+          const line = el("div", "", `${entry.project}: ${entry.lesson}`);
           if (entry.matched_terms.length) line.append(el("em", "", ` [matched: ${entry.matched_terms.join(", ")}]`));
           evidence.append(line);
         });
@@ -734,22 +971,10 @@
         cell.append(el("div", "dim-name", label), el("div", "dim-value", list(result.fingerprint[key])));
         grid.append(cell);
       });
-      const table = el("table", "analog-table");
-      const head = el("tr");
-      ["Matched initiative", "Fit", ...Object.values(dimensionLabels)].forEach((title) => head.append(el("th", "", title)));
-      table.append(head);
-      result.matches.forEach((match) => {
-        const row = el("tr");
-        row.append(el("td", "", match.name), el("td", "", `${match.similarity_pct}%`));
-        Object.keys(dimensionLabels).forEach((key) => {
-          const cell = el("td");
-          cell.append(chip(match.dimensions[key].score));
-          row.append(cell);
-        });
-        table.append(row);
-      });
       const holder = byId("intake-analogs");
-      holder.replaceChildren(table);
+      holder.replaceChildren(
+        el("p", "rom-explain", "The closest ROM inputs will be marked in the shared historical-project list after the forecast is generated."),
+      );
     }
     function metric(value, label) {
       const box = el("div", "mini-metric");
@@ -767,29 +992,107 @@
       byId("intake-rom-explain").textContent =
         `P50: median analog base ${hours(rom.base_p50_hours)} + ${hours(rom.buffer_hours_p50)} integration buffer (${rom.integration_buffer_pct}%), rounded to ${hours(rom.p50_hours)}. ` +
         `P80: ${hours(rom.base_p80_hours)} + ${hours(rom.buffer_hours_p80)} buffer, rounded to ${hours(rom.p80_hours)}. ` +
-        `Analogs: ${rom.analogs.join("; ")}. Deterministic — the same fingerprint always yields the same range.`;
+        `Analogs: ${rom.analogs.join("; ")}. This baseline remains deterministic; the historical forecast below is advisory.`;
+    }
+    function renderHistoryForecast(data) {
+      const f = data.forecast;
+      const root = byId("history-results");
+      const hero = el("div", "rom-hero");
+      hero.style.gridTemplateColumns = "repeat(5, minmax(0, 1fr))";
+      hero.replaceChildren(
+        metric(hours(f.p50_effort_hours), "P50 effort"),
+        metric(hours(f.p80_effort_hours), "P80 effort"),
+        metric(hours(f.p90_effort_hours), "P90 effort"),
+        metric(`${Math.round(f.on_time_probability * 100)}%`, "On-time probability"),
+        metric(`${Math.round(f.confidence * 100)}%`, "Forecast confidence"),
+      );
+      const lists = [];
+      const addList = (title, items) => {
+        if (!items || !items.length) return;
+        lists.push(el("strong", "", title));
+        const ul = el("ul", "history-list");
+        items.forEach((item) => ul.append(el("li", "", item)));
+        lists.push(ul);
+      };
+      addList("Key uncertainty drivers", f.key_risks);
+      addList("Recommendations", f.recommendations);
+      const forecastUsed = new Set(f.historical_projects_used);
+      const table = el("table", "history-table");
+      const head = el("tr");
+      ["Project", "ROM input", "Forecast input", "Similarity", "Team", "Integrations", "Planned h", "Actual h", "Outcome", "LLM match explanation"].forEach((label) => head.append(el("th", "", label)));
+      table.append(head);
+      data.similar_projects.forEach((p) => {
+        const row = el("tr");
+        [
+          p.project_name,
+          p.rom_input ? "Yes" : "—",
+          forecastUsed.has(p.project_name) ? "Yes" : "—",
+          `${p.similarity_pct}%`,
+          p.team_size,
+          p.integrations,
+          p.planned_effort_hours.toLocaleString(),
+          p.actual_effort_hours.toLocaleString(),
+          p.outcome.replace("_", " "),
+          p.match_reason || "—",
+        ]
+          .forEach((value) => row.append(el("td", "", String(value))));
+        table.append(row);
+      });
+      const tableWrap = el("div", "history-table-wrap");
+      tableWrap.append(table);
+      root.replaceChildren(
+        hero,
+        el("p", "rom-explain",
+          `Forecast: ${data.source === "llm" ? `LLM (${data.model})` : "statistical model"}; matches: ${data.matching_source === "llm" ? "LLM-ranked" : "SQLite similarity-ranked"}. ` +
+          `Capacity through ${data.target_date}: ${hours(data.capacity_hours)}. ${data.advisory}`),
+        ...lists,
+        tableWrap,
+      );
     }
     function renderCommitment(result) {
       const c = result.commitment;
+      const fteInput = byId("tune-fte");
+      fteInput.max = c.capacity_fte;
+      fteInput.value = c.allocated_fte;
+      byId("tune-date").value = c.target_date;
+      byId("tune-scope").value = c.scope_change_pct;
+      byId("tune-scope-value").textContent = `${c.scope_change_pct}%`;
       byId("intake-commitment").replaceChildren(
         metric(`${c.allocated_fte.toFixed(1)} of ${c.capacity_fte.toFixed(1)} FTE`, "Capacity available"),
         metric(c.target_date, "Target date"),
-        metric(`${c.confidence_pct}%`, "Initial confidence"),
+        metric(`${percent(c.confidence_pct)}%`, c.adjusted ? "Adjusted confidence" : "Initial confidence"),
         metric(`${c.required_fte_p80} FTE`, "Needed to hit P80"),
       );
       const explain = byId("intake-commit-explain");
       explain.replaceChildren(
-        document.createTextNode(`P80 of ${hours(result.rom.p80_hours)} over ${c.weeks_to_target} weeks at ${c.hours_per_fte_week} h/FTE-week needs ${c.required_fte_p80} FTE; ${c.allocated_fte.toFixed(1)} FTE are allocated. `),
+        document.createTextNode(`P80 of ${hours(c.p80_hours)}${c.scope_change_pct ? ` (including ${c.scope_change_pct}% scope change)` : ""} over ${c.weeks_to_target} weeks at ${c.hours_per_fte_week} h/FTE-week needs ${c.required_fte_p80} FTE; ${c.allocated_fte.toFixed(1)} FTE are allocated. ` +
+          `Confidence is ${c.historical_confidence_pct}% historical confidence multiplied by the ${c.fit_probability_pct}% modeled chance of fitting ${hours(c.capacity_hours)} of capacity = ${percent(c.confidence_pct)}%. `),
         el("span", c.feasible ? "gate-ok" : "gate-bad", c.feasible ? "Feasible — ready for approval." : "Not feasible with current capacity."),
       );
       byId("intake-approve").disabled = !c.feasible;
+    }
+    function commitmentAdjustments() {
+      return {
+        allocated_fte: Number(byId("tune-fte").value),
+        target_date: byId("tune-date").value,
+        scope_change_pct: Number(byId("tune-scope").value),
+      };
+    }
+    async function recalculateCommitment(adjustments) {
+      intake.result = await intakePost("/api/intake/evaluate", {
+        text: intake.text, answers: intake.result.answers, documents: docsPayload(), adjustments,
+      });
+      renderCommitment(intake.result);
+      byId("intake-approved").hidden = true;
+      byId("intake-approve").hidden = false;
+      byId("intake-continue").hidden = true;
     }
     function renderApproved(baseline) {
       byId("shape-baseline-status").textContent = "Approved";
       byId("shape-stage-status").textContent = "BASELINE APPROVED";
       byId("intake-approved").textContent =
         `Baseline #${baseline.id} approved ${baseline.approved_at}: P50 ${hours(baseline.p50_hours)} · P80 ${hours(baseline.p80_hours)} · ` +
-        `${baseline.allocated_fte.toFixed(1)}/${baseline.capacity_fte.toFixed(1)} FTE · ${baseline.target_date} · ${baseline.confidence_pct}% confidence.`;
+        `${baseline.allocated_fte.toFixed(1)}/${baseline.capacity_fte.toFixed(1)} FTE · ${baseline.target_date} · ${percent(baseline.confidence_pct)}% confidence.`;
       byId("intake-approved").hidden = false;
       byId("intake-approve").hidden = true;
       byId("intake-continue").hidden = false;
@@ -807,27 +1110,49 @@
       intakeShowUpTo(1);
       intakeError("");
     });
+    byId("intake-rom-file").addEventListener("change", (event) => attachDocuments(event.currentTarget, "rom"));
+    byId("intake-notes-file").addEventListener("change", (event) => attachDocuments(event.currentTarget, "meeting_notes"));
     byId("intake-analyze").addEventListener("click", (event) => intakeRun(event.currentTarget, async () => {
       intake.text = byId("intake-text").value;
-      intake.analysis = await intakePost("/api/intake/analyze", { text: intake.text });
+      intake.analysis = await intakePost("/api/intake/analyze", { text: intake.text, documents: docsPayload() });
       renderQuestions(intake.analysis);
       intakeShowUpTo(2);
     }));
     byId("intake-fingerprint-btn").addEventListener("click", (event) => intakeRun(event.currentTarget, async () => {
-      intake.result = await intakePost("/api/intake/evaluate", { text: intake.text, answers: selectedAnswers() });
+      intake.result = await intakePost("/api/intake/evaluate", { text: intake.text, answers: selectedAnswers(), documents: docsPayload() });
       renderFingerprint(intake.result);
       intakeShowUpTo(3);
     }));
-    byId("intake-rom-btn").addEventListener("click", () => { renderRom(intake.result); intakeShowUpTo(4); });
+    byId("intake-rom-btn").addEventListener("click", () => { byId("history-results").replaceChildren(); renderRom(intake.result); intakeShowUpTo(4); });
+    byId("intake-history-forecast").addEventListener("click", (event) => intakeRun(event.currentTarget, async () => {
+      const data = await intakePost("/api/intake/forecast", {
+        text: intake.text,
+        answers: intake.result.answers,
+        documents: docsPayload(),
+      });
+      renderHistoryForecast(data);
+    }));
     byId("intake-commit-btn").addEventListener("click", () => {
-      renderCommitment(intake.result);
-      byId("intake-approved").hidden = true;
-      byId("intake-approve").hidden = false;
-      byId("intake-continue").hidden = true;
-      intakeShowUpTo(5);
+      intakeRun(byId("intake-commit-btn"), async () => {
+        const defaults = intake.result.commitment.defaults;
+        await recalculateCommitment(defaults);
+        intakeShowUpTo(5);
+      });
     });
+    byId("tune-scope").addEventListener("input", (event) => {
+      byId("tune-scope-value").textContent = `${event.currentTarget.value}%`;
+    });
+    byId("tune-apply").addEventListener("click", (event) => intakeRun(event.currentTarget, () => recalculateCommitment(commitmentAdjustments())));
+    byId("tune-reset").addEventListener("click", (event) => intakeRun(event.currentTarget, () => recalculateCommitment(intake.result.commitment.defaults)));
     byId("intake-approve").addEventListener("click", (event) => intakeRun(event.currentTarget, async () => {
-      const approved = await intakePost("/api/intake/approve", { text: intake.text, answers: intake.result.answers });
+      const approved = await intakePost("/api/intake/approve", {
+        text: intake.text, answers: intake.result.answers, documents: docsPayload(),
+        adjustments: {
+          allocated_fte: intake.result.commitment.allocated_fte,
+          target_date: intake.result.commitment.target_date,
+          scope_change_pct: intake.result.commitment.scope_change_pct,
+        },
+      });
       renderApproved(approved.baseline);
     }));
     byId("intake-continue").addEventListener("click", () => selectStage(byId("tab-sense"), true));
