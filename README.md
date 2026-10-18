@@ -47,6 +47,26 @@ The remaining tabs use synthetic records from the five simulated sources:
 
 The dashboard is keyboard accessible: use the left/right arrow keys to move between tabs, or Home/End to select the first/last tab. The selected stage is reflected in the URL fragment.
 
+## Dashboard screenshots
+
+These screenshots show the four dashboard stages using synthetic Customer 360 data. SHAPE shows the sample request and its suggested clarification answers with historical evidence; the other screenshots show a simulated five-sprint run. Values are illustrative and change as the simulation advances.
+
+### SHAPE · Intake and clarification
+
+![SHAPE intake with the sample request, four clarification areas, suggested answers, and historical evidence](docs/screenshots/shape.png)
+
+### SENSE · Cross-system delivery signals
+
+![SENSE showing a cross-system delivery collision and its workforce, scope, blocker, and source-system signals](docs/screenshots/sense.png)
+
+### FORECAST · Rules-based delivery outlook
+
+![FORECAST showing the on-time estimate, projected slip, explainable drivers, and forecast method](docs/screenshots/forecast.png)
+
+### ACT · Recovery options
+
+![ACT comparing three advisory recovery options and proposed synchronization with no source-system write-back](docs/screenshots/act.png)
+
 ## Ask Delivery Twin: LLM chat
 
 The **Ask Delivery Twin** launcher opens a read-only assistant for questions about the current report and what its figures mean. For each question, the server builds a snapshot containing the report date, initiative, signals, finding, and workflow results, then sends that snapshot with the bounded conversation history to the configured model.
