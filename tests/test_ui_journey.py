@@ -82,6 +82,9 @@ class JourneyUiTests(unittest.TestCase):
         page.get_by_role("button", name="Generate explainable ROM").click()
         page.locator("#intake-rom").get_by_text("P50 effort").wait_for()
         self.assertEqual(self.states()["shape"], "Estimate ready")
+        analog_rows = page.locator("#rom-analogs tr").all_inner_texts()
+        self.assertEqual(len(analog_rows), 4, analog_rows)
+        self.assertRegex(analog_rows[1], r"\d+%.*\d+ h.*\d+ h")
         page.get_by_role("button", name="Continue to COMMIT →").click()
         page.locator("#commit-role-chart svg").wait_for()
 

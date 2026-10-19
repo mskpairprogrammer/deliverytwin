@@ -1142,15 +1142,17 @@
       const analogs = result.rom.analogs;
       const table = el("table", "analog-table");
       const head = el("tr");
-      ["Closest analog", "Similarity", "Planned hours", "Actual hours"].forEach((label) => head.append(el("th", "", label)));
+      ["Closest analog", "Match", "Base P50", "Base P80", "Buffer", "On-time rate"].forEach((label) => head.append(el("th", "", label)));
       table.append(head);
-      result.matches.filter((item) => analogs.includes(item.project_name)).forEach((item) => {
+      result.matches.filter((item) => analogs.includes(item.name)).forEach((item) => {
         const row = el("tr");
         [
-          item.project_name,
+          item.name,
           `${item.similarity_pct}%`,
-          Number(item.planned_effort_hours).toLocaleString(),
-          Number(item.actual_effort_hours).toLocaleString(),
+          hours(Math.round(item.base_p50_hours)),
+          hours(Math.round(item.base_p80_hours)),
+          `${item.integration_buffer_pct}%`,
+          `${Math.round(item.on_time_confidence_pct)}%`,
         ].forEach((value) => row.append(el("td", "", String(value))));
         table.append(row);
       });
