@@ -368,6 +368,21 @@
     .gate-ok { color: var(--teal); font-weight: 800; }
     .gate-bad { color: var(--red); font-weight: 800; }
     .approved-banner { padding: 12px 14px; border-radius: 9px; background: var(--teal-soft); border: 1px solid #c5e8df; color: #0c5d52; font-size: 11px; font-weight: 700; }
+    .backlog-panel { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; background: #fbfdfc; margin: 14px 0; }
+    .backlog-panel[hidden] { display: none; }
+    .backlog-tree { margin: 10px 0; display: grid; gap: 6px; font-size: 11px; line-height: 1.5; }
+    .backlog-tree details { border: 1px solid var(--line); border-radius: 7px; background: white; }
+    .backlog-tree summary { cursor: pointer; padding: 7px 10px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .backlog-tree summary:focus-visible { outline: 3px solid #80cfc0; outline-offset: 2px; }
+    .backlog-tree .backlog-features { display: grid; gap: 6px; padding: 0 10px 10px 18px; }
+    .backlog-tree .wi-body { padding: 0 10px 8px; color: var(--ink); }
+    .backlog-tree .wi-body ul { margin: 4px 0 0; padding-left: 18px; }
+    .wi-type { font-size: 9px; font-weight: 800; letter-spacing: .06em; padding: 2px 7px; border-radius: 4px; background: #eef2f6; color: var(--muted); }
+    .wi-type.epic { background: #f1e8fb; color: #6b3fa0; }
+    .wi-type.feature { background: #fdf0e0; color: #8a5a00; }
+    .wi-meta { margin-left: auto; color: var(--muted); font-size: 10px; font-weight: 700; }
+    .export-log { margin-top: 10px; padding: 10px 12px; border-radius: 8px; background: #f6f8fa; border: 1px dashed #cfd9e1; font-size: 11px; line-height: 1.6; }
+    .export-log code { font-size: 10px; }
     .awaiting { display: none; padding: 28px; border: 1px dashed var(--line); border-radius: 12px; background: white; color: var(--muted); font-size: 12px; line-height: 1.7; text-align: center; }
     .awaiting code { background: #f0f2f4; padding: 2px 6px; border-radius: 5px; color: var(--ink, #1c2733); }
     body[data-sim="false"] .awaiting { display: block; }
@@ -509,6 +524,21 @@
               <button id="intake-continue" class="intake-btn" type="button" hidden>Continue to TRACK →</button>
             </div>
             <div id="intake-approved" class="approved-banner" role="status" hidden></div>
+            <section class="backlog-panel" id="backlog-panel" aria-labelledby="backlog-title" hidden>
+              <div class="ai-review-head">
+                <h4 class="step-title" id="backlog-title">Azure DevOps backlog</h4>
+                <span class="source-pill llm">RULES-BASED · FROM THE APPROVED BASELINE</span>
+              </div>
+              <p class="step-help">One Epic and its Features, sized from the approved P50 effort and dated within the committed window. Review it, then copy or download the CSV and import it into Azure DevOps yourself. Nothing is sent to Azure DevOps.</p>
+              <div id="backlog-status" role="status" aria-live="polite"></div>
+              <div id="backlog-tree" class="backlog-tree"></div>
+              <div class="intake-actions" id="backlog-actions" hidden>
+                <button id="backlog-copy" class="intake-btn primary" type="button">Copy as ADO CSV</button>
+                <button id="backlog-download" class="intake-btn" type="button">Download CSV</button>
+                <button id="backlog-simulate" class="intake-btn" type="button">Simulate export to ADO</button>
+              </div>
+              <div id="backlog-export" class="export-log" role="status" aria-live="polite" hidden></div>
+            </section>
             <section class="what-if commit-tune" aria-labelledby="tune-title">
               <h4 class="step-title" id="tune-title">Explore what-if scenarios</h4>
               <p class="step-help">Ask in plain English, or change capacity, target date, or scope below and recalculate. The summary above updates, and approval uses the values it shows.</p>
@@ -1199,6 +1229,8 @@
     const SAMPLE_REQUEST = "We need one view of every customer across the business. Teams get different answers, and leadership wants this fixed soon.";
     const intake = { text: "", analysis: null, result: null, baselineCommitment: null, documents: [], approved: false };
     let reviewSeq = 0;
+    let backlogSeq = 0;
+    let backlog = null;
     function newIntakeSessionId() {
       if (typeof crypto.randomUUID === "function") return crypto.randomUUID();
       const bytes = crypto.getRandomValues(new Uint8Array(16));
@@ -1840,6 +1872,7 @@
       intake.approved = false;
       updateJourney();
       byId("intake-approved").hidden = true;
+      clearBacklog();
       byId("intake-approve").hidden = false;
       byId("intake-continue").hidden = true;
       loadChallenge();
@@ -1855,6 +1888,7 @@
     }
     function clearCommitAi() {
       reviewSeq += 1;
+      clearBacklog();
       ["review-source", "review-summary"].forEach((id) => { byId(id).textContent = ""; });
       ["review-risks", "review-conditions", "ask-result"].forEach((id) => byId(id).replaceChildren());
       byId("ask-result").hidden = true;
@@ -1989,6 +2023,114 @@
       byId("intake-approved").hidden = false;
       byId("intake-approve").hidden = true;
       byId("intake-continue").hidden = false;
+      loadBacklog();
+    }
+    function clearBacklog() {
+      backlogSeq += 1;
+      backlog = null;
+      byId("backlog-panel").hidden = true;
+      byId("backlog-actions").hidden = true;
+      byId("backlog-export").hidden = true;
+      byId("backlog-status").textContent = "";
+      byId("backlog-tree").replaceChildren();
+    }
+    function workItem(type, title, meta, bodyNodes, open) {
+      const item = el("details");
+      item.open = open;
+      const summary = el("summary");
+      summary.append(el("span", `wi-type ${type.toLowerCase()}`, type.toUpperCase()), el("strong", "", title), el("span", "wi-meta", meta));
+      item.append(summary);
+      if (bodyNodes.length) {
+        const body = el("div", "wi-body");
+        body.append(...bodyNodes);
+        item.append(body);
+      }
+      return item;
+    }
+    function renderBacklog(data) {
+      backlog = data;
+      const epic = data.epic;
+      const dates = (item) => `${item.start_date} → ${item.target_date}`;
+      const featureNodes = epic.features.map((feature) => {
+        const criteria = el("ul");
+        feature.acceptance_criteria.forEach((text) => criteria.append(el("li", "", text)));
+        return workItem("Feature", feature.title, `${hours(feature.effort_hours)} · ${dates(feature)}`, [
+          el("div", "", feature.why), el("strong", "", "Acceptance criteria"), criteria,
+          el("small", "", `Suggested roles: ${feature.roles.join(", ")}`),
+        ], false);
+      });
+      const children = el("div", "backlog-features");
+      children.append(...featureNodes);
+      const tree = workItem("Epic", epic.title,
+        `${hours(epic.effort_hours)} P50 · ${dates(epic)}`,
+        [el("div", "", epic.description),
+          el("small", "", `Feature efforts add up to the P50. The ${hours(epic.reserve_hours)} between P50 and P80 stays as schedule risk, not as scope.`),
+          children], true);
+      byId("backlog-tree").replaceChildren(tree);
+      byId("backlog-status").textContent = `${epic.features.length} Features under 1 Epic, ${hours(epic.effort_hours)} in total.`;
+      byId("backlog-actions").hidden = false;
+    }
+    async function loadBacklog() {
+      const seq = ++backlogSeq;
+      byId("backlog-panel").hidden = false;
+      byId("backlog-actions").hidden = true;
+      byId("backlog-export").hidden = true;
+      byId("backlog-tree").replaceChildren();
+      byId("backlog-status").textContent = "Building the Epic and Features from the approved baseline…";
+      try {
+        const data = await intakePost("/api/commit/backlog", {});
+        if (seq === backlogSeq) renderBacklog(data);
+      } catch (error) {
+        if (seq === backlogSeq) {
+          byId("backlog-status").replaceChildren(document.createTextNode(`The backlog could not be built: ${error.message} `));
+          const retry = el("button", "link-btn-inline", "Try again");
+          retry.type = "button";
+          retry.addEventListener("click", loadBacklog);
+          byId("backlog-status").append(retry);
+        }
+      }
+    }
+    function showExport(lines) {
+      const box = byId("backlog-export");
+      box.replaceChildren(...lines);
+      box.hidden = false;
+    }
+    async function copyBacklogCsv() {
+      if (!backlog) return;
+      try {
+        await navigator.clipboard.writeText(backlog.csv);
+        showExport([el("div", "", "Copied the ADO CSV to the clipboard. In Azure DevOps, open Boards → Work items → Import work items and paste it into a spreadsheet saved as CSV.")]);
+      } catch (error) {
+        showExport([el("div", "", "The browser blocked clipboard access. Use Download CSV instead.")]);
+      }
+    }
+    function downloadBacklogCsv() {
+      if (!backlog) return;
+      const url = URL.createObjectURL(new Blob(["\ufeff", backlog.csv], { type: "text/csv;charset=utf-8" }));
+      const link = el("a");
+      link.href = url;
+      link.download = backlog.csv_filename;
+      document.body.append(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      showExport([el("div", "", `Downloaded ${backlog.csv_filename}.`)]);
+    }
+    function simulateBacklogExport() {
+      if (!backlog) return;
+      const epic = backlog.epic;
+      const call = (type, title) => {
+        const row = el("div");
+        row.append(el("code", "", `POST https://dev.azure.com/{organization}/{project}/_apis/wit/workitems/$${type}?api-version=7.1`), document.createTextNode(` · ${title}`));
+        return row;
+      };
+      showExport([
+        el("strong", "", "SIMULATED · NOTHING WAS SENT"),
+        el("div", "", `Azure DevOps would create 1 Epic and ${epic.features.length} Features in state New, each Feature linked to the Epic as its parent.`),
+        call("Epic", epic.title),
+        ...epic.features.map((feature) => call("Feature", feature.title)),
+        el("small", "", "No request was made and no work item exists. Delivery Twin never writes to an enterprise system; import the CSV to create these."),
+      ]);
     }
 
     const INTAKE_STORE = "deliverytwin.intake.v1";
@@ -2029,6 +2171,7 @@
       renderCommitment(intake.result);
       intake.approved = false;
       byId("intake-approved").hidden = true;
+      clearBacklog();
       byId("intake-approve").hidden = false;
       byId("intake-continue").hidden = true;
       intakeShowUpTo(5);
@@ -2123,6 +2266,9 @@
       await loadImpactReport();
     }));
     byId("intake-continue").addEventListener("click", () => goToStage("track"));
+    byId("backlog-copy").addEventListener("click", copyBacklogCsv);
+    byId("backlog-download").addEventListener("click", downloadBacklogCsv);
+    byId("backlog-simulate").addEventListener("click", simulateBacklogExport);
     byId("track-next-go").addEventListener("click", () => goToStage("intervene"));
     byId("commit-empty-go").addEventListener("click", () => goToStage("shape"));
     updateJourney();

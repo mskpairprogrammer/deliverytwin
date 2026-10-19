@@ -483,6 +483,33 @@ class JourneyUiTests(unittest.TestCase):
         scope = page.locator("#ask-result tr", has_text="Scope change").locator("td").all_inner_texts()
         self.assertEqual(scope[2], "20%")
 
+    def test_approving_the_baseline_generates_an_ado_backlog_that_is_never_sent(self) -> None:
+        page = self.page
+        self.run_shape_to_commit()
+        self.assertTrue(page.locator("#backlog-panel").is_hidden())
+        page.get_by_role("button", name="Approve baseline").click()
+        page.locator("#backlog-tree .wi-type.epic").wait_for()
+        self.assertGreaterEqual(page.locator("#backlog-tree .wi-type.feature").count(), 3)
+        epic_effort = page.locator("#backlog-tree summary").first.locator(".wi-meta").inner_text()
+        self.assertRegex(epic_effort, r"[\d,]+ h P50 · \d{4}-\d{2}-\d{2} → \d{4}-\d{2}-\d{2}")
+        self.assertIn("Nothing is sent to Azure DevOps", page.locator("#backlog-panel").inner_text())
+
+        page.get_by_role("button", name="Simulate export to ADO").click()
+        export = page.locator("#backlog-export")
+        self.assertIn("NOTHING WAS SENT", export.inner_text())
+        self.assertEqual(export.locator("code").count(), 1 + page.locator("#backlog-tree .wi-type.feature").count())
+
+        page.context.grant_permissions(["clipboard-read", "clipboard-write"])
+        page.get_by_role("button", name="Copy as ADO CSV").click()
+        page.get_by_text("Copied the ADO CSV").wait_for()
+        copied = page.evaluate("navigator.clipboard.readText()")
+        self.assertTrue(copied.startswith("Work Item Type,Title 1,Title 2"))
+        self.assertEqual(copied.count("\r\nFeature,"), page.locator("#backlog-tree .wi-type.feature").count())
+
+        # Editing the commitment invalidates the backlog until the baseline is approved again.
+        page.locator("#tune-apply").click()
+        page.wait_for_function("document.getElementById('backlog-panel').hidden")
+
     def test_commit_ai_falls_back_to_rules_and_can_retry(self) -> None:
         type(self).llm_enabled = True
         type(self).llm = ScriptedLLM(fail=("challenge", "ask"))
@@ -565,7 +592,8 @@ class JourneyUiTests(unittest.TestCase):
         self.assertIn("Approve a baseline first", page.locator("#intervene-awaiting").inner_text())
 
         # The server enforces the same rule, so the UI cannot be bypassed.
-        for path in ("/api/simulate", "/api/track/brief", "/api/act/analyze", "/api/act/what-if", "/api/act/apply"):
+        for path in ("/api/simulate", "/api/track/brief", "/api/act/analyze", "/api/act/what-if", "/api/act/apply",
+                     "/api/commit/backlog"):
             self.assertEqual(self.post_status(path, {"next_sprint": True}), 409, path)
         self.assertEqual(self.post_status("/api/simulate", {"reset": True}), 200)
 

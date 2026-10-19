@@ -31,6 +31,7 @@ INTAKE_POST_ROUTES = (
 )
 ACT_POST_ROUTES = ("/api/act/analyze", "/api/act/what-if", "/api/act/apply")
 TRACK_POST_ROUTES = ("/api/track/brief",)
+COMMIT_POST_ROUTES = ("/api/commit/backlog",)
 MAX_CHAT_QUESTION_LENGTH = 1_200
 logger = logging.getLogger(__name__)
 BASELINE_REQUIRED = "Approve a baseline in COMMIT before tracking delivery or reviewing interventions."
@@ -1034,7 +1035,7 @@ def serve_dashboard(database: str | Path, host: str, port: int) -> None:
             route = urlsplit(self.path).path
             if route not in (
                 "/api/chat", "/api/simulate", "/api/reset-all",
-                *INTAKE_POST_ROUTES, *ACT_POST_ROUTES, *TRACK_POST_ROUTES,
+                *INTAKE_POST_ROUTES, *ACT_POST_ROUTES, *TRACK_POST_ROUTES, *COMMIT_POST_ROUTES,
             ):
                 self.send_error(404, "Not found")
                 return
@@ -1092,6 +1093,24 @@ def serve_dashboard(database: str | Path, host: str, port: int) -> None:
                     return
                 except (OSError, sqlite3.Error, RuntimeError) as error:
                     self.send_json(500, {"error": f"Unable to run simulation: {error}"})
+                    return
+                self.send_json(200, result)
+                return
+            if route in COMMIT_POST_ROUTES:
+                from .backlog import latest_backlog
+
+                try:
+                    with connect(database) as connection:
+                        result = latest_backlog(connection)
+                        if result is None:
+                            raise BaselineRequiredError(
+                                "Approve a baseline in COMMIT before generating the Azure DevOps backlog."
+                            )
+                except BaselineRequiredError as error:
+                    self.send_json(409, {"error": str(error)})
+                    return
+                except (OSError, sqlite3.Error, RuntimeError, ValueError) as error:
+                    self.send_json(500, {"error": f"Unable to build the backlog: {error}"})
                     return
                 self.send_json(200, result)
                 return

@@ -6,6 +6,7 @@ SQLite, DuckDB, and Delta tables.
 """
 from __future__ import annotations
 
+import json
 import uuid
 from datetime import date, datetime, timezone
 from typing import Any, Iterable
@@ -55,6 +56,20 @@ class BaselineRepository:
             "ORDER BY approved_at DESC, baseline_id DESC LIMIT 1"
         )
         return self._summary(rows[0]) if rows else None
+
+    def latest_scope(self) -> dict[str, Any] | None:
+        """The latest approved baseline plus the request and fingerprint it was approved for."""
+        rows = self.db.query(
+            f"SELECT {', '.join(_columns(self.TABLE))} FROM {self.db.table(self.TABLE)} "
+            "ORDER BY approved_at DESC, baseline_id DESC LIMIT 1"
+        )
+        if not rows:
+            return None
+        return {
+            **self._summary(rows[0]),
+            "request_text": rows[0]["request_text"],
+            "fingerprint": json.loads(rows[0]["fingerprint_json"] or "{}"),
+        }
 
     def get(self, baseline_id: str) -> dict[str, Any] | None:
         rows = self.db.query(
