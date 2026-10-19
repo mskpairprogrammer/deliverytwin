@@ -10,11 +10,25 @@ All source data is synthetic. There are no live connectors, and nothing is ever 
 
 | Stage | What happens | AI's role | Human decision |
 |---|---|---|---|
-| **SHAPE** | Describe a request, confirm clarifying questions, get an estimate | Writes the questions, forecasts P50/P80/P90 effort and on-time odds from similar completed projects | Confirm the answers |
-| **COMMIT** | Check feasibility against capacity, date, and scope | Challenges the commitment (risks and conditions); answers plain-English what-if questions | Approve the baseline |
-| **COMMIT** (after approval) | Turn the approved baseline into an Azure DevOps Epic and Features | None (deterministic) | Import the CSV into Azure DevOps yourself |
-| **TRACK** | Compare simulated delivery signals with the approved baseline | Explains what changed and why the forecast moved | None (monitoring) |
-| **INTERVENE** | Compare recovery options and preview their effect | Diagnoses the problem, proposes scenarios, predicts outcomes | Apply a simulated scenario |
+| **SHAPE** | Describe a request, attach a ROM and meeting notes, confirm clarifying questions, get an estimate | Writes the questions and extracts facts, risks and dependencies (each badged by source, with quotes verified word for word by code); forecasts P50/P80/P90 effort and on-time odds from similar completed projects | Confirm the answers |
+| **COMMIT** | Check feasibility against capacity, date and scope, with a Role × Phase capacity table, an HR privacy guardrail and an executive ROI strip | Challenges the commitment (risks and conditions); answers plain-English what-if questions | Approve the baseline |
+| **COMMIT** (after approval) | Turn the approved baseline into an Azure DevOps Epic, Features and User Stories | None (deterministic) | Import the CSV into Azure DevOps yourself |
+| **TRACK** | Compare simulated delivery signals with the approved baseline; scenario packs, injectable events, CSV/XLSX import | Explains what changed and why the forecast moved | None (monitoring) |
+| **INTERVENE** | Compare recovery options, each with an estimated dollar cost, ranked by confidence, then cost, then date | Diagnoses the problem, proposes scenarios, predicts outcomes | Apply a simulated scenario |
+
+### Capabilities at a glance
+
+| Area | Capability | Where |
+|---|---|---|
+| Data layer | DuckDB by default, SQLite and Azure Databricks (Unity Catalog / Delta) behind one portable interface; `--dialect` / `DELIVERYTWIN_DB_DIALECT`; thread-safe persistent DuckDB file | [Portfolio data layer](#portfolio-data-layer) |
+| Cloud AI | Databricks Model Serving, then Azure OpenAI, then OpenAI, then a labeled rules fallback; recorded mode for offline demos | [How the AI is used](#how-the-ai-is-used) |
+| SHAPE | Source badges (`Stated in Request`, `Found in Meeting Notes (Quote Verified)`, `AI Inference (Confirm)`) with deterministic verbatim quote verification; sample ROM and meeting notes | [SHAPE](#shape-estimate-from-similar-completed-projects) |
+| COMMIT | Role × Phase capacity bottlenecks; HR privacy guardrail (N ≥ 3); AI pre-commit review; what-if questions; baseline history | [COMMIT](#commit-challenge-the-commitment-then-approve-it) |
+| Azure DevOps | Epic → Feature → User Story backlog, role split, recovery-plan variant and diff, ADO CSV, REST JSON, decision pack; never sent to ADO | [COMMIT](#commit-challenge-the-commitment-then-approve-it) |
+| TRACK | Four scenario packs, event injection, import of exported CSV/XLSX files, AI sprint briefing over a computed variance table, per-sprint snapshots | [TRACK](#track-what-changed-since-the-baseline) |
+| INTERVENE | AI scenarios validated against bounds, `+$XX,XXX` / `$0` cost impact at a configurable blended rate, code-ranked recommendation, simulated apply | [INTERVENE](#intervene-recover-with-ai-proposed-scenarios) |
+| Executive ROI | Early dependency detection, estimator variance reduction, backtest MAPE and calibration, shown in COMMIT, INTERVENE and the impact panel | [COMMIT](#commit-challenge-the-commitment-then-approve-it) |
+| Deployment | Container Apps, App Service, Databricks Apps (`src/app.yaml`), AKS, ACI | [Deploy to Azure](#deploy-to-azure) |
 
 **TRACK and INTERVENE only unlock after a baseline is approved in COMMIT.** The server enforces this (HTTP 409), and the UI explains it.
 
@@ -242,8 +256,8 @@ Microsoft Agent Framework runs the four stages as deterministic executors; it or
 
 | Route | Purpose |
 |---|---|
-| `POST /api/intake/analyze` · `estimate` · `forecast` | SHAPE questions, the central estimate (forecast plus commitment), the forecast alone |
-| `POST /api/intake/evaluate` · `what-if` · `approve` | COMMIT recalculation, scope simulation, approval |
+| `POST /api/intake/analyze` · `estimate` · `forecast` | SHAPE questions and source-badged `findings` with `source_counts`, the central estimate (forecast plus commitment), the forecast alone |
+| `POST /api/intake/evaluate` · `what-if` · `approve` | COMMIT recalculation (returns the commitment, `role_phase` capacity with the privacy guardrail, and `dependency_detection`), scope simulation, approval |
 | `POST /api/intake/challenge` · `ask` | COMMIT AI review and what-if questions |
 | `POST /api/commit/backlog` | Epic/Feature/User Story backlog, CSV, and (once a recovery scenario is applied) the plan-adjusted variant and its diff (409 until a baseline exists) |
 | `POST /api/commit/pack` | Decision pack Markdown and Azure DevOps REST JSON; accepts the review shown on screen (409 until a baseline exists) |
@@ -252,10 +266,10 @@ Microsoft Agent Framework runs the four stages as deterministic executors; it or
 | `POST /api/simulate/event` | Inject an event (`engineer_leaves`, `dependency_slip`, `p1_incident`, `scope_surge`, `support_spike`) into the current sprint |
 | `POST /api/import/signals` | Import CSV/XLSX exports as the TRACK signals, returning a per-file validation report |
 | `GET /api/simulate/catalog`, `/api/samples`, `/api/ai/status` | Scenarios, event kinds and current simulation state; sample documents and exports; active AI mode |
-| `POST /api/track/brief` | TRACK AI briefing |
-| `POST /api/act/analyze` · `what-if` · `apply` | INTERVENE scenarios, prediction, simulated apply |
+| `POST /api/track/brief` | TRACK AI briefing, plus the per-sprint `trend` of recorded snapshots |
+| `POST /api/act/analyze` · `what-if` · `apply` | INTERVENE scenarios (each with `cost_impact`, ranked, with `recommendation_basis`), prediction, simulated apply |
 | `POST /api/chat`, `GET /api/chat/status` | Read-only report chat |
-| `GET /api/report`, `/api/intake/baseline`, `/api/impact`, `/healthz` | Report, latest baseline, portfolio metrics, health |
+| `GET /api/report`, `/api/intake/baseline`, `/api/impact`, `/healthz` | Report, latest baseline, portfolio metrics (backtest, calibration and `roi`), health |
 | `POST /api/reset-all` | Clear demo data (demo mode only) |
 
 ## Portfolio data layer
@@ -398,6 +412,9 @@ Use this only if you already run AKS. You would need to write a Deployment (1 re
 ## Scope and safety
 
 - Every source is marked simulated with `writeback_enabled=0`. Applying an INTERVENE scenario or approving a baseline records simulated rows locally and changes nothing elsewhere.
+- **HR privacy.** Oracle HCM and UKG data are used only as role-level aggregates; groups under three workers are suppressed and no worker name or id reaches the UI or the API response (enforced and tested in [`capacity.py`](src/deliverytwin/capacity.py)).
+- **No invented provenance.** A finding is only labeled as coming from the request or an uploaded document when its quote is found verbatim in that text; otherwise it is labeled `AI Inference (Confirm)`.
+- **Mock costs.** Dollar figures use a mock blended rate (default $150/h), not payroll or rate-card data.
 - Uploaded exports are parsed in memory and reduced to five numbers plus a list of blocking changes; the files themselves are not stored. They are limited to five files of 2 MB each, and CSV cells that could run as spreadsheet formulas are neutralized in every CSV the app produces.
 - Cross-origin POST requests are rejected, request sizes are bounded, and destructive routes need demo mode.
 - The sample server has no authentication or rate limiting. Do not expose it as a production service without identity, authorization and abuse protection.
