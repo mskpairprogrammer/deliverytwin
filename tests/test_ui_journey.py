@@ -101,7 +101,8 @@ class JourneyUiTests(unittest.TestCase):
 
     def run_shape_to_estimate(self) -> None:
         page = self.page
-        page.get_by_role("button", name="Try the sample request").click()
+        page.get_by_role("button", name="Use sample request").click()
+        page.get_by_role("button", name="Analyze request").click()
         page.get_by_role("button", name="Run prediction").click()
         page.locator("#intake-rom").get_by_text("Most likely effort (P50)").wait_for()
         self.assertEqual(self.states()["shape"], "Estimate ready")
@@ -122,7 +123,8 @@ class JourneyUiTests(unittest.TestCase):
         self.assertEqual(visible(), [1])
         self.assertEqual(page.locator("#intake-step-badge").inner_text(), "STEP 1 OF 3")
 
-        page.get_by_role("button", name="Try the sample request").click()
+        page.get_by_role("button", name="Use sample request").click()
+        page.get_by_role("button", name="Analyze request").click()
         page.get_by_role("button", name="Run prediction").wait_for()
         self.assertEqual((visible(), collapsed()), ([1, 2], [1]))
         self.assertIn("We need one view of every customer", page.locator("#summary-1").inner_text())
@@ -220,7 +222,8 @@ class JourneyUiTests(unittest.TestCase):
     def test_llm_writes_the_questions_and_its_forecast_is_the_central_result(self) -> None:
         type(self).llm_enabled = True
         page = self.page
-        page.get_by_role("button", name="Try the sample request").click()
+        page.get_by_role("button", name="Use sample request").click()
+        page.get_by_role("button", name="Analyze request").click()
         page.get_by_role("button", name="Run prediction").wait_for()
         self.assertIn("Tailored questions written by", page.locator("#intake-retrieval").inner_text())
         self.assertEqual(page.locator("#intake-questions .q-card").count(), 4)
@@ -258,7 +261,8 @@ class JourneyUiTests(unittest.TestCase):
     def test_an_ai_estimate_survives_a_reload_without_calling_the_model_again(self) -> None:
         type(self).llm_enabled = True
         page = self.page
-        page.get_by_role("button", name="Try the sample request").click()
+        page.get_by_role("button", name="Use sample request").click()
+        page.get_by_role("button", name="Analyze request").click()
         page.get_by_role("button", name="Run prediction").click()
         page.locator("#intake-rom").get_by_text("Most likely effort (P50)").wait_for()
         page.reload()
@@ -273,7 +277,8 @@ class JourneyUiTests(unittest.TestCase):
         type(self).llm_enabled = True
         type(self).llm = ScriptedLLM(forecast="invalid")
         page = self.page
-        page.get_by_role("button", name="Try the sample request").click()
+        page.get_by_role("button", name="Use sample request").click()
+        page.get_by_role("button", name="Analyze request").click()
         page.get_by_role("button", name="Run prediction").click()
         page.locator("#intake-rom").get_by_text("Most likely effort (P50)").wait_for()
         self.assertIn("STATISTICAL ESTIMATE", page.locator("#prediction-source").inner_text())
@@ -287,7 +292,8 @@ class JourneyUiTests(unittest.TestCase):
         type(self).llm_enabled = True
         type(self).llm = ScriptedLLM(fail=("questions", "forecast"))
         page = self.page
-        page.get_by_role("button", name="Try the sample request").click()
+        page.get_by_role("button", name="Use sample request").click()
+        page.get_by_role("button", name="Analyze request").click()
         page.get_by_role("button", name="Run prediction").wait_for()
         notice = page.locator("#intake-retrieval").inner_text()
         self.assertIn("could not be reached", notice)
@@ -310,6 +316,37 @@ class JourneyUiTests(unittest.TestCase):
         page.locator("#prediction-source button").click()
         page.wait_for_function("document.getElementById('prediction-source').textContent.includes('AI FORECAST ·')")
         self.assertIn("4,900 h", page.locator("#intake-rom").inner_text())
+
+    def test_documents_can_be_attached_before_analyzing_and_reach_the_model(self) -> None:
+        type(self).llm_enabled = True
+        page = self.page
+        page.get_by_role("button", name="Use sample request").click()
+        # Choosing the sample must not advance the flow; the attach controls stay available.
+        self.assertTrue(page.locator("#intake-step-1").is_visible())
+        self.assertTrue(page.locator("#intake-step-2").is_hidden())
+        directory = tempfile.mkdtemp()
+        rom, notes = os.path.join(directory, "rom.txt"), os.path.join(directory, "notes.md")
+        with open(rom, "w", encoding="utf-8") as handle:
+            handle.write("ROM: Customer 360 with identity resolution and consent review, about 5000 hours.")
+        with open(notes, "w", encoding="utf-8") as handle:
+            handle.write("Meeting notes: privacy office must sign off before profiles are shared.")
+        page.locator("#intake-rom-file").set_input_files(rom)
+        page.locator("#intake-notes-file").set_input_files(notes)
+        page.wait_for_function("document.querySelectorAll('#intake-doc-list li').length === 2")
+        self.assertIn("ROM: rom.txt", page.locator("#intake-doc-list").inner_text())
+        self.assertIn("Meeting notes: notes.md", page.locator("#intake-doc-list").inner_text())
+        self.assertTrue(page.locator("#intake-step-2").is_hidden())
+
+        page.get_by_role("button", name="Analyze request").click()
+        page.get_by_role("button", name="Run prediction").wait_for()
+        self.assertIn("2 document(s)", page.locator("#summary-1").inner_text())
+        sent = " ".join(type(self).llm.prompts)
+        self.assertIn("privacy office must sign off", sent)
+
+        # Documents can still be added later: Edit reopens step 1 with the attachments still listed.
+        page.locator('[data-edit="1"]').click()
+        self.assertTrue(page.locator("#intake-step-1").is_visible())
+        self.assertEqual(page.locator("#intake-doc-list li").count(), 2)
 
     def test_demo_data_can_be_cleared_from_the_footer(self) -> None:
         page = self.page

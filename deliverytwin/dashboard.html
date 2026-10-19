@@ -379,7 +379,7 @@
               <ul id="intake-doc-list" class="intake-doc-list"></ul>
             </div>
             <div class="intake-actions">
-              <button id="intake-sample" class="intake-btn" type="button">Try the sample request</button>
+              <button id="intake-sample" class="intake-btn" type="button">Use sample request</button>
               <button id="intake-analyze" class="intake-btn primary" type="button">Analyze request</button>
             </div>
           </div>
@@ -1624,7 +1624,6 @@
     byId("intake-sample").addEventListener("click", () => {
       byId("intake-text").value = SAMPLE_REQUEST;
       resetIntakeResult();
-      byId("intake-analyze").click();
     });
     byId("intake-text").addEventListener("input", () => {
       resetIntakeResult();

@@ -45,6 +45,7 @@ class ScriptedLLM:
 
     def __init__(self, questions=None, forecast="valid", fail=()):
         self.fail = set(fail)
+        self.prompts = []
         self.questions = questions if questions is not None else llm_questions()
         self.forecast = forecast
         self.calls = []
@@ -52,6 +53,7 @@ class ScriptedLLM:
     def __call__(self, messages, json_mode=False):
         system = messages[0]["content"]
         payload = json.loads(messages[1]["content"])
+        self.prompts.append(messages[1]["content"])
         if "clarifying questions" in system:
             self.calls.append("questions")
             if "questions" in self.fail:
