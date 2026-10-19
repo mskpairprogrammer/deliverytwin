@@ -1,3 +1,7 @@
+
+
+https://github.com/user-attachments/assets/61b6213e-1a1c-43e3-82cd-01cc7f7ed055
+
 # Delivery Twin
 
 Delivery Twin is a delivery-forecasting prototype that guides a request through four stages: **SHAPE → COMMIT → TRACK → INTERVENE**. An AI model does the analysis at every stage, and a person makes every decision. Each AI answer is validated before it is shown. If the AI is unavailable or its answer fails validation, the page falls back to a clearly labeled rules-based result.
