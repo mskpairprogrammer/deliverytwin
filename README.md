@@ -26,7 +26,7 @@ All source data is synthetic. There are no live connectors, and nothing is ever 
 
 SHAPE has three steps. Finished steps collapse to a summary with an **Edit** link, and an in-progress estimate is kept across a reload.
 
-1. **Describe the request** (10–2,000 characters), or use the sample. You can attach PDF, DOCX, XLSX or text ROM documents and meeting notes (2 MB per file, 5 MB total). Scanned PDFs need OCR first. Ready-made samples are in [`docs/samples/`](docs/samples) (a ROM document and kickoff meeting notes for the sample request).
+1. **Describe the request** (10–2,000 characters), or use the sample. You can attach PDF, DOCX, XLSX or text ROM documents and meeting notes (2 MB per file, 5 MB total). Scanned PDFs need OCR first. **Load full sample** fills the request and attaches a ready-made ROM document and kickoff meeting notes (kept in [`data/samples/`](src/deliverytwin/data/samples)) in one click.
 2. **Confirm the approach.** The AI reads the request, the documents, and the most similar completed projects, then writes 4–6 tailored clarifying questions. Each carries a suggested answer and a rationale that names the projects behind it.
 3. **Prediction analysis.** The AI forecasts P50, P80 and P90 effort, on-time probability, key risks, recommendations, and the completed projects that influenced it. The result is labeled `AI FORECAST · model` or `STATISTICAL ESTIMATE · AI FORECAST UNAVAILABLE`, and is compared with a deterministic ROM. The forecast becomes the proposed COMMIT baseline.
 
@@ -39,15 +39,27 @@ COMMIT compares the estimate with the time remaining and the team allocation. Re
 - **AI pre-commit review** (`/api/intake/challenge`). The AI reads the server-computed commitment and the most similar completed projects, then lists the biggest risks with evidence and the conditions to attach before approving. It re-runs when you recalculate. It is advisory: the feasibility check and your approval decide.
 - **What-if questions** (`/api/intake/ask`). Ask "What if we lose an engineer?" in plain English. The AI only translates the question into the same FTE / date / scope levers as the sliders. The commitment model computes the before-and-after table, and **Use these values** applies it. Questions that cannot be expressed as those levers, or fall outside their limits, are reported rather than clamped.
 
-A collapsible **Estimate quality & portfolio impact** panel shows a leave-one-out backtest (MAPE of the plan and of the similarity-analog ROM against actual effort), time-to-first-ROM and seven-day intake volume. It is portfolio context only and does not affect any approval.
+A collapsible **Estimate quality & portfolio impact** panel shows a leave-one-out backtest (MAPE of the plan and of the similarity-analog ROM against actual effort), time-to-first-ROM and seven-day intake volume. A **calibration** section checks the P50 and P80 bands the same way: how often real effort fell at or below each band (targets 50% and 80%), the average estimate bias, and how often projects finished on time. It is portfolio context only and does not affect any approval.
 
-- **Azure DevOps backlog** (`/api/commit/backlog`). Once a baseline is approved, COMMIT shows one Epic and its Features as an expandable tree. The split is deterministic, with no model involved: Feature efforts add up to the approved P50, dates fall inside the committed window, and Features come from the delivery fingerprint (discovery, each external dependency, each in-scope system, test and cutover). The P50-to-P80 gap is shown as schedule risk, not scope. **Copy as ADO CSV** and **Download CSV** produce the Azure DevOps hierarchical import layout (Epic in `Title 1`, Features in `Title 2`) for you to import yourself. **Simulate export to ADO** only lists the calls that would be made. Nothing is sent to Azure DevOps, and the endpoint returns 409 until a baseline is approved. See [`backlog.py`](src/deliverytwin/backlog.py).
+**After approval**, COMMIT also shows the following. None of it involves a model, and each item is labeled with where its data came from (synthetic, uploaded, or computed by code).
+
+- **Azure DevOps backlog** (`/api/commit/backlog`). One Epic, its Features and their User Stories as an expandable tree. Feature efforts add up to the approved P50, dates fall inside the committed window, and Features come from the delivery fingerprint (discovery, each external dependency, each in-scope system, test and cutover). Each Feature's hours are split across roles by the planned team, and each User Story comes from an acceptance criterion. The P50-to-P80 gap is shown as schedule risk, not scope.
+- **Backlog follows the plan.** When an INTERVENE scenario is applied, a second backlog is built with the new target date and the deferred share of build work moved into a follow-on Feature. A toggle switches between the approved baseline and the recovery plan, with a list of what changed.
+- **Exports.** **Copy as ADO CSV** and **Download CSV** produce the Azure DevOps hierarchical import layout (Epic in `Title 1`, Features in `Title 2`, Stories in `Title 3`). **Download ADO REST JSON** gives the same backlog as JSON Patch requests with parent links, for an engineer to script. **Download decision pack** gives a Markdown summary of the baseline, fingerprint, the pre-commit review you saw (if any), the backlog, the applied recovery scenario and the data lineage (`/api/commit/pack`). **Simulate export to ADO** only lists the calls that would be made. Nothing is sent to Azure DevOps, and the endpoints return 409 until a baseline is approved. See [`backlog.py`](src/deliverytwin/backlog.py) and [`pack.py`](src/deliverytwin/pack.py).
+- **Baseline history** (`/api/baselines`). Every approval is kept, newest first, with the change in P50, P80, FTE, target date and confidence against the one before.
+- **Persistent approval.** Reloading the page keeps the approved state and the backlog. If you have no estimate open, COMMIT shows the approved baseline and its backlog instead of an empty screen.
 
 ### TRACK: what changed since the baseline
 
 ![TRACK showing the AI sprint briefing with a computed variance table, then the delivery outlook](docs/screenshots/track.png)
 
-**Simulate next sprint** loads or advances the synthetic records from five systems (Planview, Azure DevOps, ServiceNow, Oracle HR / HCM, UKG Pro WFM) by one 14-day sprint. The outlook is a transparent formula over those signals, not a Monte Carlo forecast.
+**Simulate next sprint** loads or advances the synthetic records from five systems (Planview, Azure DevOps, ServiceNow, Oracle HR / HCM, UKG Pro WFM) by one 14-day sprint. The outlook is a transparent formula over those signals, not a Monte Carlo forecast. A lineage strip above the controls always says where the signals come from.
+
+The **Simulation lab** makes the demo repeatable without any connection to a source system:
+
+- **Scenario packs.** Four scripted scenarios: *Capacity collision* (the default), *Healthy delivery*, *Dependency slips* and *Incident spike*. Each defines, per sprint, the unplanned work, production-support hours, open P1 incidents, blocked-change age and time off, so the same inputs give the same forecast every time. Switching scenarios recomputes all simulated records from scratch.
+- **Event injection.** Add *Engineer leaves* (modeled as 80 lost lead-engineer hours), *Dependency slips two weeks*, *New P1 incident*, *Scope surge* or *Support spike* to the current sprint. The event stays in effect for later sprints until the scenario changes. The forecast formula is unchanged; only its inputs move, and TRACK and INTERVENE react.
+- **Import exports.** Upload CSV or XLSX files a person exported from Azure DevOps (work items), ServiceNow (incidents, change requests) and UKG (time entries, time off), up to five files. Each file's kind is detected from its columns, every row is used or skipped with a reason, and the import report shows what was read. Signals without a file count as zero. This replaces the scripted signals, and the forecast, briefing and recovery analysis work on them. **Use sample exports** loads five ready-made files from [`data/samples/exports/`](src/deliverytwin/data/samples/exports) with dates relative to today. See [`importer.py`](src/deliverytwin/importer.py) for the accepted columns.
 
 The **AI sprint briefing** (`/api/track/brief`) explains in plain language what moved the forecast. Its variance table is **computed**: the forecast formula in [`workflow.py`](src/deliverytwin/workflow.py) assigns each signal a penalty, and the table scales those penalties to the confidence actually lost since the baseline. The AI only writes the narrative, a per-driver explanation naming the source system, and what to watch next. It is rejected if it skips a driver.
 
@@ -69,7 +81,16 @@ The same rules apply to every AI feature:
 - **Fallbacks are truthful.** The page states why the AI was not used: no key configured, request failed (with the HTTP status), or response failed validation. It offers a retry where one makes sense.
 - **Tests never call a real model.** The suite uses a scripted stand-in model.
 
-With `OPENAI_API_KEY` set, the app uses OpenAI Chat Completions (`OPENAI_MODEL`, default `gpt-4o-mini`). Calls take a few seconds each, and the SHAPE estimate can take up to a minute.
+The AI backend is chosen from the environment, in this order:
+
+| Mode | Set | Notes |
+|---|---|---|
+| **Recorded sample** | `DELIVERYTWIN_AI_MODE=recorded` | No key and no internet. Answers are replayed deterministically from the data each prompt carries ([`recorded_ai.py`](src/deliverytwin/recorded_ai.py)); they are **not** produced by a model. Every AI label shows `recorded-sample`, and a banner says so. Use it for offline demos and for judging the product without a key. |
+| **Azure OpenAI** | `AZURE_OPENAI_ENDPOINT` (https), `AZURE_OPENAI_DEPLOYMENT`, optionally `AZURE_OPENAI_API_KEY` and `AZURE_OPENAI_API_VERSION` | Without a key it signs in with `DefaultAzureCredential` (a managed identity in Azure). The AI labels show the deployment name. |
+| **OpenAI** | `OPENAI_API_KEY`, optionally `OPENAI_MODEL` (default `gpt-4o-mini`) | Chat Completions. |
+| **Off** | nothing | Rules-based fallbacks, labeled as such. |
+
+Live calls take a few seconds each, and the SHAPE estimate can take up to a minute. `GET /api/ai/status` reports the active mode.
 
 ## Run locally
 
@@ -109,14 +130,13 @@ python -m playwright install chromium       # once, for the browser tests
 python -m unittest discover -s tests
 ```
 
-The suite covers the data layer (SQLite and DuckDB contract tests), the AI features with a scripted model, and a Playwright test of the whole SHAPE → COMMIT → TRACK → INTERVENE journey. The browser tests are skipped if Chromium is unavailable.
+The suite covers the data layer (SQLite and DuckDB contract tests), the AI features with a scripted model, the scenario packs, events, file import, backlog, decision pack, recorded and Azure OpenAI modes, and Playwright tests of the whole SHAPE → COMMIT → TRACK → INTERVENE journey. The browser tests are skipped if Chromium is unavailable, and the DuckDB tests need `requirements-dev.txt`.
 
 ## Repository layout
 
 ```
 README.md
 docs/screenshots/            screenshots used above
-docs/samples/                sample ROM document and meeting notes to try the upload step
 Delivery_Twin_Hackathon_Pitch.pdf
 src/                         the deployable unit: Docker build context
   Dockerfile
@@ -129,12 +149,18 @@ src/                         the deployable unit: Docker build context
     workflow.py              Agent Framework stage graph and the forecast formula
     intake.py                SHAPE and COMMIT logic
     commit_ai.py             COMMIT review and what-if questions
-    backlog.py               Azure DevOps Epic/Feature backlog and CSV from the approved baseline
+    backlog.py               Azure DevOps Epic/Feature/Story backlog, CSV, REST JSON, recovery-plan diff
+    pack.py                  decision pack (Markdown) for the latest approved baseline
+    scenarios.py             scripted scenario packs and injectable events for TRACK
+    importer.py              CSV/XLSX export import into TRACK signals, with a validation report
+    extras.py                handlers for the demo-environment routes (baselines, samples, import, events)
     track_ai.py              TRACK variance attribution and briefing
     recovery.py              INTERVENE scenarios and predictions
-    ai_common.py, llm.py     shared AI helpers and the OpenAI client
+    ai_common.py, llm.py     shared AI helpers; OpenAI, Azure OpenAI and recorded backends
+    recorded_ai.py           deterministic recorded stand-in for the model (offline demos)
     chat.py                  read-only "Ask Delivery Twin" assistant
     data/                    portfolio data layer, dataset, Databricks DDL
+      samples/               sample ROM, meeting notes and exports (exports/) for demos
   tests/
 ```
 
@@ -163,7 +189,8 @@ flowchart LR
         AI --> RULES
     end
     Sources -. synthetic records only .-> DATA
-    AI --> MODEL[OpenAI, or Microsoft Foundry for chat]
+    AI --> MODEL[OpenAI, Azure OpenAI, or recorded sample answers; Microsoft Foundry for chat]
+    UPLOAD[Files a person exports and uploads] -.-> API
     API --> HUMAN[Human approval]
     HUMAN -. simulated only; no write-back .-> Sources
 ```
@@ -177,8 +204,13 @@ Microsoft Agent Framework runs the four stages as deterministic executors; it or
 | `POST /api/intake/analyze` · `estimate` · `forecast` | SHAPE questions, the central estimate (forecast plus commitment), the forecast alone |
 | `POST /api/intake/evaluate` · `what-if` · `approve` | COMMIT recalculation, scope simulation, approval |
 | `POST /api/intake/challenge` · `ask` | COMMIT AI review and what-if questions |
-| `POST /api/commit/backlog` | Azure DevOps Epic/Feature backlog and CSV for the latest approved baseline (409 until one exists) |
-| `POST /api/simulate` | Advance or reset the sprint simulation (needs an approved baseline) |
+| `POST /api/commit/backlog` | Epic/Feature/User Story backlog, CSV, and (once a recovery scenario is applied) the plan-adjusted variant and its diff (409 until a baseline exists) |
+| `POST /api/commit/pack` | Decision pack Markdown and Azure DevOps REST JSON; accepts the review shown on screen (409 until a baseline exists) |
+| `GET /api/baselines` | Every approved baseline, newest first, with changes against the previous one |
+| `POST /api/simulate` | Advance the sprint simulation, optionally switching `scenario`, or reset it (needs an approved baseline; reset is demo mode only) |
+| `POST /api/simulate/event` | Inject an event (`engineer_leaves`, `dependency_slip`, `p1_incident`, `scope_surge`, `support_spike`) into the current sprint |
+| `POST /api/import/signals` | Import CSV/XLSX exports as the TRACK signals, returning a per-file validation report |
+| `GET /api/simulate/catalog`, `/api/samples`, `/api/ai/status` | Scenarios, event kinds and current simulation state; sample documents and exports; active AI mode |
 | `POST /api/track/brief` | TRACK AI briefing |
 | `POST /api/act/analyze` · `what-if` · `apply` | INTERVENE scenarios, prediction, simulated apply |
 | `POST /api/chat`, `GET /api/chat/status` | Read-only report chat |
@@ -245,10 +277,10 @@ az containerapp create -n deliverytwin -g rg-deliverytwin --environment cae-deli
   --image <acr-name>.azurecr.io/deliverytwin:1 --registry-server <acr-name>.azurecr.io --registry-identity system `
   --target-port 8000 --ingress external --min-replicas 1 --max-replicas 1 `
   --secrets openai-key=<secret-value> `
-  --env-vars DELIVERYTWIN_TRUSTED_AUTH=1 DELIVERYTWIN_DEMO_MODE=1 OPENAI_API_KEY=secretref:openai-key
+  --env-vars DELIVERYTWIN_TRUSTED_AUTH=1 DELIVERYTWIN_SIMULATION=1 OPENAI_API_KEY=secretref:openai-key
 ```
 
-Then turn on authentication with `az containerapp auth microsoft update` (Entra ID, unauthenticated requests redirected to sign-in) **before sharing the URL**. `DELIVERYTWIN_TRUSTED_AUTH=1` only tells the app that a gateway authenticates users; it does not add one. For anything beyond a demo, replace the inline secret with a Key Vault reference (`--secrets openai-key=keyvaultref:<secret-uri>,identityref:system`). `DELIVERYTWIN_DEMO_MODE=1` enables **Simulate next sprint** and **Clear all demo data**; leave it at `0` for anything but a demo.
+Then turn on authentication with `az containerapp auth microsoft update` (Entra ID, unauthenticated requests redirected to sign-in) **before sharing the URL**. `DELIVERYTWIN_TRUSTED_AUTH=1` only tells the app that a gateway authenticates users; it does not add one. For anything beyond a demo, replace the inline secret with a Key Vault reference (`--secrets openai-key=keyvaultref:<secret-uri>,identityref:system`). `DELIVERYTWIN_SIMULATION=1` enables the simulation lab (**Simulate next sprint**, scenarios, events, file import) without enabling **Clear all demo data**, which needs `DELIVERYTWIN_DEMO_MODE=1`. To run with no key at all, use `DELIVERYTWIN_AI_MODE=recorded`; to use Azure OpenAI, set the `AZURE_OPENAI_*` variables and give the app's managed identity the *Cognitive Services OpenAI User* role.
 
 #### Option 2: App Service for Containers
 
@@ -257,7 +289,7 @@ az appservice plan create -n asp-deliverytwin -g rg-deliverytwin --is-linux --sk
 az webapp create -n <app-name> -g rg-deliverytwin -p asp-deliverytwin `
   --container-image-name <acr-name>.azurecr.io/deliverytwin:1
 az webapp config appsettings set -n <app-name> -g rg-deliverytwin --settings `
-  WEBSITES_PORT=8000 DELIVERYTWIN_TRUSTED_AUTH=1 DELIVERYTWIN_DEMO_MODE=1 `
+  WEBSITES_PORT=8000 DELIVERYTWIN_TRUSTED_AUTH=1 DELIVERYTWIN_SIMULATION=1 `
   "OPENAI_API_KEY=@Microsoft.KeyVault(SecretUri=<secret-uri>)"
 az webapp config set -n <app-name> -g rg-deliverytwin --generic-configurations '{"healthCheckPath": "/healthz"}'
 ```
@@ -282,7 +314,7 @@ Use this only if you already run AKS. You would need to write a Deployment (1 re
 - **Probes.** HTTP health probe at `/healthz` on port 8000.
 - **Secrets.** Provide `OPENAI_API_KEY` (or the Foundry settings) through Key Vault references, never in the image or source control.
 - **Storage.** The container's SQLite file (`/tmp/deliverytwin.db`) is ephemeral and local to one instance, so approved baselines and the Azure DevOps backlog (which is rebuilt from the latest baseline) are lost on restart, and running several replicas would give each its own database. Keep one replica, or move to Databricks (above) for durable, shared data.
-- **AI model.** The SHAPE, COMMIT, TRACK and INTERVENE AI features call the OpenAI API (`api.openai.com`) directly through `OPENAI_API_KEY`; Azure OpenAI is not wired in yet, so the host needs outbound internet access to it. Without a key the app runs on its rules-based fallbacks.
+- **AI model.** Set `AZURE_OPENAI_ENDPOINT` and `AZURE_OPENAI_DEPLOYMENT` to keep model traffic inside your Azure tenant, signing in with the app's managed identity (no key), or set `OPENAI_API_KEY` to call `api.openai.com`, which needs outbound internet access. With neither, use `DELIVERYTWIN_AI_MODE=recorded` for replayed sample answers, or the app runs on its rules-based fallbacks. Azure OpenAI support is covered by unit tests against a fake endpoint and has **not been run against a live Azure OpenAI resource**.
 - **Foundry chat.** Set `FOUNDRY_PROJECT_ENDPOINT` and `FOUNDRY_MODEL` and use a managed identity with inference permission on the project. Chat prefers Foundry when both are set and otherwise falls back to `OPENAI_API_KEY`. Chat is read-only, limited to 1,200 characters per question and eight history messages, and treats conversation text as untrusted.
 - **Azure DevOps backlog.** It needs no Azure DevOps credentials or network access, because the app only produces a preview and a CSV for a person to import.
 
@@ -291,15 +323,19 @@ Use this only if you already run AKS. You would need to write a Deployment (1 re
 | Variable | Effect |
 |---|---|
 | `OPENAI_API_KEY`, `OPENAI_MODEL` | Enable the AI features; model defaults to `gpt-4o-mini` |
+| `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_DEPLOYMENT`, `AZURE_OPENAI_API_KEY`, `AZURE_OPENAI_API_VERSION` | Use Azure OpenAI instead (takes precedence over `OPENAI_API_KEY`); without a key, `DefaultAzureCredential` signs in |
+| `DELIVERYTWIN_AI_MODE=recorded` | Replay deterministic sample answers with no key or internet (takes precedence over everything else) |
+| `DELIVERYTWIN_SIMULATION` | Allow the simulation lab (`/api/simulate`, events, import) without demo mode |
 | `FOUNDRY_PROJECT_ENDPOINT`, `FOUNDRY_MODEL` | Use Microsoft Foundry for chat |
 | `DELIVERYTWIN_TRUSTED_AUTH` | Allow a non-loopback bind behind an authenticating gateway |
-| `DELIVERYTWIN_DEMO_MODE` | Allow `/api/reset-all` and `/api/simulate` (default on for loopback, off otherwise; the image sets `0`, so **Simulate next sprint is disabled in the container** unless you turn it on) |
+| `DELIVERYTWIN_DEMO_MODE` | Allow `/api/reset-all`, simulation reset and the whole simulation lab (default on for loopback, off otherwise; the image sets `0`, so the simulation lab is disabled in the container unless you set this or `DELIVERYTWIN_SIMULATION=1`) |
 | `AZURE_COSMOS_ENDPOINT`, `AZURE_COSMOS_DATABASE_NAME`, `AZURE_COSMOS_CONTAINER_NAME` | Cosmos DB workflow checkpoints |
 | `DATABRICKS_*`, `DELIVERYTWIN_CATALOG`, `DELIVERYTWIN_SCHEMA` | Databricks adapter |
 
 ## Scope and safety
 
 - Every source is marked simulated with `writeback_enabled=0`. Applying an INTERVENE scenario or approving a baseline records simulated rows locally and changes nothing elsewhere.
+- Uploaded exports are parsed in memory and reduced to five numbers plus a list of blocking changes; the files themselves are not stored. They are limited to five files of 2 MB each, and CSV cells that could run as spreadsheet formulas are neutralized in every CSV the app produces.
 - Cross-origin POST requests are rejected, request sizes are bounded, and destructive routes need demo mode.
 - The sample server has no authentication or rate limiting. Do not expose it as a production service without identity, authorization and abuse protection.
 - Screenshots use synthetic Customer 360 data and output from `gpt-4o-mini`; values change as the simulation advances.

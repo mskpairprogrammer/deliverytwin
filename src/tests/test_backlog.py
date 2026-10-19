@@ -4,7 +4,7 @@ import unittest
 from datetime import date
 
 from deliverytwin import connect, initialize_database, seed_demo
-from deliverytwin.backlog import _split_hours, build_backlog, latest_backlog
+from deliverytwin.backlog import _split_hours, build_backlog, diff_backlogs, latest_backlog, to_ado_rest
 from deliverytwin.intake import approve_baseline
 
 DAY = date(2026, 10, 17)
@@ -55,14 +55,60 @@ class BacklogTests(unittest.TestCase):
     def test_csv_uses_the_ado_hierarchy_layout_and_neutralizes_formulas(self) -> None:
         backlog = build_backlog(baseline(request_text="=HYPERLINK(\"http://x\")"), DAY)
         rows = list(csv.reader(io.StringIO(backlog["csv"])))
-        self.assertEqual(rows[0][:3], ["Work Item Type", "Title 1", "Title 2"])
+        self.assertEqual(rows[0][:4], ["Work Item Type", "Title 1", "Title 2", "Title 3"])
         self.assertEqual((rows[1][0], bool(rows[1][1]), rows[1][2]), ("Epic", True, ""))
         self.assertTrue(rows[1][1].startswith("'="))
-        self.assertTrue(all(row[0] == "Feature" and row[1] == "" and row[2] for row in rows[2:]))
-        self.assertEqual(len(rows) - 2, len(backlog["epic"]["features"]))
-        self.assertIn("<li>", rows[2][3])
+        features = [row for row in rows[2:] if row[0] == "Feature"]
+        stories = [row for row in rows[2:] if row[0] == "User Story"]
+        self.assertTrue(all(row[1] == "" and row[2] and row[3] == "" for row in features))
+        self.assertTrue(all(row[1] == "" and row[2] == "" and row[3] for row in stories))
+        self.assertEqual(len(features), len(backlog["epic"]["features"]))
+        self.assertEqual(len(stories), sum(len(f["stories"]) for f in backlog["epic"]["features"]))
+        self.assertEqual(rows[3][0], "User Story")
+        self.assertIn("<li>", features[0][4])
 
-    def test_latest_backlog_follows_the_approved_baseline(self) -> None:
+    def test_effort_is_split_across_roles_by_the_planned_team(self) -> None:
+        allocations = [{"role_name": "lead-engineer", "allocated_fte": 1.0}, {"role_name": "data-engineer", "allocated_fte": 3.0}]
+        epic = build_backlog(baseline(), DAY, allocations)["epic"]
+        feature = next(f for f in epic["features"] if f["kind"] == "system")
+        self.assertEqual(sum(a["hours"] for a in feature["assignments"]), feature["effort_hours"])
+        hours = {a["role"]: a["hours"] for a in feature["assignments"]}
+        self.assertGreater(hours["data-engineer"], hours["lead-engineer"] * 2)
+        self.assertEqual({s["role"] for s in feature["stories"]}, {"data-engineer"})
+        dependency = next(f for f in epic["features"] if f["kind"] == "dependency")
+        self.assertIn("lead-engineer", dependency["roles"])
+
+    def test_an_applied_recovery_scenario_moves_dates_defers_scope_and_is_diffed(self) -> None:
+        base = build_backlog(baseline(), DAY)
+        recovery = {"target_date": "2027-03-01", "scope_defer_pct": 40, "allocated_fte": 5.0, "recommended_option": "phase_scope"}
+        plan = build_backlog(baseline(), DAY, None, recovery)
+        epic = plan["epic"]
+        self.assertEqual(epic["target_date"], "2027-03-01")
+        self.assertGreater(epic["deferred_hours"], 0)
+        self.assertEqual(sum(f["effort_hours"] for f in epic["features"] if f["kind"] != "deferred"), epic["effort_hours"])
+        self.assertEqual(epic["effort_hours"] + epic["deferred_hours"], 4900)
+        deferred = epic["features"][-1]
+        self.assertEqual((deferred["kind"], deferred["start_date"], deferred["stories"]), ("deferred", None, []))
+        changes = diff_backlogs(base, plan)
+        self.assertTrue(any(c["item"] == "Epic" and "Target date" in c["change"] for c in changes))
+        self.assertTrue(any(c["item"] == "Deferred scope: follow-on release" for c in changes))
+        rows = list(csv.reader(io.StringIO(plan["csv"])))
+        self.assertEqual([r[6:9] for r in rows if r[2].startswith("Deferred")][0][1:], ["", ""])
+
+    def test_ado_rest_export_links_each_item_to_its_parent_and_is_marked_unsent(self) -> None:
+        rest = to_ado_rest(build_backlog(baseline(), DAY))
+        self.assertIn("NOT sent", rest["note"])
+        items = rest["workItems"]
+        self.assertEqual((items[0]["type"], items[0]["parent"]), ("Epic", None))
+        self.assertTrue(all(i["parent"] for i in items[1:]))
+        feature = items[1]
+        paths = {op["path"] for op in feature["body"]}
+        self.assertIn("/fields/System.Title", paths)
+        self.assertIn("/relations/-", paths)
+        self.assertTrue(any(i["type"] == "User Story" and i["parent"] == "feature-1" for i in items))
+        self.assertTrue(all("{organization}" in i["url"] for i in items))
+
+    def test_latest_backlog_follows_the_approved_baseline_and_the_applied_recovery(self) -> None:
         connection = connect(":memory:")
         self.addCleanup(connection.close)
         initialize_database(connection)
@@ -77,6 +123,23 @@ class BacklogTests(unittest.TestCase):
         self.assertEqual(backlog["baseline_id"], approved["baseline"]["id"])
         self.assertEqual(backlog["epic"]["effort_hours"], approved["baseline"]["p50_hours"])
         self.assertEqual(backlog["epic"]["target_date"], approved["baseline"]["target_date"])
+        self.assertIsNone(backlog["plan"])
+        self.assertTrue(any(a["hours"] for f in backlog["epic"]["features"] for a in f["assignments"]))
+
+        connection.execute(
+            "INSERT INTO recovery_scenarios (initiative_id, recommended_option, allocated_fte, scope_defer_pct, "
+            "target_date, incremental_cost_k, confidence_pct, saved_at) VALUES (?, 'phase_scope', 5, 40, '2027-05-01', 0, 70, ?)",
+            ("autopay-modernization", "2999-01-01T00:00:00+00:00"),
+        )
+        connection.commit()
+        followed = latest_backlog(connection, DAY)
+        self.assertEqual(followed["plan"]["scenario"]["scope_defer_pct"], 40)
+        self.assertEqual(followed["plan"]["epic"]["target_date"], "2027-05-01")
+        self.assertTrue(followed["diff"])
+        # A scenario saved before the current baseline was approved is not applied to it.
+        connection.execute("UPDATE recovery_scenarios SET saved_at = '2000-01-01T00:00:00+00:00'")
+        connection.commit()
+        self.assertIsNone(latest_backlog(connection, DAY)["plan"])
 
 
 if __name__ == "__main__":

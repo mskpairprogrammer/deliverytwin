@@ -19,6 +19,18 @@ CREATE TABLE IF NOT EXISTS simulation_state (
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS simulation_settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS simulation_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sprint_number INTEGER NOT NULL CHECK (sprint_number >= 1),
+    kind TEXT NOT NULL,
+    injected_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS ingestion_runs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     source_key TEXT NOT NULL REFERENCES source_systems(source_key),

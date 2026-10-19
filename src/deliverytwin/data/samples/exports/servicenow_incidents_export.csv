@@ -1,0 +1,5 @@
+Number,Short description,Priority,State,Opened at
+INC0010021,Profile sync failing for new customers,1 - Critical,In Progress,{today-5}
+INC0010034,Duplicate customers shown to agents,1 - Critical,New,{today-2}
+INC0010019,Slow customer search,3 - Moderate,Resolved,{today-9}
+INC0010040,Consent flag missing on merged profile,2 - High,In Progress,{today-3}

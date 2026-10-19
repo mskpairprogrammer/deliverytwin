@@ -380,9 +380,36 @@
     .wi-type { font-size: 9px; font-weight: 800; letter-spacing: .06em; padding: 2px 7px; border-radius: 4px; background: #eef2f6; color: var(--muted); }
     .wi-type.epic { background: #f1e8fb; color: #6b3fa0; }
     .wi-type.feature { background: #fdf0e0; color: #8a5a00; }
+    .wi-type.user-story { background: #e6f4ee; color: #0c5d52; }
     .wi-meta { margin-left: auto; color: var(--muted); font-size: 10px; font-weight: 700; }
     .export-log { margin-top: 10px; padding: 10px 12px; border-radius: 8px; background: #f6f8fa; border: 1px dashed #cfd9e1; font-size: 11px; line-height: 1.6; }
     .export-log code { font-size: 10px; }
+    .mode-banner { margin: 8px 0; padding: 8px 12px; border-radius: 8px; background: #fff4e5; border: 1px solid #f0d9b0; color: #8a5a00; font-size: 11px; font-weight: 700; }
+    .mode-banner[hidden] { display: none; }
+    .lineage { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; font-size: 10px; }
+    .lineage:empty { display: none; }
+    .lineage .chip { border: 1px solid var(--line); background: #f6f8fa; border-radius: 999px; padding: 3px 9px; color: var(--muted); font-weight: 700; }
+    .lineage .chip.synthetic { background: #fff4e5; color: #8a5a00; border-color: #f0d9b0; }
+    .lineage .chip.upload { background: #eaf3ff; color: #1f5a99; border-color: #c9defa; }
+    .lineage .chip.model { background: var(--teal-soft); color: var(--teal); border-color: #c5e8df; }
+    .variant-toggle { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0; }
+    .variant-toggle[hidden], .backlog-diff[hidden], .baseline-history[hidden] { display: none; }
+    .backlog-diff { border: 1px solid #f0d9b0; background: #fffaf0; border-radius: 8px; padding: 8px 12px; font-size: 11px; line-height: 1.6; margin: 8px 0; }
+    .backlog-diff ul { margin: 4px 0 0; padding-left: 18px; }
+    .baseline-history { margin-top: 12px; font-size: 11px; }
+    .baseline-history summary { cursor: pointer; font-weight: 750; }
+    .baseline-history table, .import-report table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+    .baseline-history th, .baseline-history td, .import-report th, .import-report td { text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--line); font-size: 10.5px; }
+    .delta-up { color: #8a2f2e; font-weight: 700; }
+    .delta-down { color: #0c5d52; font-weight: 700; }
+    .sim-lab { border: 1px solid var(--line); border-radius: 10px; background: #fbfdfc; padding: 10px 14px; margin: 10px 0; font-size: 11px; }
+    .sim-lab summary { cursor: pointer; font-weight: 750; font-size: 12px; }
+    .lab-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 8px; }
+    .lab-col select { flex: 1; min-width: 0; padding: 8px 10px; border: 1px solid var(--line); border-radius: 7px; font: inherit; font-size: 12px; }
+    .import-report { margin-top: 6px; line-height: 1.5; }
+    .import-report .ok { color: #0c5d52; font-weight: 700; }
+    .import-report .bad { color: #8a2f2e; font-weight: 700; }
+    @media (max-width: 900px) { .lab-grid { grid-template-columns: 1fr; } }
     .awaiting { display: none; padding: 28px; border: 1px dashed var(--line); border-radius: 12px; background: white; color: var(--muted); font-size: 12px; line-height: 1.7; text-align: center; }
     .awaiting code { background: #f0f2f4; padding: 2px 6px; border-radius: 5px; color: var(--ink, #1c2733); }
     body[data-sim="false"] .awaiting { display: block; }
@@ -417,6 +444,7 @@
       </div>
       <div class="date-pill" id="as-of">Loading report…</div>
     </div>
+    <div id="ai-banner" class="mode-banner" role="status" hidden></div>
     <div id="error" class="error" role="alert"></div>
     <div class="journey" role="tablist" aria-label="Delivery lifecycle stages">
       <button class="stage" id="tab-shape" type="button" role="tab" aria-selected="true" aria-controls="panel-shape" tabindex="0" data-stage="shape">
@@ -452,6 +480,7 @@
             </div>
             <div class="intake-actions">
               <button id="intake-sample" class="intake-btn" type="button">Use sample request</button>
+              <button id="intake-sample-full" class="intake-btn" type="button">Load full sample (request, ROM, notes)</button>
               <button id="intake-analyze" class="intake-btn primary" type="button">Analyze request</button>
             </div>
           </div>
@@ -502,12 +531,14 @@
           <div id="commit-empty" class="empty-state">
             <strong>No estimate to commit yet</strong>
             <span>Start in SHAPE: describe the request, confirm the clarifications, and generate the ROM. It will appear here for review and approval.</span>
+            <div id="commit-existing" class="approved-banner" role="status" hidden></div>
             <button id="commit-empty-go" class="intake-btn primary" type="button">Go to SHAPE</button>
           </div>
           <div class="intake-step" id="intake-step-5" hidden>
             <h4 class="step-title"><span class="step-num">5</span>Review and approve the commitment</h4>
             <div id="intake-commitment" class="rom-hero"></div>
             <p id="intake-commit-explain" class="rom-explain"></p>
+            <div class="lineage" id="commit-lineage"></div>
             <section class="ai-review" id="commit-review" aria-labelledby="review-title">
               <div class="ai-review-head">
                 <h4 class="step-title" id="review-title">AI pre-commit review</h4>
@@ -524,21 +555,6 @@
               <button id="intake-continue" class="intake-btn" type="button" hidden>Continue to TRACK →</button>
             </div>
             <div id="intake-approved" class="approved-banner" role="status" hidden></div>
-            <section class="backlog-panel" id="backlog-panel" aria-labelledby="backlog-title" hidden>
-              <div class="ai-review-head">
-                <h4 class="step-title" id="backlog-title">Azure DevOps backlog</h4>
-                <span class="source-pill llm">RULES-BASED · FROM THE APPROVED BASELINE</span>
-              </div>
-              <p class="step-help">One Epic and its Features, sized from the approved P50 effort and dated within the committed window. Review it, then copy or download the CSV and import it into Azure DevOps yourself. Nothing is sent to Azure DevOps.</p>
-              <div id="backlog-status" role="status" aria-live="polite"></div>
-              <div id="backlog-tree" class="backlog-tree"></div>
-              <div class="intake-actions" id="backlog-actions" hidden>
-                <button id="backlog-copy" class="intake-btn primary" type="button">Copy as ADO CSV</button>
-                <button id="backlog-download" class="intake-btn" type="button">Download CSV</button>
-                <button id="backlog-simulate" class="intake-btn" type="button">Simulate export to ADO</button>
-              </div>
-              <div id="backlog-export" class="export-log" role="status" aria-live="polite" hidden></div>
-            </section>
             <section class="what-if commit-tune" aria-labelledby="tune-title">
               <h4 class="step-title" id="tune-title">Explore what-if scenarios</h4>
               <p class="step-help">Ask in plain English, or change capacity, target date, or scope below and recalculate. The summary above updates, and approval uses the values it shows.</p>
@@ -564,6 +580,33 @@
             </section>
           </div>
           <div id="commit-error" class="intake-error" role="alert" hidden></div>
+          <section class="backlog-panel" id="backlog-panel" aria-labelledby="backlog-title" hidden>
+            <div class="ai-review-head">
+              <h4 class="step-title" id="backlog-title">Azure DevOps backlog</h4>
+              <span class="source-pill llm">RULES-BASED · FROM THE APPROVED BASELINE</span>
+            </div>
+            <p class="step-help">One Epic, its Features and their User Stories, sized from the approved P50 effort, dated within the committed window and split across roles by the planned team. Review it, then copy or download it and import it into Azure DevOps yourself. Nothing is sent to Azure DevOps.</p>
+            <div class="lineage" id="backlog-lineage"></div>
+            <div class="variant-toggle" id="backlog-variants" role="group" aria-label="Backlog version" hidden>
+              <button id="variant-baseline" class="intake-btn primary" type="button" aria-pressed="true">Approved baseline</button>
+              <button id="variant-plan" class="intake-btn" type="button" aria-pressed="false">After applied recovery scenario</button>
+            </div>
+            <div id="backlog-diff" class="backlog-diff" hidden></div>
+            <div id="backlog-status" role="status" aria-live="polite"></div>
+            <div id="backlog-tree" class="backlog-tree"></div>
+            <div class="intake-actions" id="backlog-actions" hidden>
+              <button id="backlog-copy" class="intake-btn primary" type="button">Copy as ADO CSV</button>
+              <button id="backlog-download" class="intake-btn" type="button">Download CSV</button>
+              <button id="backlog-pack" class="intake-btn" type="button">Download decision pack</button>
+              <button id="backlog-rest" class="intake-btn" type="button">Download ADO REST JSON</button>
+              <button id="backlog-simulate" class="intake-btn" type="button">Simulate export to ADO</button>
+            </div>
+            <div id="backlog-export" class="export-log" role="status" aria-live="polite" hidden></div>
+          </section>
+          <details class="baseline-history" id="baseline-history" hidden>
+            <summary id="baseline-history-summary">Baseline history</summary>
+            <div id="baseline-history-body"></div>
+          </details>
         </div>
       </section>
       <section id="commit-readiness" class="card impact-panel" aria-labelledby="commit-readiness-title" hidden>
@@ -585,6 +628,11 @@
         <p class="chart-note">Portfolio-level context only. These metrics do not change this initiative’s estimate, confidence, or approval gate.</p>
         <div id="impact-status" class="impact-status" role="status" aria-live="polite">Loading historical impact metrics…</div>
         <div id="impact-metrics" class="impact-grid"></div>
+        <section class="chart-card calibration" id="calibration">
+          <h4 class="chart-title">Calibration · do the P50 and P80 bands cover real outcomes?</h4>
+          <div id="calibration-metrics" class="impact-grid"></div>
+          <p class="chart-note" id="calibration-note"></p>
+        </section>
         <section class="chart-card backtest-chart">
           <h4 class="chart-title">Estimate vs actual · leave-one-out backtest</h4>
           <div id="impact-backtest-chart"></div>
@@ -595,10 +643,36 @@
     <section id="panel-track" class="stage-panel" role="tabpanel" aria-labelledby="tab-track" tabindex="0" hidden>
       <div class="stage-intro"><div><h2>Track delivery conditions</h2><p>Compare cross-system signals and the current forecast with the commitment.</p></div><span class="badge">SIGNALS + OUTLOOK</span></div>
       <div class="awaiting" id="track-awaiting" role="status"></div>
+      <div class="lineage" id="track-lineage"></div>
       <div class="sim-bar">
         <button id="sim-run" class="intake-btn primary" type="button">Simulate next sprint</button>
         <span id="sim-status" class="sim-status" role="status"></span>
       </div>
+      <details class="sim-lab" id="sim-lab">
+        <summary>Simulation lab · scenarios, events and file import</summary>
+        <p class="step-help">No source system is connected. Choose a scripted scenario, inject an event for the current sprint, or import exports a person downloaded from Azure DevOps, ServiceNow or UKG.</p>
+        <div class="lab-grid">
+          <div class="lab-col">
+            <label class="ask-label" for="sim-scenario">Scenario</label>
+            <div class="ask-row"><select id="sim-scenario"></select><button id="sim-scenario-apply" class="intake-btn" type="button">Apply scenario</button></div>
+            <p class="step-help" id="sim-scenario-desc"></p>
+          </div>
+          <div class="lab-col">
+            <span class="ask-label">Inject an event into the current sprint</span>
+            <div class="ask-chips" id="sim-events"></div>
+            <p class="step-help" id="sim-event-log">Events stay in effect for later sprints until the scenario changes.</p>
+          </div>
+          <div class="lab-col">
+            <span class="ask-label">Import exports instead</span>
+            <div class="intake-actions">
+              <label class="intake-btn">Choose CSV or XLSX files<input id="import-files" class="intake-file" type="file" multiple accept=".csv,.xlsx,text/csv"></label>
+              <button id="import-samples" class="intake-btn" type="button">Use sample exports</button>
+            </div>
+            <p class="step-help">Up to five files. The kind of each export is detected from its columns. Signals without a file count as zero.</p>
+            <div id="import-report" class="import-report" role="status" aria-live="polite"></div>
+          </div>
+        </div>
+      </details>
       <div class="grid">
         <section class="card full" id="track-brief" aria-labelledby="track-brief-title">
           <div class="card-head"><div><h3 class="card-title" id="track-brief-title">AI sprint briefing</h3><div class="card-kicker">What changed since the baseline, and why the forecast moved</div></div><span class="badge" id="brief-badge">ANALYZING</span></div>
@@ -971,7 +1045,10 @@
         const data = await intakePost(path, body);
         persisted = data.status === "simulated_updates_persisted";
         renderActScenario(data, persisted);
-        if (persisted) await refreshReport();
+        if (persisted) {
+          await refreshReport();
+          if (serverBaseline) { backlogVariant = "plan"; loadBacklog(); }
+        }
       } catch (error) {
         byId("act-scenario-status").textContent = `Recovery scenario failed: ${error.message}`;
       } finally {
@@ -1077,6 +1154,8 @@
           byId("shape-stage-status").textContent = "NO DEMO DATA";
           byId("updated").textContent = `Updated ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
           byId("error").style.display = "none";
+          renderTrackLineage(null);
+          loadSimCatalog();
           return;
         }
         if (!report.workflow || !Array.isArray(report.workflow.completed_stages)) {
@@ -1138,6 +1217,8 @@
         byId("finding").textContent = report.zero_prompt_finding;
         byId("updated").textContent = `Updated ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
         byId("error").style.display = "none";
+        renderTrackLineage(report.data_origin);
+        loadSimCatalog();
         if (!byId("panel-track").hidden) loadTrackBrief();
         if (!byId("panel-intervene").hidden) loadActAnalysis();
       } catch (error) {
@@ -1155,8 +1236,11 @@
         serverBaseline = null;
       }
       updateJourney();
+      renderExistingBaseline();
+      loadBaselineHistory();
+      loadSimCatalog();
     }
-    loadBaseline();
+    const baselineLoaded = loadBaseline();
 
     byId("act-scope-defer").addEventListener("input", (event) => {
       byId("act-scope-defer-value").textContent = `${event.currentTarget.value}%`;
@@ -1231,6 +1315,8 @@
     let reviewSeq = 0;
     let backlogSeq = 0;
     let backlog = null;
+    let backlogVariant = "baseline";
+    let lastReview = null;
     function newIntakeSessionId() {
       if (typeof crypto.randomUUID === "function") return crypto.randomUUID();
       const bytes = crypto.getRandomValues(new Uint8Array(16));
@@ -1294,6 +1380,8 @@
       });
       byId("commit-readiness").hidden = true;
       byId("intake-approved").hidden = true;
+      byId("commit-existing").hidden = true;
+      byId("baseline-history").hidden = true;
       clearCommitAi();
       clearSavedIntake();
       byId("intake-approve").hidden = false;
@@ -1396,8 +1484,9 @@
         "No intervention options yet. Use “Simulate next sprint” on the TRACK tab.",
         "INTERVENE recommends recovery options against the approved commitment. Approve a baseline in COMMIT, then simulate a sprint in TRACK.");
       const simulate = byId("sim-run");
-      simulate.disabled = !ready;
-      simulate.title = ready ? "" : "Approve a baseline in COMMIT first.";
+      simulate.disabled = !ready || (simCatalog && simCatalog.scenario === "import");
+      simulate.title = !ready ? "Approve a baseline in COMMIT first."
+        : (simCatalog && simCatalog.scenario === "import" ? "Imported data is a snapshot. Apply a scenario or import new exports." : "");
     }
     function updateJourney() {
       const sim = serverBaseline && currentReport && currentReport.simulated ? currentReport : null;
@@ -1582,6 +1671,22 @@
       byId("impact-method").textContent =
         `${data.backtest.method} MAPE is the mean absolute percentage error across the held-out projects. Lower is better. Intake metrics are instrumented from successful requests in this prototype; they are not historical estimates.`;
       renderBacktestChart(data.backtest);
+      renderCalibration(data.calibration);
+    }
+    function renderCalibration(calibration) {
+      const note = byId("calibration-note");
+      if (!calibration || !calibration.sample_count) {
+        byId("calibration-metrics").replaceChildren();
+        note.textContent = "Not enough completed projects to calibrate.";
+        return;
+      }
+      byId("calibration-metrics").replaceChildren(
+        metric(`${calibration.p50_coverage_pct}%`, "Actuals at or below P50 · target 50%"),
+        metric(`${calibration.p80_coverage_pct}%`, "Actuals at or below P80 · target 80%"),
+        metric(`${calibration.estimate_bias_pct > 0 ? "+" : ""}${percent(calibration.estimate_bias_pct)}%`, "Average P50 bias vs actual"),
+        metric(`${calibration.on_time_rate_pct}%`, `Projects finished on time · median overrun ${percent(calibration.median_duration_overrun_pct)}%`),
+      );
+      note.textContent = `${calibration.verdict} ${calibration.method} Based on ${calibration.sample_count} synthetic completed projects.`;
     }
     function renderBacktestChart(backtest) {
       const root = byId("impact-backtest-chart");
@@ -1888,6 +1993,7 @@
     }
     function clearCommitAi() {
       reviewSeq += 1;
+      lastReview = null;
       clearBacklog();
       ["review-source", "review-summary"].forEach((id) => { byId(id).textContent = ""; });
       ["review-risks", "review-conditions", "ask-result"].forEach((id) => byId(id).replaceChildren());
@@ -1895,6 +2001,7 @@
       byId("ask-input").value = "";
     }
     function renderChallenge(review) {
+      lastReview = review;
       const generated = review.source === "llm";
       const source = byId("review-source");
       source.replaceChildren(
@@ -2028,17 +2135,18 @@
     function clearBacklog() {
       backlogSeq += 1;
       backlog = null;
-      byId("backlog-panel").hidden = true;
-      byId("backlog-actions").hidden = true;
-      byId("backlog-export").hidden = true;
+      backlogVariant = "baseline";
+      ["backlog-panel", "backlog-actions", "backlog-export", "backlog-variants", "backlog-diff"].forEach((id) => { byId(id).hidden = true; });
       byId("backlog-status").textContent = "";
       byId("backlog-tree").replaceChildren();
+      byId("backlog-lineage").replaceChildren();
     }
+    function chip(text, kind) { return el("span", `chip ${kind || ""}`.trim(), text); }
     function workItem(type, title, meta, bodyNodes, open) {
       const item = el("details");
       item.open = open;
       const summary = el("summary");
-      summary.append(el("span", `wi-type ${type.toLowerCase()}`, type.toUpperCase()), el("strong", "", title), el("span", "wi-meta", meta));
+      summary.append(el("span", `wi-type ${type.toLowerCase().replace(" ", "-")}`, type.toUpperCase()), el("strong", "", title), el("span", "wi-meta", meta));
       item.append(summary);
       if (bodyNodes.length) {
         const body = el("div", "wi-body");
@@ -2047,27 +2155,57 @@
       }
       return item;
     }
+    const roleLabel = (role) => String(role).split(/[-_]/).map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(" ");
+    function currentBacklog() {
+      return backlog ? (backlogVariant === "plan" && backlog.plan ? backlog.plan : backlog) : null;
+    }
     function renderBacklog(data) {
       backlog = data;
-      const epic = data.epic;
-      const dates = (item) => `${item.start_date} → ${item.target_date}`;
+      const shown = currentBacklog();
+      const epic = shown.epic;
+      const dates = (item) => (item.start_date ? `${item.start_date} → ${item.target_date}` : "unscheduled");
       const featureNodes = epic.features.map((feature) => {
         const criteria = el("ul");
         feature.acceptance_criteria.forEach((text) => criteria.append(el("li", "", text)));
-        return workItem("Feature", feature.title, `${hours(feature.effort_hours)} · ${dates(feature)}`, [
-          el("div", "", feature.why), el("strong", "", "Acceptance criteria"), criteria,
-          el("small", "", `Suggested roles: ${feature.roles.join(", ")}`),
-        ], false);
+        const nodes = [el("div", "", feature.why), el("strong", "", "Acceptance criteria"), criteria];
+        if (feature.assignments.length) {
+          nodes.push(el("small", "", `Suggested role split: ${feature.assignments.map((a) => `${roleLabel(a.role)} ${hours(a.hours)}`).join(" · ")}`));
+        }
+        const stories = feature.stories.map((story) => workItem("User Story", story.title, story.role ? roleLabel(story.role) : "unassigned", [], false));
+        if (stories.length) {
+          const list = el("div", "backlog-features");
+          list.append(...stories);
+          nodes.push(list);
+        }
+        return workItem("Feature", feature.title, `${hours(feature.effort_hours)} · ${dates(feature)}`, nodes, false);
       });
       const children = el("div", "backlog-features");
       children.append(...featureNodes);
-      const tree = workItem("Epic", epic.title,
-        `${hours(epic.effort_hours)} P50 · ${dates(epic)}`,
-        [el("div", "", epic.description),
-          el("small", "", `Feature efforts add up to the P50. The ${hours(epic.reserve_hours)} between P50 and P80 stays as schedule risk, not as scope.`),
-          children], true);
+      const reserve = `Feature efforts add up to the in-scope effort. The ${hours(epic.reserve_hours)} between P50 and P80 stays as schedule risk, not as scope.`
+        + (epic.deferred_hours ? ` ${hours(epic.deferred_hours)} is deferred to a follow-on release.` : "");
+      const tree = workItem("Epic", epic.title, `${hours(epic.effort_hours)} · ${dates(epic)}`,
+        [el("div", "", epic.description), el("small", "", reserve), children], true);
       byId("backlog-tree").replaceChildren(tree);
-      byId("backlog-status").textContent = `${epic.features.length} Features under 1 Epic, ${hours(epic.effort_hours)} in total.`;
+      const storyCount = epic.features.reduce((sum, feature) => sum + feature.stories.length, 0);
+      byId("backlog-status").textContent = `${epic.features.length} Features and ${storyCount} User Stories under 1 Epic, ${hours(epic.effort_hours)} in scope.`;
+      byId("backlog-variants").hidden = !data.plan;
+      byId("variant-baseline").classList.toggle("primary", backlogVariant === "baseline");
+      byId("variant-plan").classList.toggle("primary", backlogVariant === "plan");
+      byId("variant-baseline").setAttribute("aria-pressed", String(backlogVariant === "baseline"));
+      byId("variant-plan").setAttribute("aria-pressed", String(backlogVariant === "plan"));
+      const diff = byId("backlog-diff");
+      diff.hidden = !(data.plan && backlogVariant === "plan");
+      if (!diff.hidden) {
+        const items = el("ul");
+        data.diff.forEach((change) => items.append(el("li", "", `${change.item}: ${change.change}`)));
+        diff.replaceChildren(el("strong", "", `Changes from the approved baseline (simulated recovery scenario: ${data.plan.scenario.recommended_option.replace(/_/g, " ")})`), items);
+      }
+      byId("backlog-lineage").replaceChildren(
+        chip("COMPUTED BY CODE · NO MODEL", "model"),
+        chip(`BASELINE ${String(data.baseline_id).slice(0, 8)}`),
+        chip("TEAM PLAN · SYNTHETIC PLANVIEW", "synthetic"),
+        ...(data.plan ? [chip("RECOVERY SCENARIO APPLIED · SIMULATED", "synthetic")] : []),
+      );
       byId("backlog-actions").hidden = false;
     }
     async function loadBacklog() {
@@ -2079,7 +2217,7 @@
       byId("backlog-status").textContent = "Building the Epic and Features from the approved baseline…";
       try {
         const data = await intakePost("/api/commit/backlog", {});
-        if (seq === backlogSeq) renderBacklog(data);
+        if (seq === backlogSeq) { renderBacklog(data); loadBaselineHistory(); }
       } catch (error) {
         if (seq === backlogSeq) {
           byId("backlog-status").replaceChildren(document.createTextNode(`The backlog could not be built: ${error.message} `));
@@ -2090,35 +2228,98 @@
         }
       }
     }
+    function setBacklogVariant(variant) {
+      if (!backlog || (variant === "plan" && !backlog.plan)) return;
+      backlogVariant = variant;
+      renderBacklog(backlog);
+    }
+    async function loadBaselineHistory() {
+      try {
+        const response = await fetch("/api/baselines", { cache: "no-store" });
+        const data = await response.json();
+        const list = data.baselines || [];
+        const box = byId("baseline-history");
+        box.hidden = list.length === 0;
+        if (!list.length) return;
+        byId("baseline-history-summary").textContent = `Baseline history · ${list.length} approved`;
+        const signed = (value, unit, goodWhenDown) => {
+          if (!value) return el("span", "", "·");
+          const cls = (value > 0) === goodWhenDown ? "delta-up" : "delta-down";
+          return el("span", cls, `${value > 0 ? "+" : ""}${Number(value).toLocaleString()}${unit}`);
+        };
+        const table = el("table");
+        const head = el("tr");
+        ["Approved", "P50", "P80", "FTE", "Target date", "Confidence"].forEach((label) => head.append(el("th", "", label)));
+        table.append(head);
+        list.forEach((baseline) => {
+          const row = el("tr");
+          const delta = baseline.delta_vs_previous;
+          const cell = (text, change) => { const td = el("td", "", text); if (change) td.append(document.createTextNode(" "), change); return td; };
+          row.append(
+            el("td", "", baseline.approved_at.replace("T", " ").slice(0, 16)),
+            cell(hours(baseline.p50_hours), delta && signed(delta.p50_hours, " h", true)),
+            cell(hours(baseline.p80_hours), delta && signed(delta.p80_hours, " h", true)),
+            cell(baseline.allocated_fte.toFixed(1), delta && signed(delta.allocated_fte, "", false)),
+            cell(baseline.target_date, delta && signed(delta.target_days, " d", true)),
+            cell(`${percent(baseline.confidence_pct)}%`, delta && signed(delta.confidence_pct, " pts", false)),
+          );
+          table.append(row);
+        });
+        byId("baseline-history-body").replaceChildren(table, el("small", "", "Red means worse than the previous baseline; green means better. The latest approval is the one TRACK and the backlog use."));
+      } catch (error) {
+        byId("baseline-history").hidden = true;
+      }
+    }
     function showExport(lines) {
       const box = byId("backlog-export");
       box.replaceChildren(...lines);
       box.hidden = false;
     }
+    function downloadFile(name, content, type) {
+      const url = URL.createObjectURL(new Blob(["\ufeff", content], { type: `${type};charset=utf-8` }));
+      const link = el("a");
+      link.href = url;
+      link.download = name;
+      document.body.append(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    }
     async function copyBacklogCsv() {
-      if (!backlog) return;
+      const shown = currentBacklog();
+      if (!shown) return;
       try {
-        await navigator.clipboard.writeText(backlog.csv);
+        await navigator.clipboard.writeText(shown.csv);
         showExport([el("div", "", "Copied the ADO CSV to the clipboard. In Azure DevOps, open Boards → Work items → Import work items and paste it into a spreadsheet saved as CSV.")]);
       } catch (error) {
         showExport([el("div", "", "The browser blocked clipboard access. Use Download CSV instead.")]);
       }
     }
     function downloadBacklogCsv() {
-      if (!backlog) return;
-      const url = URL.createObjectURL(new Blob(["\ufeff", backlog.csv], { type: "text/csv;charset=utf-8" }));
-      const link = el("a");
-      link.href = url;
-      link.download = backlog.csv_filename;
-      document.body.append(link);
-      link.click();
-      link.remove();
-      URL.revokeObjectURL(url);
-      showExport([el("div", "", `Downloaded ${backlog.csv_filename}.`)]);
+      const shown = currentBacklog();
+      if (!shown) return;
+      downloadFile(shown.csv_filename, shown.csv, "text/csv");
+      showExport([el("div", "", `Downloaded ${shown.csv_filename}.`)]);
+    }
+    async function downloadPack(kind) {
+      try {
+        const pack = await intakePost("/api/commit/pack", { review: lastReview });
+        if (kind === "rest") {
+          downloadFile(pack.ado_rest_filename, JSON.stringify(pack.ado_rest, null, 2), "application/json");
+          showExport([el("div", "", `Downloaded ${pack.ado_rest_filename}: Azure DevOps REST requests, not sent anywhere. Replace {organization} and {project} before use.`)]);
+        } else {
+          downloadFile(pack.filename, pack.markdown, "text/markdown");
+          showExport([el("div", "", `Downloaded ${pack.filename}${pack.includes_review ? " with the pre-commit review shown above" : ""}.`)]);
+        }
+      } catch (error) {
+        showExport([el("div", "", `The download could not be prepared: ${error.message}`)]);
+      }
     }
     function simulateBacklogExport() {
-      if (!backlog) return;
-      const epic = backlog.epic;
+      const shown = currentBacklog();
+      if (!shown) return;
+      const epic = shown.epic;
+      const stories = epic.features.reduce((sum, feature) => sum + feature.stories.length, 0);
       const call = (type, title) => {
         const row = el("div");
         row.append(el("code", "", `POST https://dev.azure.com/{organization}/{project}/_apis/wit/workitems/$${type}?api-version=7.1`), document.createTextNode(` · ${title}`));
@@ -2126,12 +2327,189 @@
       };
       showExport([
         el("strong", "", "SIMULATED · NOTHING WAS SENT"),
-        el("div", "", `Azure DevOps would create 1 Epic and ${epic.features.length} Features in state New, each Feature linked to the Epic as its parent.`),
+        el("div", "", `Azure DevOps would create 1 Epic, ${epic.features.length} Features and ${stories} User Stories in state New, each linked to its parent.`),
         call("Epic", epic.title),
         ...epic.features.map((feature) => call("Feature", feature.title)),
-        el("small", "", "No request was made and no work item exists. Delivery Twin never writes to an enterprise system; import the CSV to create these."),
+        el("small", "", `…and ${stories} User Story requests. No request was made and no work item exists. Delivery Twin never writes to an enterprise system; import the CSV to create these.`),
       ]);
     }
+
+    async function loadAiStatus() {
+      try {
+        const status = await (await fetch("/api/ai/status", { cache: "no-store" })).json();
+        const banner = byId("ai-banner");
+        banner.hidden = status.mode === "openai" || status.mode === "azure_openai";
+        banner.textContent = status.mode === "recorded"
+          ? "RECORDED SAMPLE AI · answers are replayed from a deterministic script, not produced by a live model."
+          : "NO AI MODEL CONFIGURED · rules-based fallbacks are shown. Set OPENAI_API_KEY, or DELIVERYTWIN_AI_MODE=recorded for a recorded demo.";
+      } catch (error) {
+        byId("ai-banner").hidden = true;
+      }
+    }
+    loadAiStatus();
+
+    function renderCommitLineage() {
+      const result = intake.result;
+      if (!result) { byId("commit-lineage").replaceChildren(); return; }
+      const generated = result.basis && result.basis.source === "llm";
+      byId("commit-lineage").replaceChildren(
+        chip(generated ? "ESTIMATE · AI FORECAST" : "ESTIMATE · STATISTICAL, SIMILAR PROJECTS", generated ? "model" : ""),
+        chip(`EVIDENCE · ${(result.matches || []).length} SYNTHETIC REFERENCE PROJECTS`, "synthetic"),
+        chip("CAPACITY · SYNTHETIC PLANVIEW", "synthetic"),
+        ...(intake.documents.length ? [chip(`${intake.documents.length} UPLOADED DOCUMENT(S)`, "upload")] : []),
+      );
+    }
+    async function syncApprovedState() {
+      await baselineLoaded;
+      const approved = serverBaseline, commitment = intake.result && intake.result.commitment;
+      if (!approved || !commitment || intake.approved) return;
+      const same = approved.p50_hours === commitment.p50_hours && approved.p80_hours === commitment.p80_hours
+        && Number(approved.allocated_fte) === Number(commitment.allocated_fte)
+        && String(approved.target_date).slice(0, 10) === commitment.target_date;
+      if (same) renderApproved(approved);
+    }
+    function renderExistingBaseline() {
+      const box = byId("commit-existing");
+      if (!serverBaseline || intake.result) { box.hidden = true; return; }
+      const baseline = serverBaseline;
+      box.textContent = `A baseline is already approved: P50 ${hours(baseline.p50_hours)} · P80 ${hours(baseline.p80_hours)} · ${baseline.allocated_fte.toFixed(1)}/${baseline.capacity_fte.toFixed(1)} FTE · ${baseline.target_date} · ${percent(baseline.confidence_pct)}% confidence. Its Azure DevOps backlog is below.`;
+      box.hidden = false;
+      if (!backlog) loadBacklog();
+    }
+    function renderTrackLineage(origin) {
+      const box = byId("track-lineage");
+      if (!origin) { box.replaceChildren(); return; }
+      const imported = origin.mode === "imported";
+      box.title = origin.detail || "";
+      box.replaceChildren(
+        chip(`SIGNALS · ${origin.label.toUpperCase()}`, imported ? "upload" : "synthetic"),
+        chip(imported ? "FROM FILES A PERSON UPLOADED · NO LIVE CONNECTION" : "SCRIPTED · NO LIVE CONNECTION", imported ? "upload" : "synthetic"),
+        ...(origin.events || []).map((event) => chip(`EVENT · SPRINT ${event.sprint_number} · ${event.label.toUpperCase()}`, "synthetic")),
+      );
+    }
+
+    var simCatalog = null;
+    async function loadSimCatalog() {
+      try {
+        simCatalog = await (await fetch("/api/simulate/catalog", { cache: "no-store" })).json();
+      } catch (error) {
+        return;
+      }
+      const select = byId("sim-scenario");
+      if (!select.options.length) {
+        select.replaceChildren(...simCatalog.scenarios.map((scenario) => {
+          const option = el("option", "", scenario.label);
+          option.value = scenario.key;
+          return option;
+        }));
+        byId("sim-events").replaceChildren(...simCatalog.event_kinds.map((event) => {
+          const button = el("button", "ask-chip", event.label);
+          button.type = "button";
+          button.title = event.description;
+          button.dataset.event = event.key;
+          button.addEventListener("click", () => injectEvent(event.key));
+          return button;
+        }));
+      }
+      if (simCatalog.scenario && simCatalog.scenario !== "import") select.value = simCatalog.scenario;
+      const describe = simCatalog.scenarios.find((scenario) => scenario.key === select.value);
+      byId("sim-scenario-desc").textContent = simCatalog.scenario === "import"
+        ? "Currently using imported exports. Apply a scenario to switch back to scripted data."
+        : (describe ? describe.description : "");
+      const ready = Boolean(serverBaseline), running = Boolean(simCatalog.simulation) && simCatalog.scenario !== "import";
+      byId("sim-scenario-apply").disabled = !ready;
+      byId("import-samples").disabled = !ready;
+      document.querySelectorAll("#sim-events button").forEach((button) => { button.disabled = !running; });
+      updateJourney();
+      byId("sim-event-log").textContent = simCatalog.events.length
+        ? `Injected so far: ${simCatalog.events.map((event) => `${event.label} (sprint ${event.sprint_number})`).join(", ")}.`
+        : "Events stay in effect for later sprints until the scenario changes.";
+      if (simCatalog.import) renderImportReport(simCatalog.import);
+    }
+    async function simPost(path, body, done) {
+      const status = byId("sim-status");
+      status.textContent = "Working…";
+      try {
+        const response = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.error || `Request failed (${response.status})`);
+        await refreshReport();
+        status.textContent = done(data);
+        return data;
+      } catch (error) {
+        status.textContent = `Simulation failed: ${error.message}`;
+        return null;
+      }
+    }
+    async function applyScenario() {
+      const key = byId("sim-scenario").value;
+      const sprints = simCatalog && simCatalog.simulation ? simCatalog.simulation.sprints_advanced : 3;
+      await simPost("/api/simulate", { scenario: key, sprints }, (data) => `Scenario applied: ${data.scenario}, sprint ${data.sprints_advanced}.`);
+      loadTrackBrief(true);
+    }
+    async function injectEvent(kind) {
+      await simPost("/api/simulate/event", { kind }, (data) => `Event injected into sprint ${data.sprints_advanced}.`);
+      loadTrackBrief(true);
+    }
+    function renderImportReport(data) {
+      const box = byId("import-report");
+      const table = el("table");
+      const head = el("tr");
+      ["File", "Detected as", "Rows used", "Notes"].forEach((label) => head.append(el("th", "", label)));
+      table.append(head);
+      data.files.forEach((file) => {
+        const row = el("tr");
+        const notes = file.accepted
+          ? (file.rows_skipped ? `${file.rows_skipped} skipped: ${file.skipped_reasons.join("; ")}` : "all rows read")
+          : file.message;
+        row.append(el("td", "", file.name), el("td", file.accepted ? "ok" : "bad", file.accepted ? file.kind_label : "not used"),
+          el("td", "", file.accepted ? `${file.rows_used} of ${file.rows}` : "—"), el("td", "", notes));
+        table.append(row);
+      });
+      box.replaceChildren(table, el("small", "", `As of ${data.as_of}. ${data.not_provided.length ? `Not provided, counted as zero: ${data.not_provided.join(", ")}.` : "All five kinds of export were provided."}`));
+    }
+    async function readExportFile(file) {
+      if (file.size > 2000000) throw new Error(`${file.name} is too large (limit 2 MB).`);
+      if (file.name.toLowerCase().endsWith(".xlsx")) {
+        const bytes = new Uint8Array(await file.arrayBuffer());
+        const chunks = [];
+        for (let offset = 0; offset < bytes.length; offset += 0x8000) chunks.push(String.fromCharCode(...bytes.subarray(offset, offset + 0x8000)));
+        return { name: file.name, content_base64: btoa(chunks.join("")) };
+      }
+      return { name: file.name, text: await file.text() };
+    }
+    async function importExports(files) {
+      const data = await simPost("/api/import/signals", { files }, (result) => `Imported ${result.files.filter((file) => file.accepted).length} export file(s) as of ${result.as_of}.`);
+      if (data) { renderImportReport(data); loadTrackBrief(true); }
+    }
+    async function loadFullSample() {
+      const samples = await (await fetch("/api/samples", { cache: "no-store" })).json();
+      byId("intake-text").value = SAMPLE_REQUEST;
+      resetIntakeResult();
+      intake.documents.length = 0;
+      samples.documents.forEach((doc) => intake.documents.push({ name: doc.name, kind: doc.kind, size: doc.text.length, text: doc.text }));
+      renderDocList();
+    }
+    byId("sim-scenario").addEventListener("change", () => {
+      const scenario = simCatalog && simCatalog.scenarios.find((item) => item.key === byId("sim-scenario").value);
+      byId("sim-scenario-desc").textContent = scenario ? scenario.description : "";
+    });
+    byId("sim-scenario-apply").addEventListener("click", applyScenario);
+    byId("import-files").addEventListener("change", async (event) => {
+      const input = event.currentTarget;
+      const picked = Array.from(input.files);
+      input.value = "";
+      try { await importExports(await Promise.all(picked.map(readExportFile))); } catch (error) { byId("sim-status").textContent = `Import failed: ${error.message}`; }
+    });
+    byId("import-samples").addEventListener("click", async () => {
+      const samples = await (await fetch("/api/samples", { cache: "no-store" })).json();
+      importExports(samples.exports.map((file) => ({ name: file.name, text: file.text })));
+    });
+    byId("intake-sample-full").addEventListener("click", loadFullSample);
+    byId("variant-baseline").addEventListener("click", () => setBacklogVariant("baseline"));
+    byId("variant-plan").addEventListener("click", () => setBacklogVariant("plan"));
+    byId("backlog-pack").addEventListener("click", () => downloadPack("pack"));
+    byId("backlog-rest").addEventListener("click", () => downloadPack("rest"));
 
     const INTAKE_STORE = "deliverytwin.intake.v1";
     function saveIntake(step) {
@@ -2176,6 +2554,8 @@
       byId("intake-continue").hidden = true;
       intakeShowUpTo(5);
       loadChallenge();
+      renderCommitLineage();
+      syncApprovedState();
     }
     function restoreIntake() {
       let saved = null;

@@ -57,6 +57,14 @@ class BaselineRepository:
         )
         return self._summary(rows[0]) if rows else None
 
+    def history(self) -> list[dict[str, Any]]:
+        """Every approved baseline, oldest first."""
+        rows = self.db.query(
+            f"SELECT {', '.join(_columns(self.TABLE))} FROM {self.db.table(self.TABLE)} "
+            "ORDER BY approved_at ASC, baseline_id ASC"
+        )
+        return [self._summary(row) for row in rows]
+
     def latest_scope(self) -> dict[str, Any] | None:
         """The latest approved baseline plus the request and fingerprint it was approved for."""
         rows = self.db.query(

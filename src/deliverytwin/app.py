@@ -12,6 +12,9 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
 
+from .extras import (
+    EXTRA_GET_ROUTES, EXTRA_POST_ROUTES, SIMULATION_ROUTES, BaselineRequired, handle_get, handle_post,
+)
 
 SCHEMA_PATH = Path(__file__).with_name("schema.sql")
 DASHBOARD_PATH = Path(__file__).with_name("dashboard.html")
@@ -319,10 +322,26 @@ SPRINT_DAYS = 14
 MAX_SIMULATED_SPRINTS = 20
 
 
+def _purge_simulated_rows(connection: sqlite3.Connection) -> None:
+    """Remove every simulated record so a scenario change never leaves rows of the previous one behind."""
+    with connection:
+        for table, pattern in (
+            ("ado_work_items", "ADO-SIM-WI-%"), ("ado_sprints", "ADO-SIM-SPRINT-%"),
+            ("ukg_time_entries", "UKG-SIM-%"), ("servicenow_incidents", "INC-SIM-%"),
+            ("servicenow_change_requests", "CHG-SIM-%"), ("ukg_pto_requests", "UKG-SIM-PTO-%"),
+        ):
+            connection.execute(f"DELETE FROM {table} WHERE external_id LIKE ?", (pattern,))
+
+
 def _seed_simulated_sprints(
     connection: sqlite3.Connection, start: date, sprints: int
 ) -> None:
     """Load stable, deterministic source records for every completed and current sprint."""
+    from .scenarios import IMPORT_SCENARIO, effective_signals, list_events, scenario_key
+
+    _purge_simulated_rows(connection)
+    scenario = scenario_key(connection)
+    events = list_events(connection)
     with connection:
         connection.execute(
             """
@@ -339,8 +358,11 @@ def _seed_simulated_sprints(
             WHERE external_id = 'CHG-C360-001'
             """
         )
+    if scenario == IMPORT_SCENARIO:
+        return
 
     for sprint_number in range(1, sprints + 1):
+        signals = effective_signals(scenario, sprint_number, events)
         sprint_start = start + timedelta(days=(sprint_number - 1) * SPRINT_DAYS)
         sprint_end = start + timedelta(days=sprint_number * SPRINT_DAYS)
         sprint_id = f"ADO-SIM-SPRINT-{sprint_number:03d}"
@@ -362,7 +384,7 @@ def _seed_simulated_sprints(
                     (f"ADO-SIM-WI-{sprint_number:03d}-{index:03d}", "ADO-AUTO", sprint_id,
                      f"Sprint {sprint_number} customer profile work item {index}",
                      "User Story", "Done" if sprint_number < sprints else "New", 4, 1)
-                    for index in range(1, sprint_number * 4 + 1)
+                    for index in range(1, signals.unplanned_items + 1)
                 ],
                 ("project_external_id", "sprint_external_id", "title", "work_item_type",
                  "state", "story_points", "is_unplanned"),
@@ -372,10 +394,9 @@ def _seed_simulated_sprints(
                 "ukg_time_entries",
                 ("external_id", "person_id", "initiative_id", "work_date", "work_type", "hours"),
                 [(f"UKG-SIM-SUPPORT-{sprint_number:03d}", "lead-engineer", INITIATIVE_ID,
-                  sprint_end.isoformat(), "production_support", sprint_number * 4)],
+                  sprint_end.isoformat(), "production_support", signals.support_hours)],
                 ("person_id", "initiative_id", "work_date", "work_type", "hours"),
             )
-            incident_count = min((sprint_number + 1) // 2, 3)
             _upsert_many(
                 connection,
                 "servicenow_incidents",
@@ -386,33 +407,33 @@ def _seed_simulated_sprints(
                      "lead-engineer", 1, "in_progress",
                      f"Sprint {sprint_number} customer profile sync incident {index}",
                      (sprint_start + timedelta(days=2)).isoformat())
-                    for index in range(1, incident_count + 1)
+                    for index in range(1, signals.p1_incidents + 1)
                 ],
                 ("initiative_id", "assignee_person_id", "priority", "state",
                  "short_description", "opened_at"),
             )
-            change_age_days = 2 + 6 * (sprint_number - 1)
-            _upsert_many(
-                connection,
-                "servicenow_change_requests",
-                ("external_id", "initiative_id", "short_description", "state", "opened_at",
-                 "planned_start", "is_blocking"),
-                [(f"CHG-SIM-SPRINT-{sprint_number:03d}", INITIATIVE_ID,
-                  f"Sprint {sprint_number} customer identity matching rules",
-                  "cab_review",
-                  (sprint_end - timedelta(days=change_age_days)).isoformat(),
-                  None, 1)],
-                ("initiative_id", "short_description", "state", "opened_at",
-                 "planned_start", "is_blocking"),
-            )
-            if sprint_number == 3:
+            if signals.change_age_days is not None:
+                _upsert_many(
+                    connection,
+                    "servicenow_change_requests",
+                    ("external_id", "initiative_id", "short_description", "state", "opened_at",
+                     "planned_start", "is_blocking"),
+                    [(f"CHG-SIM-SPRINT-{sprint_number:03d}", INITIATIVE_ID,
+                      f"Sprint {sprint_number} customer identity matching rules",
+                      "cab_review",
+                      (sprint_end - timedelta(days=signals.change_age_days)).isoformat(),
+                      None, 1)],
+                    ("initiative_id", "short_description", "state", "opened_at",
+                     "planned_start", "is_blocking"),
+                )
+            if signals.pto_hours:
                 _upsert_many(
                     connection,
                     "ukg_pto_requests",
                     ("external_id", "person_id", "start_date", "end_date", "hours", "status"),
                     [(f"UKG-SIM-PTO-{sprint_number:03d}", "lead-engineer",
                       (sprint_end - timedelta(days=2)).isoformat(),
-                      (sprint_end - timedelta(days=1)).isoformat(), 40, "approved")],
+                      (sprint_end - timedelta(days=1)).isoformat(), signals.pto_hours, "approved")],
                     ("person_id", "start_date", "end_date", "hours", "status"),
                 )
 
@@ -430,13 +451,23 @@ def simulated_as_of(connection: sqlite3.Connection) -> date | None:
 
 
 def simulate_sprints(
-    connection: sqlite3.Connection, sprints: int = 5, start: date | None = None
+    connection: sqlite3.Connection, sprints: int = 5, start: date | None = None,
+    scenario: str | None = None,
 ) -> dict[str, Any]:
     """Load the synthetic source scenario as it stands after N sprints and move the report date there."""
     if sprints < 1:
         raise ValueError("Sprints must be at least 1.")
     from .intake import latest_baseline
+    from .scenarios import IMPORT_SCENARIO, SCENARIOS, list_events, scenario_key, set_scenario
 
+    if scenario is not None:
+        from .scenarios import clear_events
+
+        if scenario not in SCENARIOS and scenario != IMPORT_SCENARIO:
+            raise ValueError(f"Unknown scenario. Choose one of: {', '.join(SCENARIOS)}.")
+        if scenario != scenario_key(connection):
+            clear_events(connection)
+        set_scenario(connection, scenario)
     start = start or date.today()
     as_of = start + timedelta(days=sprints * SPRINT_DAYS)
     seed_demo(connection, as_of)
@@ -476,6 +507,8 @@ def simulate_sprints(
             (start + timedelta(days=SPRINT_DAYS * n)).isoformat() for n in range(1, sprints + 1)
         ],
         "used_approved_baseline": baseline is not None,
+        "scenario": scenario_key(connection),
+        "events": list_events(connection),
     }
 
 
@@ -486,14 +519,38 @@ def advance_one_sprint(connection: sqlite3.Connection) -> dict[str, Any]:
         return simulate_sprints(connection, 1)
     if state["sprints_advanced"] >= MAX_SIMULATED_SPRINTS:
         raise ValueError(f"The simulation is already at the {MAX_SIMULATED_SPRINTS}-sprint limit.")
+    from .scenarios import IMPORT_SCENARIO, scenario_key
+
+    if scenario_key(connection) == IMPORT_SCENARIO:
+        raise ValueError("Imported data is a snapshot. Import new exports or apply a scenario to keep simulating.")
     return simulate_sprints(
         connection, state["sprints_advanced"] + 1, date.fromisoformat(state["started_on"])
     )
 
 
+def inject_event(connection: sqlite3.Connection, kind: str) -> dict[str, Any]:
+    """Apply an event to the current sprint and recompute the simulated records."""
+    from .scenarios import IMPORT_SCENARIO, add_event, scenario_key
+
+    state = simulation_state(connection)
+    if not state:
+        raise ValueError("Simulate a sprint before injecting an event.")
+    if scenario_key(connection) == IMPORT_SCENARIO:
+        raise ValueError("Events apply to scripted scenarios. Switch back to a scenario to inject one.")
+    add_event(connection, kind, state["sprints_advanced"])
+    return simulate_sprints(
+        connection, state["sprints_advanced"], date.fromisoformat(state["started_on"])
+    )
+
+
 def reset_simulation(connection: sqlite3.Connection) -> None:
+    from .scenarios import clear_events
+
     with connection:
         connection.execute("DELETE FROM simulation_state")
+        connection.execute("DELETE FROM simulation_settings")
+    clear_events(connection)
+    _purge_simulated_rows(connection)
     seed_demo(connection)
 
 
@@ -643,6 +700,31 @@ def build_report(connection: sqlite3.Connection, as_of: date | None = None) -> d
         ],
         "oldest_blocking_change_age_days": max_change_age,
     }
+    data_origin: dict[str, Any] = {
+        "mode": "synthetic_default", "label": "Synthetic demo data",
+        "detail": "Seeded records for five simulated systems.",
+    }
+    if simulation:
+        from .scenarios import IMPORT_SCENARIO, SCENARIOS, list_events, scenario_key
+
+        key = scenario_key(connection)
+        if key == IMPORT_SCENARIO:
+            from .importer import load_import
+
+            imported = load_import(connection)
+            if imported:
+                signals.update(imported["signals"])
+                data_origin = {
+                    "mode": "imported", "label": "Imported exports",
+                    "detail": ", ".join(item["name"] for item in imported["files"] if item.get("accepted"))
+                              + f" (as of {imported['as_of']}). Signals without a file count as zero.",
+                }
+        else:
+            events = list_events(connection)
+            data_origin = {
+                "mode": "synthetic_scenario", "label": f"Synthetic scenario: {SCENARIOS[key].label}",
+                "detail": SCENARIOS[key].description, "scenario": key, "events": events,
+            }
     collision_detected = (
         signals["lead_production_support_hours_per_week"] >= 8
         and signals["unplanned_story_points"] >= 32
@@ -668,6 +750,7 @@ def build_report(connection: sqlite3.Connection, as_of: date | None = None) -> d
             "target_end": initiative["target_end"],
         },
         "signals": signals,
+        "data_origin": data_origin,
         "zero_prompt_finding": (
             "Cross-system delivery collision detected: production support is reducing effective "
             "capacity while unplanned scope is growing and a blocking change remains unresolved."
@@ -788,7 +871,7 @@ def _env_flag(name: str) -> bool | None:
     return None if value is None else value.strip().lower() in ("1", "true", "yes", "on")
 
 
-DESTRUCTIVE_ROUTES = ("/api/reset-all", "/api/simulate")
+DESTRUCTIVE_ROUTES = ("/api/reset-all",)
 
 
 def serve_dashboard(database: str | Path, host: str, port: int) -> None:
@@ -802,6 +885,8 @@ def serve_dashboard(database: str | Path, host: str, port: int) -> None:
         )
     configured_demo = _env_flag("DELIVERYTWIN_DEMO_MODE")
     demo_mode = loopback if configured_demo is None else configured_demo
+    # Simulation only rewrites synthetic records, so it can be allowed without the data-wiping demo mode.
+    simulation_enabled = demo_mode or bool(_env_flag("DELIVERYTWIN_SIMULATION"))
     with connect(database) as connection:
         initialize_database(connection, register_sources=False)
 
@@ -821,6 +906,16 @@ def serve_dashboard(database: str | Path, host: str, port: int) -> None:
                 from .chat import chat_configuration_status
 
                 self.send_json(200, chat_configuration_status())
+                return
+            if route in EXTRA_GET_ROUTES:
+                try:
+                    if route in ("/api/ai/status", "/api/samples"):
+                        self.send_json(200, handle_get(route, None))
+                    else:
+                        with connect(database) as connection:
+                            self.send_json(200, handle_get(route, connection))
+                except (OSError, sqlite3.Error, RuntimeError, ValueError) as error:
+                    self.send_json(500, {"error": f"Unable to load {route}: {error}"})
                 return
             if route == "/api/impact":
                 from .analytics import build_impact_report
@@ -1036,6 +1131,7 @@ def serve_dashboard(database: str | Path, host: str, port: int) -> None:
             if route not in (
                 "/api/chat", "/api/simulate", "/api/reset-all",
                 *INTAKE_POST_ROUTES, *ACT_POST_ROUTES, *TRACK_POST_ROUTES, *COMMIT_POST_ROUTES,
+                *EXTRA_POST_ROUTES,
             ):
                 self.send_error(404, "Not found")
                 return
@@ -1046,10 +1142,32 @@ def serve_dashboard(database: str | Path, host: str, port: int) -> None:
             if route in DESTRUCTIVE_ROUTES and not demo_mode:
                 self.reject(403, "Demo data operations are disabled (DELIVERYTWIN_DEMO_MODE).")
                 return
+            if route in SIMULATION_ROUTES and not simulation_enabled:
+                self.reject(403, "Simulation is disabled (set DELIVERYTWIN_SIMULATION=1 or DELIVERYTWIN_DEMO_MODE=1).")
+                return
             payload = self.read_json_object(
-                MAX_INTAKE_REQUEST_BYTES if route in INTAKE_POST_ROUTES else MAX_CHAT_REQUEST_BYTES
+                MAX_INTAKE_REQUEST_BYTES
+                if route in INTAKE_POST_ROUTES or route == "/api/import/signals" else MAX_CHAT_REQUEST_BYTES
             )
             if payload is None:
+                return
+            if route == "/api/simulate" and payload.get("reset") is True and not demo_mode:
+                self.send_json(403, {"error": "Resetting the simulation is disabled (DELIVERYTWIN_DEMO_MODE)."})
+                return
+            if route in EXTRA_POST_ROUTES:
+                try:
+                    with connect(database) as connection:
+                        result = handle_post(route, payload, connection)
+                except BaselineRequired:
+                    self.send_json(409, {"error": BASELINE_REQUIRED})
+                    return
+                except ValueError as error:
+                    self.send_json(400, {"error": str(error)})
+                    return
+                except (OSError, sqlite3.Error, RuntimeError) as error:
+                    self.send_json(500, {"error": f"Unable to process the request: {error}"})
+                    return
+                self.send_json(200, result)
                 return
             if route == "/api/reset-all":
                 if payload.get("confirm") is not True:
@@ -1084,7 +1202,15 @@ def serve_dashboard(database: str | Path, host: str, port: int) -> None:
                         elif payload.get("next_sprint") is True:
                             result = {"simulated": True, **advance_one_sprint(connection)}
                         else:
-                            result = {"simulated": True, **simulate_sprints(connection, sprints)}
+                            scenario = payload.get("scenario")
+                            if scenario is not None and not isinstance(scenario, str):
+                                raise ValueError("The scenario must be a string.")
+                            current = simulation_state(connection) if scenario else None
+                            result = {"simulated": True, **simulate_sprints(
+                                connection, sprints,
+                                date.fromisoformat(current["started_on"]) if current else None,
+                                scenario=scenario,
+                            )}
                 except BaselineRequiredError as error:
                     self.send_json(409, {"error": str(error)})
                     return

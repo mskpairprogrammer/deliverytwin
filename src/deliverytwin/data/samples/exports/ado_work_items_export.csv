@@ -1,0 +1,11 @@
+ID,Work Item Type,Title,State,Story Points,Tags,Iteration Path
+1001,User Story,Match rules for shared household emails,Active,8,unplanned,Customer360\Sprint 6
+1002,User Story,Profile API pagination,Active,5,,Customer360\Sprint 6
+1003,Bug,Duplicate merge drops consent flag,Active,5,unplanned; defect,Customer360\Sprint 6
+1004,User Story,Reconciliation report export,New,3,,Customer360\Sprint 6
+1005,User Story,Urgent contact center field request,Active,5,unplanned,Customer360\Sprint 6
+1006,User Story,Backfill legacy CRM ids,Active,8,unplanned,Customer360\Sprint 6
+1007,Bug,Timeout on identity lookup,Active,3,unplanned; defect,Customer360\Sprint 6
+1008,User Story,Regional matching variant,New,5,unplanned,Customer360\Sprint 6
+1009,User Story,Old audit view,Removed,3,unplanned,Customer360\Sprint 6
+1010,User Story,Consent preference sync,Active,5,,Customer360\Sprint 6

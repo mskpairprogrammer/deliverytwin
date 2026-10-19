@@ -142,6 +142,67 @@ def _backtest(connection: sqlite3.Connection) -> dict[str, Any]:
     }
 
 
+def _calibration(connection: sqlite3.Connection) -> dict[str, Any]:
+    """Do the P50 and P80 bands from similar projects cover real outcomes as often as they should?"""
+    rows = connection.execute(
+        """
+        SELECT project_id, technologies, integrations, team_size, planned_effort_hours, actual_effort_hours,
+               planned_duration_weeks, actual_duration_weeks
+        FROM historical_projects
+        WHERE planned_effort_hours > 0 AND actual_effort_hours > 0
+        ORDER BY project_id
+        """
+    ).fetchall()
+    below_p50 = below_p80 = 0
+    signed_errors: list[float] = []
+    plan_errors: list[float] = []
+    for target in rows:
+        peers = sorted(
+            (row for row in rows if row["project_id"] != target["project_id"]),
+            key=lambda peer: (-_similarity(target, peer), peer["project_id"]),
+        )[:5]
+        if len(peers) < 3:
+            continue
+        values = sorted(peer["actual_effort_hours"] for peer in peers)
+        p50 = median(values)
+        position = 0.8 * (len(values) - 1)
+        low = int(position)
+        p80 = values[low] + (values[min(low + 1, len(values) - 1)] - values[low]) * (position - low)
+        actual = target["actual_effort_hours"]
+        below_p50 += actual <= p50
+        below_p80 += actual <= p80
+        signed_errors.append((p50 - actual) / actual * 100)
+        plan_errors.append((target["planned_effort_hours"] - actual) / actual * 100)
+    count = len(signed_errors)
+    if not count:
+        return {"sample_count": 0}
+    p80_cover = round(below_p80 / count * 100)
+    on_time = [row for row in rows if row["actual_duration_weeks"] <= row["planned_duration_weeks"]]
+    overruns = [
+        (row["actual_duration_weeks"] - row["planned_duration_weeks"]) / row["planned_duration_weeks"] * 100
+        for row in rows if row["planned_duration_weeks"]
+    ]
+    if p80_cover >= 85:
+        verdict = "The P80 band is conservative: it covers more outcomes than its 80% target."
+    elif p80_cover >= 75:
+        verdict = "The P80 band is well calibrated against its 80% target."
+    else:
+        verdict = "The P80 band is optimistic: it covers fewer outcomes than its 80% target, so treat it with care."
+    return {
+        "method": (
+            "Leave-one-out: each completed project is estimated from its five closest other projects. "
+            "P50 is their median actual effort and P80 their 80th percentile; coverage is how often the real effort "
+            "fell at or below each band."
+        ),
+        "sample_count": count,
+        "p50_coverage_pct": round(below_p50 / count * 100), "p80_coverage_pct": p80_cover,
+        "estimate_bias_pct": round(mean(signed_errors), 1), "original_plan_bias_pct": round(mean(plan_errors), 1),
+        "on_time_rate_pct": round(len(on_time) / len(rows) * 100) if rows else None,
+        "median_duration_overrun_pct": round(median(overruns), 1) if overruns else None,
+        "verdict": verdict,
+    }
+
+
 def build_impact_report(
     connection: sqlite3.Connection,
     now: datetime | None = None,
@@ -168,4 +229,5 @@ def build_impact_report(
             "intake_starts_last_7_days": recent_starts,
         },
         "backtest": _backtest(connection),
+        "calibration": _calibration(connection),
     }

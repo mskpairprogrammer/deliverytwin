@@ -6,6 +6,7 @@ Skipped when Playwright or its Chromium build is not installed
 import http.client
 import json
 import os
+import re
 import socket
 import tempfile
 import threading
@@ -491,7 +492,7 @@ class JourneyUiTests(unittest.TestCase):
         page.locator("#backlog-tree .wi-type.epic").wait_for()
         self.assertGreaterEqual(page.locator("#backlog-tree .wi-type.feature").count(), 3)
         epic_effort = page.locator("#backlog-tree summary").first.locator(".wi-meta").inner_text()
-        self.assertRegex(epic_effort, r"[\d,]+ h P50 · \d{4}-\d{2}-\d{2} → \d{4}-\d{2}-\d{2}")
+        self.assertRegex(epic_effort, r"[\d,]+ h · \d{4}-\d{2}-\d{2} → \d{4}-\d{2}-\d{2}")
         self.assertIn("Nothing is sent to Azure DevOps", page.locator("#backlog-panel").inner_text())
 
         page.get_by_role("button", name="Simulate export to ADO").click()
@@ -509,6 +510,119 @@ class JourneyUiTests(unittest.TestCase):
         # Editing the commitment invalidates the backlog until the baseline is approved again.
         page.locator("#tune-apply").click()
         page.wait_for_function("document.getElementById('backlog-panel').hidden")
+
+    def test_the_full_sample_loads_the_request_rom_and_meeting_notes(self) -> None:
+        page = self.page
+        page.get_by_role("button", name="Load full sample (request, ROM, notes)").click()
+        page.wait_for_function("document.querySelectorAll('#intake-doc-list li').length === 2")
+        documents = page.locator("#intake-doc-list").inner_text()
+        self.assertIn("ROM: sample_rom_customer_360.md", documents)
+        self.assertIn("Meeting notes: sample_meeting_notes_customer_360.md", documents)
+        self.assertTrue(page.input_value("#intake-text").startswith("We need one view of every customer"))
+        page.get_by_role("button", name="Analyze request").click()
+        page.locator("#intake-questions input").first.wait_for()
+
+    def test_the_simulation_lab_switches_scenarios_injects_events_and_imports_exports(self) -> None:
+        page = self.page
+        self.run_shape_to_commit()
+        self.approve_and_simulate()
+        page.locator("#sim-lab summary").click()
+        confidence = lambda: int(page.locator("#confidence").inner_text())
+        lineage = lambda text: page.wait_for_function(
+            f"document.getElementById('track-lineage').textContent.includes({json.dumps(text)})")
+
+        page.select_option("#sim-scenario", "healthy")
+        page.get_by_role("button", name="Apply scenario").click()
+        lineage("HEALTHY DELIVERY")
+        healthy = confidence()
+        page.select_option("#sim-scenario", "collision")
+        page.get_by_role("button", name="Apply scenario").click()
+        lineage("CAPACITY COLLISION")
+        collision = confidence()
+        self.assertGreater(healthy, collision)
+
+        page.get_by_role("button", name="Engineer leaves").click()
+        lineage("ENGINEER LEAVES")
+        self.assertLess(confidence(), collision)
+        self.assertIn("Engineer leaves (sprint", page.locator("#sim-event-log").inner_text())
+
+        page.get_by_role("button", name="Use sample exports").click()
+        lineage("IMPORTED EXPORTS")
+        page.locator("#import-report table").wait_for()
+        report = page.locator("#import-report").inner_text()
+        for kind in ("Azure DevOps work items", "ServiceNow incidents", "ServiceNow change requests",
+                     "UKG time entries", "UKG time-off requests"):
+            self.assertIn(kind, report)
+        self.assertEqual(page.locator("#import-report tr").count(), 6)
+        self.assertTrue(page.locator("#sim-events button").first.is_disabled())
+        self.assertIn("NO LIVE CONNECTION", page.locator("#track-lineage").inner_text())
+
+    def test_applying_a_recovery_scenario_updates_the_backlog_with_a_diff(self) -> None:
+        page = self.page
+        self.run_shape_to_commit()
+        self.approve_and_simulate()
+        page.get_by_role("button", name="Review recovery options →").click()
+        page.wait_for_function("document.querySelectorAll('#act-options .rec-card').length === 3")
+        page.locator("#act-options .rec-card", has_text=re.compile("phase", re.I)).get_by_role(
+            "button", name="Preview this scenario").click()
+        page.locator("#act-what-if-results").get_by_text("Predicted on-time").wait_for()
+        page.get_by_role("button", name="Apply simulated updates").click()
+        page.wait_for_function("document.getElementById('act-scenario-status').textContent.includes('saved')")
+        self.go("commit")
+        page.locator("#backlog-variants").wait_for(state="visible")
+        page.locator("#backlog-diff").wait_for(state="visible")
+        self.assertIn("Deferred scope: follow-on release", page.locator("#backlog-diff").inner_text())
+        self.assertIn("Deferred scope: follow-on release", page.locator("#backlog-tree").inner_text())
+        page.get_by_role("button", name="Approved baseline").click()
+        self.assertTrue(page.locator("#backlog-diff").is_hidden())
+        self.assertNotIn("Deferred scope", page.locator("#backlog-tree").inner_text())
+
+    def test_an_approved_baseline_and_its_backlog_survive_a_reload(self) -> None:
+        type(self).llm_enabled = True
+        page = self.page
+        self.run_shape_to_commit()
+        page.get_by_role("button", name="Approve baseline").click()
+        page.locator("#intake-approved").wait_for(state="visible")
+        page.reload()
+        page.locator("#intake-approved").wait_for(state="visible")
+        page.locator("#backlog-tree .wi-type.epic").wait_for()
+        self.assertTrue(page.locator("#intake-approve").is_hidden())
+        self.assertEqual(self.states()["commit"], "Baseline approved")
+
+    def test_an_existing_baseline_is_shown_in_commit_without_an_estimate(self) -> None:
+        page = self.page
+        self.run_shape_to_commit()
+        page.get_by_role("button", name="Approve baseline").click()
+        page.locator("#intake-approved").wait_for(state="visible")
+        page.reload()
+        self.go("commit")
+        page.locator("#commit-existing").wait_for(state="visible")
+        self.assertIn("A baseline is already approved", page.locator("#commit-existing").inner_text())
+        page.locator("#backlog-tree .wi-type.epic").wait_for()
+
+    def test_baseline_history_shows_each_approval_and_what_changed(self) -> None:
+        page = self.page
+        self.run_shape_to_commit()
+        page.get_by_role("button", name="Approve baseline").click()
+        page.locator("#intake-approved").wait_for(state="visible")
+        page.wait_for_function("document.getElementById('baseline-history').hidden === false")
+        self.assertIn("1 approved", page.locator("#baseline-history-summary").inner_text())
+        page.fill("#tune-fte", "8")
+        page.locator("#tune-apply").click()
+        page.wait_for_function("!document.getElementById('intake-approve').hidden")
+        page.get_by_role("button", name="Approve baseline").click()
+        page.wait_for_function("document.getElementById('baseline-history-summary').textContent.includes('2 approved')")
+        page.locator("#baseline-history-summary").click()
+        self.assertEqual(page.locator("#baseline-history-body tr").count(), 3)
+        self.assertRegex(page.locator("#baseline-history-body tr").nth(1).inner_text(), r"[+-]")
+
+    def test_the_calibration_view_reports_coverage_of_the_p50_and_p80_bands(self) -> None:
+        page = self.page
+        page.get_by_role("button", name="Use sample request").click()
+        page.get_by_role("button", name="Analyze request").click()
+        page.wait_for_function("document.querySelectorAll('#calibration-metrics > *').length === 4")
+        self.assertIn("P80", page.locator("#calibration-note").inner_text())
+        self.assertIn("target 80%", page.locator("#calibration-metrics").inner_text())
 
     def test_commit_ai_falls_back_to_rules_and_can_retry(self) -> None:
         type(self).llm_enabled = True

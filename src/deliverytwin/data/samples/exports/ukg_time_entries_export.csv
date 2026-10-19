@@ -1,0 +1,6 @@
+Employee,Work Date,Pay Code,Hours
+Lead Engineer,{today-1},Production Support,5
+Lead Engineer,{today-3},Production Support,4
+Lead Engineer,{today-5},Project Work,8
+Lead Engineer,{today-12},Production Support,6
+Delivery Engineer,{today-2},Project Work,8
