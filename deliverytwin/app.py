@@ -27,11 +27,23 @@ MAX_CHAT_REQUEST_BYTES = 16_384
 MAX_INTAKE_REQUEST_BYTES = 7_500_000
 INTAKE_POST_ROUTES = (
     "/api/intake/analyze", "/api/intake/evaluate", "/api/intake/approve", "/api/intake/what-if",
-    "/api/intake/forecast", "/api/intake/estimate",
+    "/api/intake/forecast", "/api/intake/estimate", "/api/intake/challenge", "/api/intake/ask",
 )
 ACT_POST_ROUTES = ("/api/act/analyze", "/api/act/what-if", "/api/act/apply")
+TRACK_POST_ROUTES = ("/api/track/brief",)
 MAX_CHAT_QUESTION_LENGTH = 1_200
 logger = logging.getLogger(__name__)
+BASELINE_REQUIRED = "Approve a baseline in COMMIT before tracking delivery or reviewing interventions."
+
+
+class BaselineRequiredError(Exception):
+    """TRACK and INTERVENE only work against an approved COMMIT baseline."""
+
+
+def baseline_approved(connection: sqlite3.Connection) -> bool:
+    from .intake import latest_baseline
+
+    return latest_baseline(connection) is not None
 
 
 def connect(database: str | Path) -> sqlite3.Connection:
@@ -845,8 +857,9 @@ def serve_dashboard(database: str | Path, host: str, port: int) -> None:
                 try:
                     with connect(database) as connection:
                         state = simulation_state(connection)
-                        if state is None:
-                            payload = {"simulated": False}
+                        approved = baseline_approved(connection)
+                        if state is None or not approved:
+                            payload = {"simulated": False, "baseline_required": not approved}
                         else:
                             payload = {**build_workflow_report(connection), "simulated": True,
                                        "simulation": state}
@@ -952,6 +965,27 @@ def serve_dashboard(database: str | Path, host: str, port: int) -> None:
                                 available_hours,
                             )
                         }
+                    elif route == "/api/intake/challenge":
+                        from .commit_ai import challenge_commitment
+
+                        evaluation = evaluate_intake(
+                            connection, payload.get("text"), payload.get("answers"),
+                            documents=payload.get("documents"), adjustments=payload.get("adjustments"),
+                            questions=payload.get("questions"), basis=payload.get("basis"),
+                        )
+                        result = challenge_commitment(connection, evaluation)
+                    elif route == "/api/intake/ask":
+                        from .commit_ai import ask_whatif
+
+                        result = ask_whatif(
+                            connection, payload.get("question"), date.today(),
+                            lambda adjustments: evaluate_intake(
+                                connection, payload.get("text"), payload.get("answers"),
+                                documents=payload.get("documents"), adjustments=adjustments,
+                                questions=payload.get("questions"), basis=payload.get("basis"),
+                            ),
+                            payload.get("adjustments") or {},
+                        )
                     elif route == "/api/intake/evaluate":
                         result = evaluate_intake(
                             connection, payload.get("text"), payload.get("answers"),
@@ -999,7 +1033,7 @@ def serve_dashboard(database: str | Path, host: str, port: int) -> None:
             route = urlsplit(self.path).path
             if route not in (
                 "/api/chat", "/api/simulate", "/api/reset-all",
-                *INTAKE_POST_ROUTES, *ACT_POST_ROUTES,
+                *INTAKE_POST_ROUTES, *ACT_POST_ROUTES, *TRACK_POST_ROUTES,
             ):
                 self.send_error(404, "Not found")
                 return
@@ -1043,10 +1077,15 @@ def serve_dashboard(database: str | Path, host: str, port: int) -> None:
                         if payload.get("reset") is True:
                             reset_simulation(connection)
                             result: dict[str, Any] = {"simulated": False}
+                        elif not baseline_approved(connection):
+                            raise BaselineRequiredError(BASELINE_REQUIRED)
                         elif payload.get("next_sprint") is True:
                             result = {"simulated": True, **advance_one_sprint(connection)}
                         else:
                             result = {"simulated": True, **simulate_sprints(connection, sprints)}
+                except BaselineRequiredError as error:
+                    self.send_json(409, {"error": str(error)})
+                    return
                 except ValueError as error:
                     self.send_json(400, {"error": str(error)})
                     return
@@ -1055,11 +1094,35 @@ def serve_dashboard(database: str | Path, host: str, port: int) -> None:
                     return
                 self.send_json(200, result)
                 return
+            if route in TRACK_POST_ROUTES:
+                from .intake import latest_baseline
+                from .track_ai import build_brief
+
+                try:
+                    with connect(database) as connection:
+                        if not baseline_approved(connection):
+                            raise BaselineRequiredError(BASELINE_REQUIRED)
+                        if simulation_state(connection) is None:
+                            raise ValueError("Simulate a sprint before requesting a TRACK briefing.")
+                        result = build_brief(build_workflow_report(connection), latest_baseline(connection))
+                except BaselineRequiredError as error:
+                    self.send_json(409, {"error": str(error)})
+                    return
+                except ValueError as error:
+                    self.send_json(400, {"error": str(error)})
+                    return
+                except (OSError, sqlite3.Error, RuntimeError) as error:
+                    self.send_json(500, {"error": f"Unable to build the TRACK briefing: {error}"})
+                    return
+                self.send_json(200, result)
+                return
             if route in ACT_POST_ROUTES:
                 from .recovery import analyze_intervention, predict_scenario
 
                 try:
                     with connect(database) as connection:
+                        if not baseline_approved(connection):
+                            raise BaselineRequiredError(BASELINE_REQUIRED)
                         if simulation_state(connection) is None:
                             raise ValueError("Simulate a sprint before creating an ACT recovery scenario.")
                         report = build_workflow_report(connection)
@@ -1078,6 +1141,9 @@ def serve_dashboard(database: str | Path, host: str, port: int) -> None:
                             result = predict_scenario(report, payload, late)
                             if route == "/api/act/apply":
                                 result = save_recovery_scenario(connection, result)
+                except BaselineRequiredError as error:
+                    self.send_json(409, {"error": str(error)})
+                    return
                 except ValueError as error:
                     self.send_json(400, {"error": str(error)})
                     return

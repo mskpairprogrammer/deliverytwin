@@ -45,6 +45,8 @@ class JourneyUiTests(unittest.TestCase):
             patch("deliverytwin.intake.complete", side_effect=lambda *a, **k: cls.llm(*a, **k)),
             patch("deliverytwin.recovery.openai_configured", side_effect=lambda: cls.llm_enabled),
             patch("deliverytwin.recovery.complete", side_effect=lambda *a, **k: cls.llm(*a, **k)),
+            patch("deliverytwin.ai_common.openai_configured", side_effect=lambda: cls.llm_enabled),
+            patch("deliverytwin.ai_common.complete", side_effect=lambda *a, **k: cls.llm(*a, **k)),
         ]
         for active in cls.patches:
             active.start()
@@ -187,6 +189,8 @@ class JourneyUiTests(unittest.TestCase):
                      "Customer Privacy Engineer"):
             self.assertIn(role, roles)
         self.assertIn("Feasible", page.locator("#intake-commit-explain").inner_text())
+        page.wait_for_function("document.getElementById('review-risks').children.length > 0")
+        self.assertIn("RULES-BASED REVIEW", page.locator("#review-source").inner_text())
         starting = page.locator(".scenario-table").inner_text()
 
         page.locator("#tune-fte").fill("3")
@@ -194,6 +198,7 @@ class JourneyUiTests(unittest.TestCase):
         page.wait_for_function("document.getElementById('intake-approve').disabled")
         self.assertIn("Not feasible", page.locator(".scenario-table").inner_text())
         self.assertIn("add capacity", page.locator("#intake-approve").get_attribute("title"))
+        page.wait_for_function("document.getElementById('review-source').textContent.includes('NOT READY')")
 
         page.get_by_role("button", name="Reset to defaults").click()
         page.wait_for_function("!document.getElementById('intake-approve').disabled")
@@ -211,7 +216,11 @@ class JourneyUiTests(unittest.TestCase):
         page.locator("#track-next").wait_for(state="visible")
         self.assertRegex(self.states()["track"], r"^Sprint 1 · \d+% on time$")
         titles = page.locator("#panel-track .card-title").all_inner_texts()
-        self.assertTrue(titles[0].startswith("Sprint 1 delivery outlook"), titles)
+        self.assertEqual(titles[0], "AI sprint briefing", titles)
+        self.assertTrue(any(title.startswith("Sprint 1 delivery outlook") for title in titles), titles)
+        page.wait_for_function("document.getElementById('brief-drivers').children.length > 0")
+        self.assertIn("RULES-BASED BRIEFING", page.locator("#brief-source").inner_text())
+        self.assertIn("Production support load", page.locator("#brief-drivers").inner_text())
 
         page.get_by_role("button", name="Review recovery options →").click()
         self.assertEqual(page.locator("#tab-intervene").get_attribute("aria-selected"), "true")
@@ -398,7 +407,7 @@ class JourneyUiTests(unittest.TestCase):
         page.wait_for_function("document.getElementById('act-scenario-status').textContent.includes('saved')")
         self.assertEqual(calls("recovery_prediction"), 1)
         page.reload()
-        page.locator("#act-what-if-results").wait_for(state="attached")
+        page.wait_for_function("document.getElementById('act-scenario-status').textContent.includes('saved')")
         self.assertIn("saved", page.locator("#act-scenario-status").inner_text())
 
     def test_a_failing_ai_in_intervene_falls_back_and_can_retry(self) -> None:
@@ -424,6 +433,154 @@ class JourneyUiTests(unittest.TestCase):
         page.wait_for_function("document.getElementById('act-source').textContent.includes('AI RECOVERY ANALYSIS')")
         self.assertEqual(page.locator("#act-options .rec-card").count(), 3)
 
+    def approve_and_simulate(self) -> None:
+        page = self.page
+        page.get_by_role("button", name="Approve baseline").click()
+        page.locator("#intake-approved").wait_for(state="visible")
+        page.get_by_role("button", name="Continue to TRACK →").click()
+        page.get_by_role("button", name="Simulate next sprint").click()
+        page.locator("#track-next").wait_for(state="visible")
+
+    def test_ai_challenges_the_commitment_and_answers_what_if_questions(self) -> None:
+        type(self).llm_enabled = True
+        page = self.page
+        self.run_shape_to_commit()
+        llm = type(self).llm
+        page.wait_for_function("document.getElementById('review-risks').children.length === 2")
+        self.assertIn("AI REVIEW", page.locator("#review-source").inner_text())
+        self.assertIn("READY WITH CONDITIONS", page.locator("#review-source").inner_text())
+        self.assertIn("Shared identity matching", page.locator("#review-risks").inner_text())
+        self.assertIn("Get a dated CAB slot", page.locator("#review-conditions").inner_text())
+        self.assertEqual(llm.calls.count("challenge"), 1)
+
+        summary = page.locator("#intake-commitment").inner_text()
+        current_fte = float(page.input_value("#tune-fte"))
+        page.locator("#ask-input").fill("What if we lose an engineer?")
+        page.get_by_role("button", name="Ask AI").click()
+        page.locator("#ask-result table").wait_for()
+        self.assertIn("Reads as losing one engineer", page.locator("#ask-result").inner_text())
+        cells = page.locator("#ask-result tr", has_text="Allocated FTE").locator("td").all_inner_texts()
+        self.assertEqual(cells, ["Allocated FTE", f"{current_fte:.1f}", f"{current_fte - 1:.1f}"])
+        confidence = page.locator("#ask-result tr", has_text="On-time confidence").locator("td").all_inner_texts()
+        self.assertLess(float(confidence[2].rstrip("%")), float(confidence[1].rstrip("%")))
+        self.assertEqual(page.locator("#intake-commitment").inner_text(), summary)
+        self.assertEqual(llm.calls.count("ask"), 1)
+
+        page.get_by_role("button", name="Use these values").click()
+        page.wait_for_function(f"Number(document.getElementById('tune-fte').value) === {current_fte - 1}")
+        self.assertTrue(page.locator("#ask-result").is_hidden())
+        self.assertNotEqual(page.locator("#intake-commitment").inner_text(), summary)
+        page.wait_for_function("document.getElementById('review-risks').children.length === 2")
+        self.assertEqual(llm.calls.count("challenge"), 2)
+
+        page.locator("#ask-input").fill("What is the weather like?")
+        page.get_by_role("button", name="Ask AI").click()
+        page.locator("#ask-result").get_by_text("cannot be expressed").wait_for()
+        self.assertEqual(page.locator("#ask-result table").count(), 0)
+
+        page.get_by_role("button", name="What if scope grows 20%?").click()
+        page.locator("#ask-result table").wait_for()
+        scope = page.locator("#ask-result tr", has_text="Scope change").locator("td").all_inner_texts()
+        self.assertEqual(scope[2], "20%")
+
+    def test_commit_ai_falls_back_to_rules_and_can_retry(self) -> None:
+        type(self).llm_enabled = True
+        type(self).llm = ScriptedLLM(fail=("challenge", "ask"))
+        page = self.page
+        self.run_shape_to_commit()
+        page.wait_for_function("document.getElementById('review-source').textContent.includes('RULES-BASED REVIEW')")
+        self.assertIn("HTTP 502", page.locator("#review-source").inner_text())
+        self.assertGreater(page.locator("#review-risks .review-risk").count(), 0)
+        page.locator("#ask-input").fill("What if we lose an engineer?")
+        page.get_by_role("button", name="Ask AI").click()
+        page.locator("#ask-result").get_by_text("use the sliders instead").wait_for()
+        self.assertIn("AI UNAVAILABLE", page.locator("#ask-result").inner_text())
+        type(self).llm = ScriptedLLM()
+        page.locator("#review-source button").click()
+        page.wait_for_function("document.getElementById('review-source').textContent.includes('AI REVIEW')")
+        self.assertEqual(page.locator("#review-risks .review-risk").count(), 2)
+
+    def test_ai_briefs_the_sprint_over_computed_variance(self) -> None:
+        type(self).llm_enabled = True
+        page = self.page
+        self.run_shape_to_commit()
+        self.approve_and_simulate()
+        llm = type(self).llm
+        page.wait_for_function("document.getElementById('brief-drivers').children.length > 0")
+        self.assertIn("AI BRIEFING", page.locator("#brief-source").inner_text())
+        self.assertIn("cut confidence", page.locator("#brief-headline").inner_text())
+        self.assertIn("main reasons the forecast moved", page.locator("#brief-narrative").inner_text())
+        self.assertIn("Approved baseline", page.locator("#brief-summary").inner_text())
+        rows = page.locator("#brief-drivers .var-row")
+        self.assertGreater(rows.count(), 1)
+        for index in range(rows.count()):
+            row = rows.nth(index)
+            self.assertRegex(row.locator(".var-num").inner_text(), r"^−[\d.]+ pts · \+[\d.]+ days$")
+            self.assertIn("Evidence from", row.locator(".var-why").inner_text())
+        self.assertIn("CAB decision on identity matching", page.locator("#brief-watch").inner_text())
+        self.assertRegex(page.locator("#brief-badge").inner_text(), r"^\d+ PTS BELOW BASELINE$")
+        self.assertEqual(llm.calls.count("brief"), 1)
+
+        self.go("intervene")
+        self.go("track")
+        self.assertEqual(llm.calls.count("brief"), 1)
+        page.get_by_role("button", name="Re-run briefing").click()
+        page.wait_for_function("document.getElementById('brief-rerun').disabled === false")
+        self.assertEqual(llm.calls.count("brief"), 2)
+
+        page.reload()
+        page.wait_for_function("document.getElementById('brief-drivers').children.length > 0")
+        self.assertEqual(llm.calls.count("brief"), 2)
+
+    def test_track_briefing_falls_back_to_computed_variance_and_can_retry(self) -> None:
+        type(self).llm_enabled = True
+        type(self).llm = ScriptedLLM(fail=("brief",))
+        page = self.page
+        self.run_shape_to_commit()
+        self.approve_and_simulate()
+        page.wait_for_function("document.getElementById('brief-drivers').children.length > 0")
+        source = page.locator("#brief-source").inner_text()
+        self.assertIn("RULES-BASED BRIEFING", source)
+        self.assertIn("HTTP 500", source)
+        self.assertIn("costs about", page.locator("#brief-drivers .var-why").first.inner_text())
+        type(self).llm = ScriptedLLM()
+        page.locator("#brief-source button").click()
+        page.wait_for_function("document.getElementById('brief-source').textContent.includes('AI BRIEFING')")
+
+    def post_status(self, path: str, body: dict | None = None) -> int:
+        connection = http.client.HTTPConnection("127.0.0.1", self.port, timeout=30)
+        connection.request("POST", path, json.dumps(body or {}), {"Content-Type": "application/json"})
+        status = connection.getresponse().status
+        connection.close()
+        return status
+
+    def test_track_and_intervene_stay_locked_until_a_baseline_is_approved(self) -> None:
+        page = self.page
+        for stage in ("track", "intervene"):
+            self.assertEqual(self.states()[stage], "Needs approved baseline")
+        self.go("track")
+        self.assertIn("Approve a baseline first", page.locator("#track-awaiting").inner_text())
+        self.assertTrue(page.locator("#sim-run").is_disabled())
+        self.go("intervene")
+        self.assertIn("Approve a baseline first", page.locator("#intervene-awaiting").inner_text())
+
+        # The server enforces the same rule, so the UI cannot be bypassed.
+        for path in ("/api/simulate", "/api/track/brief", "/api/act/analyze", "/api/act/what-if", "/api/act/apply"):
+            self.assertEqual(self.post_status(path, {"next_sprint": True}), 409, path)
+        self.assertEqual(self.post_status("/api/simulate", {"reset": True}), 200)
+
+        page.get_by_role("button", name="Go to COMMIT").click()
+        self.assertEqual(page.locator("#tab-commit").get_attribute("aria-selected"), "true")
+        page.get_by_role("button", name="Go to SHAPE").click()
+        self.run_shape_to_commit()
+        self.assertEqual(self.states()["track"], "Needs approved baseline")
+        page.get_by_role("button", name="Approve baseline").click()
+        page.locator("#intake-approved").wait_for(state="visible")
+        self.assertEqual(self.states()["track"], "Not started")
+        self.go("track")
+        self.assertTrue(page.locator("#sim-run").is_enabled())
+        self.assertEqual(self.post_status("/api/simulate", {"next_sprint": True}), 200)
+
     def test_demo_data_can_be_cleared_from_the_footer(self) -> None:
         page = self.page
         self.run_shape_to_commit()
@@ -433,7 +590,7 @@ class JourneyUiTests(unittest.TestCase):
         self.assertEqual(
             self.states(),
             {"shape": "Start here", "commit": "Needs an estimate",
-             "track": "Not started", "intervene": "Waiting for signals"},
+             "track": "Needs approved baseline", "intervene": "Needs approved baseline"},
         )
         self.go("commit")
         self.assertTrue(page.locator("#commit-empty").is_visible())

@@ -214,6 +214,52 @@
     .link-btn-inline { border: 0; background: none; color: var(--teal); font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; padding: 0; }
     .intake-working { margin: 12px 19px 0; padding: 10px 14px; border-radius: 8px; background: #f0f7f5; color: var(--teal); font-size: 12px; font-weight: 700; }
     .intake-working[hidden] { display: none; }
+    .ai-review { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; background: #fbfdfc; margin-top: 14px; }
+    .ai-review-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .ai-review-head .step-title { margin: 0; }
+    .review-risks { display: grid; gap: 8px; margin: 8px 0; }
+    .review-risk { border: 1px solid var(--line); border-left: 4px solid var(--muted); background: white; border-radius: 7px; padding: 8px 10px; font-size: 11px; line-height: 1.5; }
+    .review-risk.sev-high { border-left-color: var(--red); }
+    .review-risk.sev-medium { border-left-color: #d89614; }
+    .review-risk strong { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 12px; }
+    .review-risk small { display: block; color: var(--muted); }
+    .sev-tag { font-size: 9px; font-weight: 800; letter-spacing: .06em; color: var(--muted); }
+    .sev-high .sev-tag { color: var(--red); }
+    .sev-medium .sev-tag { color: #8a5a00; }
+    .verdict-pill { border-radius: 999px; padding: 4px 10px; font-weight: 800; font-size: 10px; letter-spacing: .04em; background: #eef2f6; color: var(--ink); }
+    .verdict-pill.ready { background: var(--teal-soft); color: var(--teal); }
+    .verdict-pill.not_ready { background: #fdecec; color: var(--red); }
+    .review-conditions { margin: 6px 0 0; padding-left: 18px; font-size: 11px; line-height: 1.6; }
+    .ask-box { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; margin: 10px 0 14px; background: #fbfdfc; display: grid; gap: 8px; }
+    .ask-label { font-size: 11px; font-weight: 750; }
+    .ask-row { display: flex; gap: 8px; }
+    .ask-row input { flex: 1; min-width: 0; padding: 8px 10px; border: 1px solid var(--line); border-radius: 7px; font: inherit; font-size: 12px; }
+    .ask-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+    .ask-chip { border: 1px solid var(--line); background: white; border-radius: 999px; padding: 4px 10px; font: inherit; font-size: 10px; color: var(--ink); cursor: pointer; }
+    .ask-chip:hover { border-color: var(--teal); color: var(--teal); }
+    .ask-result { display: grid; gap: 8px; font-size: 11px; line-height: 1.55; }
+    .ask-result[hidden] { display: none; }
+    .ask-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+    .ask-table th, .ask-table td { padding: 5px 8px; border-bottom: 1px solid var(--line); text-align: left; }
+    .ask-table th { color: var(--muted); font-size: 10px; font-weight: 700; }
+    .ask-table td.changed { font-weight: 800; }
+    .ask-table td.worse { color: var(--red); }
+    .ask-table td.better { color: var(--teal); }
+    .brief-narrative { margin: 0 0 12px; font-size: 12px; line-height: 1.65; }
+    #track-brief { padding-bottom: 6px; }
+    #track-brief > :not(.card-head):not(.approval-note) { margin-left: 19px; margin-right: 19px; }
+    #track-brief > .approval-note { margin-top: 12px; }
+    .var-summary { margin: 0 0 8px; font-size: 11px; color: var(--muted); }
+    .var-row { display: grid; gap: 4px; padding: 8px 0; border-top: 1px solid var(--line); font-size: 11px; line-height: 1.5; }
+    .var-top { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+    .var-top strong { font-size: 12px; }
+    .var-chip { color: var(--muted); font-size: 10px; }
+    .var-num { margin-left: auto; font-weight: 800; color: var(--red); white-space: nowrap; }
+    .var-bar { height: 6px; background: #eef2f6; border-radius: 999px; overflow: hidden; }
+    .var-bar span { display: block; height: 100%; background: var(--red); border-radius: 999px; }
+    .var-why { margin: 0; color: var(--muted); }
+    .brief-watch { margin: 10px 0 0; font-size: 11px; }
+    .brief-watch ul { margin: 4px 0 0; padding-left: 18px; line-height: 1.6; }
     @media (max-width: 900px) { .prediction-columns { grid-template-columns: 1fr; } }
     .intake-step.collapsed { background: white; padding: 10px 15px; }
     .intake-step.collapsed > :not(.step-title):not(.step-summary) { display: none; }
@@ -447,14 +493,34 @@
             <h4 class="step-title"><span class="step-num">5</span>Review and approve the commitment</h4>
             <div id="intake-commitment" class="rom-hero"></div>
             <p id="intake-commit-explain" class="rom-explain"></p>
+            <section class="ai-review" id="commit-review" aria-labelledby="review-title">
+              <div class="ai-review-head">
+                <h4 class="step-title" id="review-title">AI pre-commit review</h4>
+                <button id="review-rerun" class="link-btn-inline" type="button">Re-run review</button>
+              </div>
+              <div class="prediction-source" id="review-source" role="status" aria-live="polite">The review starts when this estimate is shown.</div>
+              <p class="prediction-headline" id="review-summary"></p>
+              <div class="review-risks" id="review-risks"></div>
+              <div id="review-conditions"></div>
+              <p class="step-help">Advisory only. The feasibility check and your approval decide the baseline; the review never changes the numbers.</p>
+            </section>
             <div class="intake-actions">
               <button id="intake-approve" class="intake-btn primary" type="button">Approve baseline</button>
               <button id="intake-continue" class="intake-btn" type="button" hidden>Continue to TRACK →</button>
             </div>
             <div id="intake-approved" class="approved-banner" role="status" hidden></div>
             <section class="what-if commit-tune" aria-labelledby="tune-title">
-              <h4 class="step-title" id="tune-title">Explore what-if adjustments</h4>
-              <p class="step-help">Change capacity, target date, or scope and recalculate. The summary above updates, and approval uses the values it shows.</p>
+              <h4 class="step-title" id="tune-title">Explore what-if scenarios</h4>
+              <p class="step-help">Ask in plain English, or change capacity, target date, or scope below and recalculate. The summary above updates, and approval uses the values it shows.</p>
+              <div class="ask-box">
+                <label class="ask-label" for="ask-input">Ask a what-if question</label>
+                <div class="ask-row">
+                  <input id="ask-input" type="text" maxlength="300" autocomplete="off" placeholder="e.g. What if we lose an engineer?">
+                  <button id="ask-go" class="intake-btn primary" type="button">Ask AI</button>
+                </div>
+                <div class="ask-chips" id="ask-chips"></div>
+                <div class="ask-result" id="ask-result" role="status" aria-live="polite" hidden></div>
+              </div>
               <div class="tune-grid">
                 <label for="tune-fte"><span>Allocated FTE</span><input id="tune-fte" type="number" min="0.5" step="0.5"></label>
                 <label for="tune-date"><span>Target date</span><input id="tune-date" type="date"></label>
@@ -498,10 +564,25 @@
     </section>
     <section id="panel-track" class="stage-panel" role="tabpanel" aria-labelledby="tab-track" tabindex="0" hidden>
       <div class="stage-intro"><div><h2>Track delivery conditions</h2><p>Compare cross-system signals and the current forecast with the commitment.</p></div><span class="badge">SIGNALS + OUTLOOK</span></div>
-      <div class="awaiting" role="status">No delivery signals yet. Click <strong>Simulate next sprint</strong> below to load test data and move the date forward one sprint.</div>
+      <div class="awaiting" id="track-awaiting" role="status"></div>
       <div class="sim-bar">
         <button id="sim-run" class="intake-btn primary" type="button">Simulate next sprint</button>
         <span id="sim-status" class="sim-status" role="status"></span>
+      </div>
+      <div class="grid">
+        <section class="card full" id="track-brief" aria-labelledby="track-brief-title">
+          <div class="card-head"><div><h3 class="card-title" id="track-brief-title">AI sprint briefing</h3><div class="card-kicker">What changed since the baseline, and why the forecast moved</div></div><span class="badge" id="brief-badge">ANALYZING</span></div>
+          <div id="brief-working" class="intake-working" role="status" aria-live="polite" hidden></div>
+          <div class="prediction-source" id="brief-source"></div>
+          <p class="prediction-headline" id="brief-headline"></p>
+          <p class="brief-narrative" id="brief-narrative"></p>
+          <h4 class="step-title">Why the forecast moved</h4>
+          <p class="var-summary" id="brief-summary"></p>
+          <div id="brief-drivers"></div>
+          <div class="brief-watch" id="brief-watch"></div>
+          <div class="intake-actions"><button id="brief-rerun" class="intake-btn" type="button">Re-run briefing</button></div>
+          <p class="approval-note">Confidence points and days are computed from the forecast formula; the AI only explains them.</p>
+        </section>
       </div>
       <div class="grid">
         <section class="card overview">
@@ -571,7 +652,7 @@
     </section>
     <section id="panel-intervene" class="stage-panel" role="tabpanel" aria-labelledby="tab-intervene" tabindex="0" hidden>
       <div class="stage-intro"><div><h2>Review an intervention</h2><p>Compare evidence-backed recovery options. Approval and source-system execution remain separate steps.</p></div><span class="badge">DECISION REQUIRED</span></div>
-      <div class="awaiting" role="status">No intervention options yet. Use <strong>Simulate next sprint</strong> on the TRACK tab.</div>
+      <div class="awaiting" id="intervene-awaiting" role="status"></div>
       <div class="grid">
         <section class="card full">
           <div class="card-head"><div><h3 class="card-title">AI recovery analysis</h3><div class="card-kicker" id="act-kicker">Diagnosis and recovery scenarios written from the latest sprint signals and lessons from late projects.</div></div><span class="badge" id="act-recommendation">ANALYZING</span></div>
@@ -631,6 +712,10 @@
     const stageTabs = [...document.querySelectorAll('[role="tab"]')];
     let currentReport = null;
     let serverBaseline = null;
+    let trackBrief = null;
+    let trackPendingKey = null;
+    let trackSeq = 0;
+    const TRACK_STORE = "deliverytwin.track.v1";
     function selectStage(tab, moveFocus = false) {
       stageTabs.forEach((item) => {
         const selected = item === tab;
@@ -643,6 +728,7 @@
       }
       if (moveFocus) tab.focus();
       if (tab.dataset.stage === "intervene" && typeof loadActAnalysis === "function") loadActAnalysis();
+      if (tab.dataset.stage === "track") loadTrackBrief();
     }
     function goToStage(stage) {
       const tab = byId(`tab-${stage}`);
@@ -863,6 +949,90 @@
       }
     }
 
+    function renderTrackBrief() {
+      const brief = trackBrief;
+      if (!brief) return;
+      const generated = brief.source === "llm";
+      const variance = brief.variance;
+      const source = byId("brief-source");
+      source.replaceChildren(
+        el("span", `source-pill ${generated ? "llm" : "fallback"}`, generated ? `AI BRIEFING · ${brief.model}` : "RULES-BASED BRIEFING · AI UNAVAILABLE"),
+        el("span", "", generated
+          ? "The narrative and explanations are written by the AI from the five systems' signals."
+          : aiUnavailableText(brief.fallback_reason, "a rules-based briefing")),
+      );
+      if (!generated && brief.fallback_reason && brief.fallback_reason.code !== "not_configured") {
+        const retry = el("button", "link-btn-inline", "Try again with AI");
+        retry.type = "button";
+        retry.addEventListener("click", () => loadTrackBrief(true));
+        source.append(retry);
+      }
+      const lost = -variance.confidence_change_points;
+      byId("brief-badge").textContent = lost > 0 ? `${lost} PTS BELOW BASELINE` : "ON BASELINE";
+      byId("brief-headline").textContent = brief.headline;
+      byId("brief-narrative").textContent = brief.narrative;
+      byId("brief-summary").textContent =
+        `${brief.baseline.source === "approved_baseline" ? "Approved baseline" : "Seed baseline (no approval recorded)"}: ` +
+        `${variance.baseline_confidence_pct}% on-time → ${variance.current_confidence_pct}% now · ` +
+        `projected slip ${variance.baseline_slip_days} → ${variance.current_slip_days} days.`;
+      const biggest = Math.max(...variance.drivers.map((driver) => driver.confidence_points_lost), 0.1);
+      byId("brief-drivers").replaceChildren(...variance.drivers.map((driver) => {
+        const row = el("div", "var-row");
+        const top = el("div", "var-top");
+        top.append(
+          el("strong", "", driver.label),
+          el("span", "var-chip", `${driver.source_name} · ${driver.signal_value} ${driver.unit}`),
+          el("span", "var-num", `−${driver.confidence_points_lost} pts · +${driver.slip_days_added} days`),
+        );
+        const bar = el("div", "var-bar");
+        const fill = el("span");
+        fill.style.width = `${Math.round((driver.confidence_points_lost / biggest) * 100)}%`;
+        bar.append(fill);
+        row.append(top, bar, el("p", "var-why", driver.explanation));
+        return row;
+      }));
+      const watch = byId("brief-watch");
+      watch.replaceChildren();
+      if (brief.watch_next.length) {
+        const items = el("ul");
+        brief.watch_next.forEach((item) => items.append(el("li", "", item)));
+        watch.append(el("strong", "", "Watch next sprint"), items);
+      }
+    }
+    async function loadTrackBrief(force = false) {
+      if (!currentReport || !currentReport.simulated) return;
+      const initiative = currentReport.initiative;
+      const key = [currentReport.as_of, currentReport.workflow.stages.track.sprint_number, initiative.initial_confidence_pct, initiative.target_end].join("|");
+      if (!force && ((trackBrief && trackBrief.key === key) || trackPendingKey === key)) return;
+      if (!force) {
+        try {
+          const saved = JSON.parse(sessionStorage.getItem(TRACK_STORE) || "null");
+          if (saved && saved.key === key && saved.source === "llm") { trackBrief = saved; renderTrackBrief(); return; }
+        } catch (error) { /* fall through to a fresh briefing */ }
+      }
+      const seq = ++trackSeq;
+      trackPendingKey = key;
+      const working = byId("brief-working");
+      working.textContent = "Explaining what changed since the baseline…";
+      working.hidden = false;
+      byId("brief-rerun").disabled = true;
+      try {
+        const data = await intakePost("/api/track/brief", {});
+        if (seq !== trackSeq) return;
+        trackBrief = { ...data, key };
+        if (data.source === "llm") sessionStorage.setItem(TRACK_STORE, JSON.stringify(trackBrief));
+        renderTrackBrief();
+      } catch (error) {
+        if (seq === trackSeq) byId("brief-source").textContent = `The AI briefing could not be loaded: ${error.message}`;
+      } finally {
+        if (seq === trackSeq) {
+          trackPendingKey = null;
+          working.hidden = true;
+          byId("brief-rerun").disabled = false;
+        }
+      }
+    }
+
     async function refreshReport() {
       try {
         const response = await fetch("/api/report", { cache: "no-store" });
@@ -875,8 +1045,7 @@
           byId("workflow-status").textContent = "NO SPRINT DATA YET";
           byId("as-of").textContent = "BEFORE KICKOFF";
           byId("shape-stage-status").textContent = "NO DEMO DATA";
-          if (!byId("panel-intervene").hidden) loadActAnalysis();
-        byId("updated").textContent = `Updated ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
+          byId("updated").textContent = `Updated ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
           byId("error").style.display = "none";
           return;
         }
@@ -939,6 +1108,8 @@
         byId("finding").textContent = report.zero_prompt_finding;
         byId("updated").textContent = `Updated ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
         byId("error").style.display = "none";
+        if (!byId("panel-track").hidden) loadTrackBrief();
+        if (!byId("panel-intervene").hidden) loadActAnalysis();
       } catch (error) {
         byId("error").textContent = `Dashboard data could not be loaded: ${error.message}`;
         byId("error").style.display = "block";
@@ -996,7 +1167,7 @@
       } catch (error) {
         status.textContent = `Simulation failed: ${error.message}`;
       } finally {
-        button.disabled = false;
+        button.disabled = !serverBaseline;
       }
     }
     byId("sim-run").addEventListener("click", () =>
@@ -1027,6 +1198,7 @@
     });
     const SAMPLE_REQUEST = "We need one view of every customer across the business. Teams get different answers, and leadership wants this fixed soon.";
     const intake = { text: "", analysis: null, result: null, baselineCommitment: null, documents: [], approved: false };
+    let reviewSeq = 0;
     function newIntakeSessionId() {
       if (typeof crypto.randomUUID === "function") return crypto.randomUUID();
       const bytes = crypto.getRandomValues(new Uint8Array(16));
@@ -1060,6 +1232,7 @@
       intake.baselineCommitment = null;
       byId("commit-readiness").hidden = true;
       byId("commit-scenario-chart").replaceChildren();
+      clearCommitAi();
       clearSavedIntake();
       clearCommitmentSummary();
       intakeShowUpTo(1);
@@ -1089,6 +1262,7 @@
       });
       byId("commit-readiness").hidden = true;
       byId("intake-approved").hidden = true;
+      clearCommitAi();
       clearSavedIntake();
       byId("intake-approve").hidden = false;
       byId("intake-approve").disabled = true;
@@ -1172,10 +1346,32 @@
       }
     }
     const JOURNEY_STAGES = ["shape", "commit", "track", "intervene"];
+    function renderAwaiting() {
+      const ready = Boolean(serverBaseline);
+      const fill = (id, readyText, blockedText) => {
+        const box = byId(id);
+        box.replaceChildren();
+        if (ready) { box.append(document.createTextNode(readyText)); return; }
+        const go = el("button", "intake-btn primary", "Go to COMMIT");
+        go.type = "button";
+        go.addEventListener("click", () => goToStage("commit"));
+        box.append(el("strong", "", "Approve a baseline first. "), document.createTextNode(blockedText), el("div"), go);
+      };
+      fill("track-awaiting",
+        "No delivery signals yet. Click “Simulate next sprint” below to load test data and move the date forward one sprint.",
+        "TRACK compares delivery signals against the approved commitment, so it unlocks once you approve a baseline in COMMIT.");
+      fill("intervene-awaiting",
+        "No intervention options yet. Use “Simulate next sprint” on the TRACK tab.",
+        "INTERVENE recommends recovery options against the approved commitment. Approve a baseline in COMMIT, then simulate a sprint in TRACK.");
+      const simulate = byId("sim-run");
+      simulate.disabled = !ready;
+      simulate.title = ready ? "" : "Approve a baseline in COMMIT first.";
+    }
     function updateJourney() {
-      const sim = currentReport && currentReport.simulated ? currentReport : null;
+      const sim = serverBaseline && currentReport && currentReport.simulated ? currentReport : null;
       const act = sim && sim.workflow && sim.workflow.stages ? sim.workflow.stages : null;
       const approved = intake.approved || (!intake.result && Boolean(serverBaseline));
+      const locked = ["pending", "Needs approved baseline"];
       const states = {
         shape: intake.result || approved
           ? ["done", "Estimate ready"]
@@ -1183,10 +1379,10 @@
         commit: approved
           ? ["done", "Baseline approved"]
           : intake.result ? ["ready", "Awaiting approval"] : ["pending", "Needs an estimate"],
-        track: sim
+        track: !serverBaseline ? locked : sim
           ? ["ready", `Sprint ${sim.simulation.sprints_advanced}${act ? ` · ${act.track.on_time_pct}% on time` : ""}`]
           : ["pending", "Not started"],
-        intervene: sim && act
+        intervene: !serverBaseline ? locked : sim && act
           ? ["ready", actRecommended() ? `${actRecommended().title} recommended` : `Option ${act.intervene.recommended_option} recommended`]
           : ["pending", "Waiting for signals"],
       };
@@ -1198,6 +1394,7 @@
         byId(`state-${stage}`).textContent = text;
       });
       byId("track-next").hidden = !sim;
+      renderAwaiting();
     }
     function clearCommitmentSummary() {
       byId("shape-stage-status").textContent = "INTAKE IN PROGRESS";
@@ -1645,6 +1842,140 @@
       byId("intake-approved").hidden = true;
       byId("intake-approve").hidden = false;
       byId("intake-continue").hidden = true;
+      loadChallenge();
+    }
+    const VERDICT_TEXT = { ready: "READY TO APPROVE", ready_with_conditions: "READY WITH CONDITIONS", not_ready: "NOT READY" };
+    function commitAiPayload() {
+      const c = intake.result.commitment;
+      return {
+        text: intake.text, answers: intake.result.answers, documents: docsPayload(),
+        questions: intake.analysis.clarifications, basis: intake.result.basis,
+        adjustments: { allocated_fte: c.allocated_fte, target_date: c.target_date, scope_change_pct: c.scope_change_pct },
+      };
+    }
+    function clearCommitAi() {
+      reviewSeq += 1;
+      ["review-source", "review-summary"].forEach((id) => { byId(id).textContent = ""; });
+      ["review-risks", "review-conditions", "ask-result"].forEach((id) => byId(id).replaceChildren());
+      byId("ask-result").hidden = true;
+      byId("ask-input").value = "";
+    }
+    function renderChallenge(review) {
+      const generated = review.source === "llm";
+      const source = byId("review-source");
+      source.replaceChildren(
+        el("span", `source-pill ${generated ? "llm" : "fallback"}`, generated ? `AI REVIEW · ${review.model}` : "RULES-BASED REVIEW · AI UNAVAILABLE"),
+        el("span", `verdict-pill ${review.verdict}`, VERDICT_TEXT[review.verdict]),
+      );
+      if (!generated) {
+        source.append(el("span", "", aiUnavailableText(review.fallback_reason, "rules-based checks")));
+        if (review.fallback_reason && review.fallback_reason.code !== "not_configured") {
+          const retry = el("button", "link-btn-inline", "Try again with AI");
+          retry.type = "button";
+          retry.addEventListener("click", loadChallenge);
+          source.append(retry);
+        }
+      }
+      byId("review-summary").textContent = review.summary;
+      byId("review-risks").replaceChildren(...review.risks.map((risk) => {
+        const item = el("div", `review-risk sev-${risk.severity}`);
+        const title = el("strong", "", risk.title);
+        title.append(el("span", "sev-tag", risk.severity.toUpperCase()));
+        item.append(title, el("div", "", risk.detail), el("small", "", `Evidence: ${risk.evidence}`));
+        return item;
+      }));
+      const conditions = byId("review-conditions");
+      conditions.replaceChildren();
+      if (review.conditions.length) {
+        const items = el("ul", "review-conditions");
+        review.conditions.forEach((text) => items.append(el("li", "", text)));
+        conditions.append(el("strong", "", "Conditions to attach before approving"), items);
+      }
+    }
+    async function loadChallenge() {
+      if (!intake.result || !intake.analysis) return;
+      const seq = ++reviewSeq;
+      byId("review-source").textContent = "Reviewing this commitment against similar completed projects…";
+      byId("review-summary").textContent = "";
+      byId("review-risks").replaceChildren();
+      byId("review-conditions").replaceChildren();
+      byId("review-rerun").disabled = true;
+      try {
+        const review = await intakePost("/api/intake/challenge", commitAiPayload());
+        if (seq === reviewSeq) renderChallenge(review);
+      } catch (error) {
+        if (seq === reviewSeq) byId("review-source").textContent = `The review could not run: ${error.message}`;
+      } finally {
+        if (seq === reviewSeq) byId("review-rerun").disabled = false;
+      }
+    }
+    const ASK_EXAMPLES = ["What if we lose an engineer?", "What if the date moves out a month?", "What if scope grows 20%?"];
+    function renderAsk(data) {
+      const out = byId("ask-result");
+      const generated = data.source === "llm";
+      const header = el("div", "prediction-source");
+      header.append(el("span", `source-pill ${generated ? "llm" : "fallback"}`, generated ? `AI INTERPRETATION · ${data.model}` : "AI UNAVAILABLE"));
+      out.replaceChildren(header);
+      if (!data.answerable) {
+        if (data.reading) out.append(el("p", "", `I read this as: ${data.reading}`));
+        out.append(el("p", "", data.reason));
+        if (!generated && data.fallback_reason && data.fallback_reason.detail) out.append(el("small", "", data.fallback_reason.detail));
+        return;
+      }
+      out.append(el("p", "", `I read this as: ${data.reading}`));
+      const now = data.current, next = data.scenario;
+      const rows = [
+        ["On-time confidence", `${percent(now.confidence_pct)}%`, `${percent(next.confidence_pct)}%`, next.confidence_pct - now.confidence_pct],
+        ["Allocated FTE", now.allocated_fte.toFixed(1), next.allocated_fte.toFixed(1), next.allocated_fte - now.allocated_fte],
+        ["Target date", now.target_date, next.target_date, 0],
+        ["Scope change", `${now.scope_change_pct}%`, `${next.scope_change_pct}%`, now.scope_change_pct - next.scope_change_pct],
+        ["FTE needed for P80", now.required_fte_p80, next.required_fte_p80, now.required_fte_p80 - next.required_fte_p80],
+        ["Feasible", now.feasible ? "Yes" : "No", next.feasible ? "Yes" : "No", Number(next.feasible) - Number(now.feasible)],
+      ];
+      const table = el("table", "ask-table");
+      const head = el("tr");
+      ["", "Current", "If this happens"].forEach((label) => head.append(el("th", "", label)));
+      table.append(head);
+      rows.forEach(([label, before, after, direction]) => {
+        const row = el("tr");
+        const cell = el("td", `${String(before) !== String(after) ? "changed" : ""} ${direction > 0 ? "better" : direction < 0 ? "worse" : ""}`.trim(), String(after));
+        row.append(el("td", "", label), el("td", "", String(before)), cell);
+        table.append(row);
+      });
+      out.append(table);
+      if (data.caveats.length) {
+        const items = el("ul");
+        data.caveats.forEach((text) => items.append(el("li", "", text)));
+        out.append(el("strong", "", "Assumptions"), items);
+      }
+      if (!next.feasible) out.append(el("p", "gate-bad", "Not feasible at these values: approval stays disabled until capacity, date, or scope changes."));
+      const actions = el("div", "intake-actions");
+      const apply = el("button", "intake-btn primary", "Use these values");
+      apply.type = "button";
+      apply.addEventListener("click", (event) => intakeRun(event.currentTarget, async () => {
+        await recalculateCommitment(data.adjustments);
+        out.hidden = true;
+      }));
+      const dismiss = el("button", "intake-btn", "Dismiss");
+      dismiss.type = "button";
+      dismiss.addEventListener("click", () => { out.hidden = true; });
+      actions.append(apply, dismiss);
+      out.append(actions, el("small", "", "Figures come from the commitment model, not the AI. Nothing changes until you use these values."));
+    }
+    async function askWhatIf(question) {
+      const out = byId("ask-result");
+      out.hidden = false;
+      if (!question.trim()) { out.textContent = "Type a what-if question first."; return; }
+      if (!intake.result) return;
+      byId("ask-go").disabled = true;
+      out.textContent = "Reading your question, then running the commitment model…";
+      try {
+        renderAsk(await intakePost("/api/intake/ask", { ...commitAiPayload(), question: question.trim() }));
+      } catch (error) {
+        out.textContent = `The question could not be answered: ${error.message}`;
+      } finally {
+        byId("ask-go").disabled = false;
+      }
     }
     function renderApproved(baseline) {
       intake.approved = true;
@@ -1701,6 +2032,7 @@
       byId("intake-approve").hidden = false;
       byId("intake-continue").hidden = true;
       intakeShowUpTo(5);
+      loadChallenge();
     }
     function restoreIntake() {
       let saved = null;
@@ -1752,6 +2084,7 @@
       intake.result = null;
       intake.approved = false;
       byId("commit-readiness").hidden = true;
+      clearCommitAi();
       clearCommitmentSummary();
       intakeShowUpTo(Number(button.dataset.edit));
     }));
@@ -1764,6 +2097,18 @@
     });
     byId("tune-apply").addEventListener("click", (event) => intakeRun(event.currentTarget, () => recalculateCommitment(commitmentAdjustments())));
     byId("tune-reset").addEventListener("click", (event) => intakeRun(event.currentTarget, () => recalculateCommitment(intake.result.commitment.defaults)));
+    byId("review-rerun").addEventListener("click", loadChallenge);
+    byId("ask-go").addEventListener("click", () => askWhatIf(byId("ask-input").value));
+    byId("ask-input").addEventListener("keydown", (event) => {
+      if (event.key === "Enter") { event.preventDefault(); askWhatIf(byId("ask-input").value); }
+    });
+    byId("ask-chips").replaceChildren(...ASK_EXAMPLES.map((question) => {
+      const chip = el("button", "ask-chip", question);
+      chip.type = "button";
+      chip.addEventListener("click", () => { byId("ask-input").value = question; askWhatIf(question); });
+      return chip;
+    }));
+    byId("brief-rerun").addEventListener("click", () => loadTrackBrief(true));
     byId("intake-approve").addEventListener("click", (event) => intakeRun(event.currentTarget, async () => {
       const approved = await intakePost("/api/intake/approve", {
         text: intake.text, answers: intake.result.answers, documents: docsPayload(),

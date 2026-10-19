@@ -1,6 +1,6 @@
 """Scripted stand-in for the OpenAI client shared by the prediction and UI tests."""
 import json
-
+from datetime import date, timedelta
 from deliverytwin.llm import LLMError
 
 
@@ -43,8 +43,10 @@ def llm_questions():
 class ScriptedLLM:
     """Stands in for the OpenAI client; each call type can succeed or fail independently."""
 
-    def __init__(self, questions=None, forecast="valid", fail=(), recovery="valid"):
+    def __init__(self, questions=None, forecast="valid", fail=(), recovery="valid", challenge="valid", brief="valid"):
         self.recovery = recovery
+        self.challenge = challenge
+        self.brief = brief
         self.fail = set(fail)
         self.prompts = []
         self.questions = questions if questions is not None else llm_questions()
@@ -75,8 +77,69 @@ class ScriptedLLM:
             })
         if "recovery advisor" in system:
             return self._recovery(system, payload)
+        if "governance reviewer" in system:
+            return self._challenge(payload)
+        if "what-if question" in system:
+            return self._ask(payload)
+        if "delivery tracking analyst" in system:
+            return self._brief(payload)
         self.calls.append("rerank")
         raise LLMError("rerank not scripted")
+
+    def _challenge(self, payload):
+        self.calls.append("challenge")
+        if "challenge" in self.fail:
+            raise LLMError("OpenAI request failed with HTTP 502.")
+        severity = "catastrophic" if self.challenge == "invalid" else "high"
+        verdict = "ready" if self.challenge == "ready" else "ready_with_conditions"
+        return json.dumps({
+            "verdict": verdict, "summary": "The date is tight and rests on one shared identity-matching service.",
+            "risks": [
+                {"title": "Shared identity matching", "severity": severity,
+                 "detail": "Two similar projects slipped waiting on this service.", "evidence": "HIST-001 slipped 6 weeks"},
+                {"title": "Thin capacity headroom", "severity": "medium",
+                 "detail": "Required FTE is close to allocated.", "evidence": "Required vs allocated FTE"},
+            ],
+            "conditions": ["Get a dated CAB slot for identity matching.", "Name a backup engineer."],
+        })
+
+    def _ask(self, payload):
+        self.calls.append("ask")
+        if "ask" in self.fail:
+            raise LLMError("OpenAI request failed with HTTP 503.")
+        question, current = payload["question"].lower(), payload["current_levers"]
+        levers = {
+            "answerable": True, "reading": "Reads as a change to the commitment levers.",
+            "allocated_fte": current["allocated_fte"], "target_date": current["target_date"],
+            "scope_change_pct": current["scope_change_pct"], "caveats": ["Assumes no replacement is found."],
+        }
+        if "lose" in question:
+            levers["allocated_fte"] = max(0.5, current["allocated_fte"] - 1)
+            levers["reading"] = "Reads as losing one engineer, so allocated FTE drops by 1."
+        elif "delay" in question:
+            moved = date.fromisoformat(current["target_date"]) + timedelta(days=28)
+            levers.update(target_date=moved.isoformat(), reading="Reads as moving the date out four weeks.")
+        elif "scope" in question:
+            levers.update(scope_change_pct=float(current["scope_change_pct"] + 20),
+                          reading="Reads as 20% more scope.")
+        elif "huge" in question:
+            levers["allocated_fte"] = 99
+        elif "nothing" not in question:
+            return json.dumps({"answerable": False, "reason": "That cannot be expressed as capacity, date, or scope."})
+        return json.dumps(levers)
+
+    def _brief(self, payload):
+        self.calls.append("brief")
+        if "brief" in self.fail:
+            raise LLMError("OpenAI request failed with HTTP 500.")
+        drivers = payload["variance"]["drivers"]
+        shown = drivers[:-1] if self.brief == "invalid" else drivers
+        return json.dumps({
+            "headline": "Support load and a stuck change request cut confidence.",
+            "narrative": "Production support and a blocked change request are the main reasons the forecast moved.",
+            "drivers": [{"key": item["key"], "explanation": f"Evidence from {item['source_name']}."} for item in shown],
+            "watch_next": ["CAB decision on identity matching", "Lead engineer support hours"],
+        })
 
     def _recovery(self, system, payload):
         analysis = "propose 3 distinct recovery scenarios" in system

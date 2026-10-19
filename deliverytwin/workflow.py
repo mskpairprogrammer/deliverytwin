@@ -16,6 +16,25 @@ from agent_framework import (
 STAGES = ("shape", "commit", "track", "intervene")
 WORKFLOW_NAME = "deliverytwin"
 
+# (key, label, signal, confidence points lost per unit, unit, source system). The TRACK forecast
+# and its variance explanation both read this table, so attribution always matches the forecast.
+FORECAST_PENALTIES = (
+    ("production_support", "Production support load", "lead_production_support_hours_per_week", 0.8, "h/week", "ukg_wfm"),
+    ("unplanned_scope", "Unplanned scope", "unplanned_story_points", 0.2, "points", "azure_devops"),
+    ("change_blocker", "Blocked change approval", "oldest_blocking_change_age_days", 0.6, "days open", "servicenow"),
+    ("approved_pto", "Approved time off", "lead_approved_pto_hours", 0.1, "hours", "ukg_wfm"),
+    ("p1_incidents", "Priority-1 incidents", "active_priority_1_incidents", 2, "open", "servicenow"),
+)
+SLIP_DAYS_PER_POINT = 0.45
+
+
+def forecast_confidence(baseline_pct: float, signals: dict[str, Any]) -> float:
+    """Unclamped on-time confidence: the baseline minus each signal's penalty."""
+    value = baseline_pct
+    for _key, _label, signal, weight, _unit, _source in FORECAST_PENALTIES:
+        value -= signals[signal] * weight
+    return value
+
 
 def _stage_result(stage: str, report: dict[str, Any]) -> dict[str, Any]:
     initiative = report["initiative"]
@@ -24,17 +43,9 @@ def _stage_result(stage: str, report: dict[str, Any]) -> dict[str, Any]:
     sprint_number = simulation.get("sprints_advanced", 4)
     on_time_pct = round(max(
         5,
-        min(
-            95,
-            initiative["initial_confidence_pct"]
-            - signals["lead_production_support_hours_per_week"] * 0.8
-            - signals["unplanned_story_points"] * 0.2
-            - signals["oldest_blocking_change_age_days"] * 0.6
-            - signals["lead_approved_pto_hours"] * 0.1
-            - signals["active_priority_1_incidents"] * 2,
-        ),
+        min(95, forecast_confidence(initiative["initial_confidence_pct"], signals)),
     ))
-    projected_slip_days = round(max(0, (100 - on_time_pct) * 0.45))
+    projected_slip_days = round(max(0, (100 - on_time_pct) * SLIP_DAYS_PER_POINT))
 
     if stage == "shape":
         return {
