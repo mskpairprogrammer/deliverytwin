@@ -12,10 +12,11 @@ import csv
 import io
 import json
 import re
-import sqlite3
 import zipfile
 from datetime import date, datetime, timedelta
 from typing import Any
+
+from .data.connection import Connection
 
 MAX_FILES = 5
 MAX_FILE_BYTES = 2_000_000
@@ -356,7 +357,7 @@ def parse_exports(files: object, as_of: date | None = None) -> dict[str, Any]:
     }
 
 
-def save_import(connection: sqlite3.Connection, parsed: dict[str, Any]) -> None:
+def save_import(connection: Connection, parsed: dict[str, Any]) -> None:
     with connection:
         connection.execute(
             "INSERT INTO simulation_settings (key, value) VALUES ('import_signals', ?) "
@@ -364,6 +365,6 @@ def save_import(connection: sqlite3.Connection, parsed: dict[str, Any]) -> None:
         )
 
 
-def load_import(connection: sqlite3.Connection) -> dict[str, Any] | None:
+def load_import(connection: Connection) -> dict[str, Any] | None:
     row = connection.execute("SELECT value FROM simulation_settings WHERE key = 'import_signals'").fetchone()
     return json.loads(row["value"]) if row else None

@@ -87,6 +87,9 @@ class BaselineRepository:
         )
         return self._summary(rows[0]) if rows else None
 
+    def clear(self) -> None:
+        self.db.clear_table(self.TABLE)
+
     @staticmethod
     def _summary(row: dict[str, Any]) -> dict[str, Any]:
         return {
@@ -136,6 +139,9 @@ class IntakeSessionRepository:
         with self.db.batch():
             self.db.upsert(self.TABLE, rows)
 
+    def clear(self) -> None:
+        self.db.clear_table(self.TABLE)
+
     def sessions(self) -> list[dict[str, Any]]:
         return [
             {
@@ -146,3 +152,82 @@ class IntakeSessionRepository:
             }
             for row in self._select()
         ]
+
+
+class RecoveryScenarioRepository:
+    """INTERVENE scenarios saved after a what-if preview, with their simulated per-system update records."""
+
+    TABLE = "recovery_scenarios"
+    UPDATES = "recovery_target_updates"
+
+    def __init__(self, db: Database) -> None:
+        self.db = db
+        db.create_tables(names=(self.TABLE, self.UPDATES))
+
+    def save(self, scenario: dict[str, Any], updates: list[dict[str, Any]]) -> int:
+        """Store a scenario and its updates in one unit; returns the new scenario id."""
+        saved_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
+        with self.db.batch():
+            current = self.db.query(f"SELECT MAX(scenario_id) AS latest FROM {self.db.table(self.TABLE)}")
+            scenario_id = int(current[0]["latest"] or 0) + 1
+            self.db.upsert(self.TABLE, [{**scenario, "scenario_id": scenario_id, "saved_at": saved_at}])
+            self.db.upsert(self.UPDATES, [
+                {"scenario_id": scenario_id, "source_key": update["source_key"],
+                 "payload_json": json.dumps(update["payload"])}
+                for update in updates
+            ])
+        return scenario_id
+
+    def latest(self) -> dict[str, Any] | None:
+        rows = self.db.query(
+            f"SELECT {', '.join(_columns(self.TABLE))} FROM {self.db.table(self.TABLE)} "
+            "ORDER BY scenario_id DESC LIMIT 1"
+        )
+        if not rows:
+            return None
+        row = rows[0]
+        updates = self.db.query(
+            f"SELECT source_key, payload_json FROM {self.db.table(self.UPDATES)} "
+            "WHERE scenario_id = ? ORDER BY source_key", [row["scenario_id"]],
+        )
+        return {
+            "id": row["scenario_id"], "initiative_id": row["initiative_id"],
+            "recommended_option": row["recommended_option"], "allocated_fte": row["allocated_fte"],
+            "scope_defer_pct": row["scope_defer_pct"], "target_date": _text(row["target_date"]),
+            "incremental_cost_k": row["incremental_cost_k"], "confidence_pct": row["confidence_pct"],
+            "saved_at": _text(row["saved_at"]),
+            "updates": [{"source_key": u["source_key"], "payload": json.loads(u["payload_json"])} for u in updates],
+        }
+
+    def clear(self) -> None:
+        for name in (self.UPDATES, self.TABLE):
+            self.db.clear_table(name)
+
+
+class TrackSnapshotRepository:
+    """One TRACK outlook per initiative and sprint, so the trend survives restarts."""
+
+    TABLE = "track_snapshots"
+
+    def __init__(self, db: Database) -> None:
+        self.db = db
+        db.create_tables(names=(self.TABLE,))
+
+    def record(self, snapshot: dict[str, Any]) -> str:
+        """Idempotent per sprint: recording the same sprint again replaces its outlook."""
+        snapshot_id = f"{snapshot['initiative_id']}-sprint-{int(snapshot['sprint_number']):03d}"
+        captured_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
+        self.db.upsert(self.TABLE, [{**snapshot, "snapshot_id": snapshot_id, "captured_at": captured_at}])
+        return snapshot_id
+
+    def trend(self, initiative_id: str) -> list[dict[str, Any]]:
+        rows = self.db.query(
+            f"SELECT {', '.join(_columns(self.TABLE))} FROM {self.db.table(self.TABLE)} "
+            "WHERE initiative_id = ? ORDER BY sprint_number ASC", [initiative_id],
+        )
+        return [
+            {**row, "as_of": _text(row["as_of"]), "captured_at": _text(row["captured_at"])} for row in rows
+        ]
+
+    def clear(self) -> None:
+        self.db.clear_table(self.TABLE)

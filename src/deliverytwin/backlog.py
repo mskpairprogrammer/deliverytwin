@@ -12,9 +12,10 @@ import csv
 import html
 import io
 import re
-import sqlite3
 from datetime import date, datetime, timedelta
 from typing import Any
+
+from .data.connection import Connection
 
 ADO_COLUMNS = (
     "Work Item Type", "Title 1", "Title 2", "Title 3", "Description", "Tags", "Effort", "Start Date", "Target Date",
@@ -322,31 +323,30 @@ def to_ado_rest(backlog: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _plan_inputs(connection: sqlite3.Connection, approved_at: str) -> tuple[list[dict[str, Any]], dict[str, Any] | None]:
+def _plan_inputs(connection: Connection, approved_at: str) -> tuple[list[dict[str, Any]], dict[str, Any] | None]:
+    from .data import RecoveryScenarioRepository
+
     allocations = [
         dict(row) for row in connection.execute(
             "SELECT role_name, ROUND(SUM(allocated_fte), 1) AS allocated_fte FROM planview_resource_assignments "
             "GROUP BY role_name ORDER BY role_name"
         )
     ]
-    row = connection.execute(
-        "SELECT recommended_option, allocated_fte, scope_defer_pct, target_date, saved_at "
-        "FROM recovery_scenarios ORDER BY id DESC LIMIT 1"
-    ).fetchone()
+    row = RecoveryScenarioRepository(connection.app_database()).latest()
     recovery = None
     if row:
         # saved_at has second precision and approved_at microseconds, so compare as times at second precision.
         approved = datetime.fromisoformat(approved_at).replace(microsecond=0)
         if datetime.fromisoformat(str(row["saved_at"])) >= approved:
-            recovery = dict(row)
+            recovery = row
     return allocations, recovery
 
 
-def latest_backlog(connection: sqlite3.Connection, as_of: date | None = None) -> dict[str, Any] | None:
+def latest_backlog(connection: Connection, as_of: date | None = None) -> dict[str, Any] | None:
     """The backlog for the latest approved baseline, plus a recovery-plan variant once a scenario is applied."""
-    from .data import BaselineRepository, SQLiteDatabase
+    from .data import BaselineRepository
 
-    baseline = BaselineRepository(SQLiteDatabase(connection)).latest_scope()
+    baseline = BaselineRepository(connection.app_database()).latest_scope()
     if baseline is None:
         return None
     approved = datetime.fromisoformat(baseline["approved_at"]).date()

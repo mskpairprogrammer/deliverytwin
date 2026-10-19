@@ -5,13 +5,15 @@ import ipaddress
 import json
 import logging
 import os
-import sqlite3
 from datetime import date, datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
 
+from .data.connection import Connection, default_database_path, resolve_dialect
+from .data.connection import connect as open_connection
+from .data.database import DatabaseError
 from .extras import (
     EXTRA_GET_ROUTES, EXTRA_POST_ROUTES, SIMULATION_ROUTES, BaselineRequired, handle_get, handle_post,
 )
@@ -44,21 +46,18 @@ class BaselineRequiredError(Exception):
     """TRACK and INTERVENE only work against an approved COMMIT baseline."""
 
 
-def baseline_approved(connection: sqlite3.Connection) -> bool:
+def baseline_approved(connection: Connection) -> bool:
     from .intake import latest_baseline
 
     return latest_baseline(connection) is not None
 
 
-def connect(database: str | Path) -> sqlite3.Connection:
-    """Open a SQLite connection with foreign-key enforcement enabled."""
-    connection = sqlite3.connect(database)
-    connection.row_factory = sqlite3.Row
-    connection.execute("PRAGMA foreign_keys = ON")
-    return connection
+def connect(database: str | Path | None = None, dialect: str | None = None) -> Connection:
+    """Open the local engine: DuckDB by default (see ``--dialect`` / ``DELIVERYTWIN_DB_DIALECT``)."""
+    return open_connection(database, dialect)
 
 
-def initialize_database(connection: sqlite3.Connection, register_sources: bool = True) -> None:
+def initialize_database(connection: Connection, register_sources: bool = True) -> None:
     """Create the source-system and deliverytwin schema."""
     connection.executescript(SCHEMA_PATH.read_text(encoding="utf-8"))
     if register_sources:
@@ -74,7 +73,7 @@ def initialize_database(connection: sqlite3.Connection, register_sources: bool =
 
 
 def _upsert_many(
-    connection: sqlite3.Connection,
+    connection: Connection,
     table: str,
     columns: tuple[str, ...],
     rows: list[tuple[Any, ...]],
@@ -90,7 +89,7 @@ def _upsert_many(
     )
 
 
-def seed_demo(connection: sqlite3.Connection, as_of: date | None = None) -> dict[str, Any]:
+def seed_demo(connection: Connection, as_of: date | None = None) -> dict[str, Any]:
     """Load the synthetic Customer 360 source-system scenario."""
     from .analytics import seed_synthetic_intake_activity
 
@@ -322,19 +321,22 @@ SPRINT_DAYS = 14
 MAX_SIMULATED_SPRINTS = 20
 
 
-def _purge_simulated_rows(connection: sqlite3.Connection) -> None:
-    """Remove every simulated record so a scenario change never leaves rows of the previous one behind."""
-    with connection:
-        for table, pattern in (
-            ("ado_work_items", "ADO-SIM-WI-%"), ("ado_sprints", "ADO-SIM-SPRINT-%"),
-            ("ukg_time_entries", "UKG-SIM-%"), ("servicenow_incidents", "INC-SIM-%"),
-            ("servicenow_change_requests", "CHG-SIM-%"), ("ukg_pto_requests", "UKG-SIM-PTO-%"),
-        ):
-            connection.execute(f"DELETE FROM {table} WHERE external_id LIKE ?", (pattern,))
+def _purge_simulated_rows(connection: Connection) -> None:
+    """Remove every simulated record so a scenario change never leaves rows of the previous one behind.
+
+    Children are deleted before parents, each in its own statement: DuckDB cannot delete a child and then its
+    parent inside one transaction while foreign keys are enforced.
+    """
+    for table, pattern in (
+        ("ado_work_items", "ADO-SIM-WI-%"), ("ado_sprints", "ADO-SIM-SPRINT-%"),
+        ("ukg_time_entries", "UKG-SIM-%"), ("servicenow_incidents", "INC-SIM-%"),
+        ("servicenow_change_requests", "CHG-SIM-%"), ("ukg_pto_requests", "UKG-SIM-PTO-%"),
+    ):
+        connection.execute(f"DELETE FROM {table} WHERE external_id LIKE ?", (pattern,))
 
 
 def _seed_simulated_sprints(
-    connection: sqlite3.Connection, start: date, sprints: int
+    connection: Connection, start: date, sprints: int
 ) -> None:
     """Load stable, deterministic source records for every completed and current sprint."""
     from .scenarios import IMPORT_SCENARIO, effective_signals, list_events, scenario_key
@@ -438,20 +440,20 @@ def _seed_simulated_sprints(
                 )
 
 
-def simulation_state(connection: sqlite3.Connection) -> dict[str, Any] | None:
+def simulation_state(connection: Connection) -> dict[str, Any] | None:
     row = connection.execute(
         "SELECT started_on, as_of, sprints_advanced, sprint_days FROM simulation_state WHERE id = 1"
     ).fetchone()
     return dict(row) if row else None
 
 
-def simulated_as_of(connection: sqlite3.Connection) -> date | None:
+def simulated_as_of(connection: Connection) -> date | None:
     state = simulation_state(connection)
     return date.fromisoformat(state["as_of"]) if state else None
 
 
 def simulate_sprints(
-    connection: sqlite3.Connection, sprints: int = 5, start: date | None = None,
+    connection: Connection, sprints: int = 5, start: date | None = None,
     scenario: str | None = None,
 ) -> dict[str, Any]:
     """Load the synthetic source scenario as it stands after N sprints and move the report date there."""
@@ -512,7 +514,7 @@ def simulate_sprints(
     }
 
 
-def advance_one_sprint(connection: sqlite3.Connection) -> dict[str, Any]:
+def advance_one_sprint(connection: Connection) -> dict[str, Any]:
     """Move the simulation forward exactly one sprint, starting a new one if none exists."""
     state = simulation_state(connection)
     if not state:
@@ -528,7 +530,7 @@ def advance_one_sprint(connection: sqlite3.Connection) -> dict[str, Any]:
     )
 
 
-def inject_event(connection: sqlite3.Connection, kind: str) -> dict[str, Any]:
+def inject_event(connection: Connection, kind: str) -> dict[str, Any]:
     """Apply an event to the current sprint and recompute the simulated records."""
     from .scenarios import IMPORT_SCENARIO, add_event, scenario_key
 
@@ -543,7 +545,7 @@ def inject_event(connection: sqlite3.Connection, kind: str) -> dict[str, Any]:
     )
 
 
-def reset_simulation(connection: sqlite3.Connection) -> None:
+def reset_simulation(connection: Connection) -> None:
     from .scenarios import clear_events
 
     with connection:
@@ -554,32 +556,22 @@ def reset_simulation(connection: sqlite3.Connection) -> None:
     seed_demo(connection)
 
 
-def clear_demo_data(connection: sqlite3.Connection) -> int:
-    """Delete every application data row while preserving the SQLite schema."""
-    connection.execute("PRAGMA foreign_keys = OFF")
-    try:
-        tables = [
-            row["name"]
-            for row in connection.execute(
-                "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'"
-            )
-        ]
-        deleted = 0
-        with connection:
-            for table in tables:
-                quoted_table = table.replace('"', '""')
-                cursor = connection.execute(f'DELETE FROM "{quoted_table}"')
-                deleted += max(cursor.rowcount, 0)
-            if connection.execute(
-                "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'sqlite_sequence'"
-            ).fetchone():
-                connection.execute("DELETE FROM sqlite_sequence")
-        return deleted
-    finally:
-        connection.execute("PRAGMA foreign_keys = ON")
+def clear_demo_data(connection: Connection) -> int:
+    """Delete every application data row while preserving the schema (local tables and portable app tables)."""
+    deleted = connection.local.clear_all()
+    if connection.dialect == "databricks":
+        from .data import (
+            BaselineRepository, IntakeSessionRepository, RecoveryScenarioRepository, TrackSnapshotRepository,
+        )
+
+        warehouse = connection.app_database()
+        for repository in (BaselineRepository, IntakeSessionRepository, RecoveryScenarioRepository,
+                           TrackSnapshotRepository):
+            repository(warehouse).clear()
+    return deleted
 
 
-def build_report(connection: sqlite3.Connection, as_of: date | None = None) -> dict[str, Any]:
+def build_report(connection: Connection, as_of: date | None = None) -> dict[str, Any]:
     """Aggregate the synthetic source records into a transparent cross-system signal report."""
     simulation = simulation_state(connection)
     report_date = as_of or (
@@ -779,7 +771,7 @@ def build_report(connection: sqlite3.Connection, as_of: date | None = None) -> d
 
 
 def build_workflow_report(
-    connection: sqlite3.Connection, as_of: date | None = None
+    connection: Connection, as_of: date | None = None
 ) -> dict[str, Any]:
     """Build the deterministic report and run it through the Agent Framework graph."""
     from .workflow import run_delivery_workflow_sync
@@ -791,24 +783,20 @@ def _write_json(payload: dict[str, Any]) -> None:
     print(json.dumps(payload, indent=2))
 
 
-def _latest_recovery_scenario(connection: sqlite3.Connection) -> dict[str, Any] | None:
-    row = connection.execute(
-        "SELECT * FROM recovery_scenarios ORDER BY id DESC LIMIT 1"
-    ).fetchone()
-    if row is None:
+def _latest_recovery_scenario(connection: Connection) -> dict[str, Any] | None:
+    from .data import RecoveryScenarioRepository
+
+    scenario = RecoveryScenarioRepository(connection.app_database()).latest()
+    if scenario is None:
         return None
-    scenario = dict(row)
+    updates = scenario.pop("updates")
     scenario["target_updates"] = [
         {
             "source_key": update["source_key"],
             "system_name": SOURCE_SYSTEMS[update["source_key"]][0],
-            "payload": json.loads(update["payload_json"]),
+            "payload": update["payload"],
         }
-        for update in connection.execute(
-            "SELECT source_key, payload_json FROM recovery_target_updates "
-            "WHERE scenario_id = ? ORDER BY source_key",
-            (row["id"],),
-        )
+        for update in updates
     ]
     from .recovery import CONFIDENCE_METHOD
 
@@ -821,40 +809,36 @@ def _latest_recovery_scenario(connection: sqlite3.Connection) -> dict[str, Any] 
 
 
 def save_recovery_scenario(
-    connection: sqlite3.Connection, scenario: dict[str, Any]
+    connection: Connection, scenario: dict[str, Any]
 ) -> dict[str, Any]:
-    """Persist a recovery what-if and its simulated per-system update records in SQLite."""
-    saved_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
-    with connection:
-        cursor = connection.execute(
-            """
-            INSERT INTO recovery_scenarios
-                (initiative_id, recommended_option, allocated_fte, scope_defer_pct,
-                 target_date, incremental_cost_k, confidence_pct, saved_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                scenario["initiative_id"],
-                scenario["recommended_option"],
-                scenario["allocated_fte"],
-                scenario["scope_defer_pct"],
-                scenario["target_date"],
-                scenario["incremental_cost_k"],
-                scenario["confidence_pct"],
-                saved_at,
-            ),
-        )
-        connection.executemany(
-            """
-            INSERT INTO recovery_target_updates (scenario_id, source_key, payload_json)
-            VALUES (?, ?, ?)
-            """,
-            [
-                (cursor.lastrowid, update["source_key"], json.dumps(update["payload"]))
-                for update in scenario["target_updates"]
-            ],
-        )
+    """Persist a recovery what-if and its simulated per-system update records through the portable layer."""
+    from .data import RecoveryScenarioRepository
+
+    RecoveryScenarioRepository(connection.app_database()).save(
+        {key: scenario[key] for key in (
+            "initiative_id", "recommended_option", "allocated_fte", "scope_defer_pct", "target_date",
+            "incremental_cost_k", "confidence_pct",
+        )},
+        scenario["target_updates"],
+    )
     return _latest_recovery_scenario(connection) or {}
+
+
+def record_track_snapshot(connection: Connection, report: dict[str, Any]) -> list[dict[str, Any]]:
+    """Keep this sprint's TRACK outlook (idempotent per sprint) and return the whole trend."""
+    from .data import TrackSnapshotRepository
+
+    repository = TrackSnapshotRepository(connection.app_database())
+    outlook = report["workflow"]["stages"]["track"]
+    signals = report["signals"]
+    repository.record({
+        "initiative_id": report["initiative"]["id"], "sprint_number": outlook["sprint_number"],
+        "as_of": report["as_of"], "on_time_pct": outlook["on_time_pct"],
+        "projected_slip_days": outlook["projected_slip_days"],
+        "unplanned_story_points": signals["unplanned_story_points"],
+        "support_hours_per_week": signals["lead_production_support_hours_per_week"],
+    })
+    return repository.trend(report["initiative"]["id"])
 
 
 def _is_loopback(host: str) -> bool:
@@ -874,7 +858,9 @@ def _env_flag(name: str) -> bool | None:
 DESTRUCTIVE_ROUTES = ("/api/reset-all",)
 
 
-def serve_dashboard(database: str | Path, host: str, port: int) -> None:
+def serve_dashboard(
+    database: str | Path | None, host: str, port: int, dialect: str | None = None
+) -> None:
     """Serve the dashboard and API; refuse unauthenticated exposure beyond loopback."""
     loopback = _is_loopback(host)
     if not loopback and not _env_flag("DELIVERYTWIN_TRUSTED_AUTH"):
@@ -887,6 +873,13 @@ def serve_dashboard(database: str | Path, host: str, port: int) -> None:
     demo_mode = loopback if configured_demo is None else configured_demo
     # Simulation only rewrites synthetic records, so it can be allowed without the data-wiping demo mode.
     simulation_enabled = demo_mode or bool(_env_flag("DELIVERYTWIN_SIMULATION"))
+    chosen_dialect = resolve_dialect(dialect)
+    database = database if database is not None else default_database_path(chosen_dialect)
+
+    def connect(path: str | Path) -> Connection:
+        """Per-request connection: ``with connect(...) as connection`` scopes and closes it."""
+        return open_connection(path, chosen_dialect, session=True)
+
     with connect(database) as connection:
         initialize_database(connection, register_sources=False)
 
@@ -914,7 +907,7 @@ def serve_dashboard(database: str | Path, host: str, port: int) -> None:
                     else:
                         with connect(database) as connection:
                             self.send_json(200, handle_get(route, connection))
-                except (OSError, sqlite3.Error, RuntimeError, ValueError) as error:
+                except (OSError, *DatabaseError, RuntimeError, ValueError) as error:
                     self.send_json(500, {"error": f"Unable to load {route}: {error}"})
                 return
             if route == "/api/impact":
@@ -923,7 +916,7 @@ def serve_dashboard(database: str | Path, host: str, port: int) -> None:
                 try:
                     with connect(database) as connection:
                         self.send_json(200, build_impact_report(connection))
-                except (OSError, sqlite3.Error, RuntimeError) as error:
+                except (OSError, *DatabaseError, RuntimeError) as error:
                     self.send_json(500, {"error": f"Unable to build impact report: {error}"})
                 return
             if route == "/api/intake/baseline":
@@ -932,14 +925,14 @@ def serve_dashboard(database: str | Path, host: str, port: int) -> None:
                 try:
                     with connect(database) as connection:
                         self.send_json(200, {"baseline": latest_baseline(connection)})
-                except (OSError, sqlite3.Error) as error:
+                except (OSError, *DatabaseError) as error:
                     self.send_json(500, {"error": f"Unable to load baseline: {error}"})
                 return
             if route == "/healthz":
                 try:
                     with connect(database) as connection:
                         connection.execute("SELECT 1")
-                except (OSError, sqlite3.Error) as error:
+                except (OSError, *DatabaseError) as error:
                     self.send_error(503, f"Dashboard health check failed: {error}")
                     return
                 body = b'{"status":"ok"}'
@@ -961,7 +954,7 @@ def serve_dashboard(database: str | Path, host: str, port: int) -> None:
                             payload = {**build_workflow_report(connection), "simulated": True,
                                        "simulation": state}
                         body = json.dumps(payload).encode("utf-8")
-                except (OSError, sqlite3.Error, RuntimeError) as error:
+                except (OSError, *DatabaseError, RuntimeError) as error:
                     self.send_error(500, f"Unable to build dashboard report: {error}")
                     return
                 self.send_response(200)
@@ -1111,7 +1104,7 @@ def serve_dashboard(database: str | Path, host: str, port: int) -> None:
             except ValueError as error:
                 self.send_json(400, {"error": str(error)})
                 return
-            except (OSError, sqlite3.Error, RuntimeError) as error:
+            except (OSError, *DatabaseError, RuntimeError) as error:
                 self.send_json(500, {"error": f"Unable to process intake request: {error}"})
                 return
             self.send_json(200, result)
@@ -1164,7 +1157,7 @@ def serve_dashboard(database: str | Path, host: str, port: int) -> None:
                 except ValueError as error:
                     self.send_json(400, {"error": str(error)})
                     return
-                except (OSError, sqlite3.Error, RuntimeError) as error:
+                except (OSError, *DatabaseError, RuntimeError) as error:
                     self.send_json(500, {"error": f"Unable to process the request: {error}"})
                     return
                 self.send_json(200, result)
@@ -1176,7 +1169,7 @@ def serve_dashboard(database: str | Path, host: str, port: int) -> None:
                 try:
                     with connect(database) as connection:
                         deleted = clear_demo_data(connection)
-                except (OSError, sqlite3.Error) as error:
+                except (OSError, *DatabaseError) as error:
                     self.send_json(500, {"error": f"Unable to clear demo data: {error}"})
                     return
                 self.send_json(200, {"cleared": True, "rows_deleted": deleted})
@@ -1217,7 +1210,7 @@ def serve_dashboard(database: str | Path, host: str, port: int) -> None:
                 except ValueError as error:
                     self.send_json(400, {"error": str(error)})
                     return
-                except (OSError, sqlite3.Error, RuntimeError) as error:
+                except (OSError, *DatabaseError, RuntimeError) as error:
                     self.send_json(500, {"error": f"Unable to run simulation: {error}"})
                     return
                 self.send_json(200, result)
@@ -1235,7 +1228,7 @@ def serve_dashboard(database: str | Path, host: str, port: int) -> None:
                 except BaselineRequiredError as error:
                     self.send_json(409, {"error": str(error)})
                     return
-                except (OSError, sqlite3.Error, RuntimeError, ValueError) as error:
+                except (OSError, *DatabaseError, RuntimeError, ValueError) as error:
                     self.send_json(500, {"error": f"Unable to build the backlog: {error}"})
                     return
                 self.send_json(200, result)
@@ -1250,14 +1243,16 @@ def serve_dashboard(database: str | Path, host: str, port: int) -> None:
                             raise BaselineRequiredError(BASELINE_REQUIRED)
                         if simulation_state(connection) is None:
                             raise ValueError("Simulate a sprint before requesting a TRACK briefing.")
-                        result = build_brief(build_workflow_report(connection), latest_baseline(connection))
+                        report = build_workflow_report(connection)
+                        result = build_brief(report, latest_baseline(connection))
+                        result["trend"] = record_track_snapshot(connection, report)
                 except BaselineRequiredError as error:
                     self.send_json(409, {"error": str(error)})
                     return
                 except ValueError as error:
                     self.send_json(400, {"error": str(error)})
                     return
-                except (OSError, sqlite3.Error, RuntimeError) as error:
+                except (OSError, *DatabaseError, RuntimeError) as error:
                     self.send_json(500, {"error": f"Unable to build the TRACK briefing: {error}"})
                     return
                 self.send_json(200, result)
@@ -1293,7 +1288,7 @@ def serve_dashboard(database: str | Path, host: str, port: int) -> None:
                 except ValueError as error:
                     self.send_json(400, {"error": str(error)})
                     return
-                except (OSError, sqlite3.Error, RuntimeError) as error:
+                except (OSError, *DatabaseError, RuntimeError) as error:
                     self.send_json(500, {"error": f"Unable to process recovery scenario: {error}"})
                     return
                 self.send_json(200, result)
@@ -1344,7 +1339,7 @@ def serve_dashboard(database: str | Path, host: str, port: int) -> None:
                         )
                         return
                     report = build_workflow_report(connection)
-            except (OSError, sqlite3.Error, RuntimeError) as error:
+            except (OSError, *DatabaseError, RuntimeError) as error:
                 self.send_json(500, {"error": f"Unable to load report context: {error}"})
                 return
 
@@ -1382,20 +1377,37 @@ def serve_dashboard(database: str | Path, host: str, port: int) -> None:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Synthetic Delivery Twin source-system demo")
-    parser.add_argument("--db", default="deliverytwin.db", help="SQLite database file (default: deliverytwin.db)")
+    parser.add_argument(
+        "--db", default=None,
+        help="Database file (default: deliverytwin.duckdb for DuckDB, deliverytwin.db for SQLite; "
+             "DELIVERYTWIN_DB_PATH overrides)",
+    )
+    engine = argparse.ArgumentParser(add_help=False)
+    engine.add_argument(
+        "--dialect", choices=("duckdb", "sqlite", "databricks"), default=None,
+        help="Database engine (default: DELIVERYTWIN_DB_DIALECT, else databricks when DATABRICKS_HOST is set, "
+             "else duckdb). With databricks the simulated source records stay in a local DuckDB file and the "
+             "application tables use the Databricks warehouse.",
+    )
     subparsers = parser.add_subparsers(dest="command", required=True)
-    subparsers.add_parser("init", help="Create the SQLite schema and register simulated sources")
-    subparsers.add_parser("seed-demo", help="Load synthetic records from all five source systems")
-    subparsers.add_parser("report", help="Print the cross-system delivery signal report")
-    subparsers.add_parser("demo", help="Initialize, seed synthetic data, and print a report")
+    subparsers.add_parser("init", parents=[engine], help="Create the schema and register simulated sources")
+    subparsers.add_parser("seed-demo", parents=[engine], help="Load synthetic records from all five source systems")
+    subparsers.add_parser("report", parents=[engine], help="Print the cross-system delivery signal report")
+    subparsers.add_parser("demo", parents=[engine], help="Initialize, seed synthetic data, and print a report")
     simulate_parser = subparsers.add_parser(
-        "simulate", help="Load synthetic test data and move the date forward by N sprints"
+        "simulate", parents=[engine], help="Load synthetic test data and move the date forward by N sprints"
     )
     simulate_parser.add_argument("--sprints", type=int, default=5, help="Sprints to advance (default: 5)")
     simulate_parser.add_argument("--reset", action="store_true", help="Clear the simulation so the other tabs go blank")
-    serve_parser = subparsers.add_parser("serve", help="Run the local read-only web dashboard")
-    serve_parser.add_argument("--host", default="127.0.0.1", help="Dashboard bind address")
-    serve_parser.add_argument("--port", type=int, default=8765, help="Dashboard port")
+    serve_parser = subparsers.add_parser("serve", parents=[engine], help="Run the local web dashboard")
+    serve_parser.add_argument(
+        "--host", default=os.environ.get("DELIVERYTWIN_HOST") or ("0.0.0.0" if os.environ.get("DATABRICKS_APP_PORT") else "127.0.0.1"),
+        help="Dashboard bind address (default: 127.0.0.1; 0.0.0.0 inside Databricks Apps)",
+    )
+    serve_parser.add_argument(
+        "--port", type=int, default=int(os.environ.get("DATABRICKS_APP_PORT") or os.environ.get("DELIVERYTWIN_PORT") or 8765),
+        help="Dashboard port (default: DATABRICKS_APP_PORT, DELIVERYTWIN_PORT, else 8765)",
+    )
     data_parser = subparsers.add_parser(
         "generate-data", help="Regenerate the deterministic delivery_intel-shaped CSV dataset"
     )
@@ -1428,14 +1440,19 @@ def main(argv: list[str] | None = None) -> int:
         qualified = args.dialect == "databricks"
         print(render_ddl(args.dialect, args.catalog if qualified else None, args.schema if qualified else None), end="")
         return 0
+    try:
+        dialect = resolve_dialect(getattr(args, "dialect", None))
+    except ValueError as error:
+        parser.error(str(error))
+    database = args.db or default_database_path(dialect)
     if args.command == "serve":
-        serve_dashboard(args.db, args.host, args.port)
+        serve_dashboard(database, args.host, args.port, dialect)
         return 0
 
-    with connect(args.db) as connection:
+    with open_connection(database, dialect, session=True) as connection:
         if args.command == "init":
             initialize_database(connection)
-            _write_json({"database": args.db, "initialized": True})
+            _write_json({"database": database, "dialect": dialect, "initialized": True})
         elif args.command == "seed-demo":
             _write_json(seed_demo(connection))
         elif args.command == "simulate":

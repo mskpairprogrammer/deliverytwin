@@ -4,7 +4,6 @@ import io
 import json
 import os
 import random
-import sqlite3
 import unittest
 from docx import Document
 from datetime import date, datetime, timedelta, timezone
@@ -20,6 +19,7 @@ from deliverytwin.chat import (
     validate_chat_history,
 )
 from deliverytwin.analytics import build_impact_report, record_intake_activity
+from deliverytwin.data import IntegrityError
 from deliverytwin.intake import (
     IntakeError,
     analyze_intake,
@@ -223,7 +223,7 @@ class DeliveryTwinTests(unittest.TestCase):
             validate_chat_history([{"role": "user", "content": "x" * 1201}])
 
     def test_foreign_keys_reject_orphan_source_records(self) -> None:
-        with self.assertRaises(sqlite3.IntegrityError):
+        with self.assertRaises(IntegrityError):
             self.connection.execute(
                 """
                 INSERT INTO planview_projects

@@ -5,11 +5,11 @@ person saw on screen can be included; it is validated, labeled with its source, 
 """
 from __future__ import annotations
 
-import sqlite3
 from datetime import date
 from typing import Any
 
 from .backlog import _label, latest_backlog, to_ado_rest
+from .data.connection import Connection
 
 MAX_REVIEW_TEXT = 500
 VERDICTS = {"ready": "Ready to approve", "ready_with_conditions": "Ready with conditions", "not_ready": "Not ready"}
@@ -46,7 +46,7 @@ def clean_review(review: object) -> dict[str, Any] | None:
     return {"verdict": review["verdict"], "summary": summary, "risks": risks, "conditions": conditions, "source": source}
 
 
-def _signal_origin(connection: sqlite3.Connection) -> str:
+def _signal_origin(connection: Connection) -> str:
     from .scenarios import IMPORT_SCENARIO, SCENARIOS, scenario_key
 
     if not connection.execute("SELECT 1 FROM simulation_state WHERE id = 1").fetchone():
@@ -57,10 +57,10 @@ def _signal_origin(connection: sqlite3.Connection) -> str:
     return f"TRACK signals come from the synthetic scenario “{SCENARIOS[key].label}”, not from a live connection."
 
 
-def build_pack(connection: sqlite3.Connection, review: object = None, as_of: date | None = None) -> dict[str, Any] | None:
-    from .data import BaselineRepository, SQLiteDatabase
+def build_pack(connection: Connection, review: object = None, as_of: date | None = None) -> dict[str, Any] | None:
+    from .data import BaselineRepository
 
-    baseline = BaselineRepository(SQLiteDatabase(connection)).latest_scope()
+    baseline = BaselineRepository(connection.app_database()).latest_scope()
     backlog = latest_backlog(connection, as_of)
     if baseline is None or backlog is None:
         return None

@@ -22,9 +22,9 @@ except ImportError:  # pragma: no cover - optional dependency
 from deliverytwin.app import serve_dashboard
 
 try:
-    from tests.llm_stub import ScriptedLLM
+    from tests.llm_stub import ScriptedLLM, llm_questions
 except ImportError:  # discovery with -s tests
-    from llm_stub import ScriptedLLM
+    from llm_stub import ScriptedLLM, llm_questions
 
 
 def _free_port() -> int:
@@ -362,6 +362,58 @@ class JourneyUiTests(unittest.TestCase):
         self.assertTrue(page.locator("#intake-step-1").is_visible())
         self.assertEqual(page.locator("#intake-doc-list li").count(), 2)
 
+    def test_shape_badges_commit_role_phase_guardrail_and_roi_strips(self) -> None:
+        type(self).llm_enabled = True
+        questions = llm_questions()
+        questions["findings"] = [
+            {"kind": "risk", "text": "Privacy sign-off gates sharing.", "source": "document",
+             "source_document": "notes.md", "source_quote": "privacy office must sign off before profiles"},
+            {"kind": "risk", "text": "Vendor lead time is long.", "source": "document",
+             "source_document": "notes.md", "source_quote": "the vendor needs ninety days to deliver"},
+            {"kind": "fact", "text": "Leadership wants one customer view.", "source": "request",
+             "source_quote": "one view of every customer"},
+            {"kind": "dependency", "text": "CRM changes may be needed."},
+        ]
+        type(self).llm = ScriptedLLM(questions=questions)
+        page = self.page
+        page.get_by_role("button", name="Use sample request").click()
+        directory = tempfile.mkdtemp()
+        notes = os.path.join(directory, "notes.md")
+        with open(notes, "w", encoding="utf-8") as handle:
+            handle.write("Meeting notes: privacy office must sign off before profiles are shared.")
+        page.locator("#intake-notes-file").set_input_files(notes)
+        page.wait_for_function("document.querySelectorAll('#intake-doc-list li').length === 1")
+        page.get_by_role("button", name="Analyze request").click()
+        page.get_by_role("button", name="Run prediction").wait_for()
+
+        findings = page.locator("#intake-findings")
+        self.assertTrue(findings.is_visible())
+        text = findings.inner_text()
+        self.assertIn("Found in Meeting Notes (Quote Verified)", text)
+        self.assertIn("Stated in Request", text)
+        self.assertIn("AI Inference (Confirm)", text)
+        self.assertIn("Downgraded", text)  # the fabricated vendor quote is not in the notes
+        self.assertEqual(findings.locator(".src-badge.document").count(), 2)  # the verified one plus its summary chip
+        self.assertEqual(findings.locator("li .src-badge.inference").count(), 2)
+
+        page.get_by_role("button", name="Run prediction").click()
+        page.locator("#intake-rom").get_by_text("Most likely effort (P50)").wait_for()
+        page.get_by_role("button", name="Continue to COMMIT →").click()
+        page.locator("#role-phase-table table").wait_for()
+        guardrail = page.locator("#privacy-guardrail").inner_text()
+        self.assertIn("Privacy Guardrail Active: Oracle HCM & UKG capacity aggregated at role level only", guardrail)
+        self.assertIn("minimum N >= 3 anonymity threshold; worker-level PII isolated", guardrail)
+        self.assertEqual(page.locator("#role-phase-table tbody tr").count(), 4)
+        self.assertEqual(page.locator("#role-phase-table thead th").all_inner_texts(),
+                         ["Role", "Discovery", "Build", "Test", "Cutover"])
+        self.assertGreaterEqual(page.locator("#role-phase-table td[data-status='unstaffed']").count(), 1)
+
+        page.wait_for_function("!document.getElementById('commit-roi').hidden")
+        roi = page.locator("#commit-roi").inner_text()
+        self.assertRegex(roi, r"\d+% caught at intake")
+        self.assertRegex(roi, r"[−+]\d+% spread")
+        self.assertRegex(roi, r"\d+ flagged · \d+ stated")
+
     def test_ai_drives_the_intervention_analysis_and_what_if_predictions(self) -> None:
         type(self).llm_enabled = True
         page = self.page
@@ -378,15 +430,17 @@ class JourneyUiTests(unittest.TestCase):
         page.wait_for_function("document.querySelectorAll('#act-options .rec-card').length === 3")
         self.assertIn("AI RECOVERY ANALYSIS", page.locator("#act-source").inner_text())
         self.assertIn("production support", page.locator("#act-diagnosis").inner_text())
-        self.assertIn("RECOMMENDED: PHASE SCOPE", page.locator("#act-recommendation").inner_text())
+        self.assertIn("RECOMMENDED: EXTEND DATE", page.locator("#act-recommendation").inner_text())
         recommended = page.locator("#act-options .rec-card.recommended")
         self.assertEqual(recommended.count(), 1)
-        self.assertIn("78%", recommended.inner_text())
-        self.assertEqual(self.states()["intervene"], "Phase Scope recommended")
+        self.assertIn("83%", recommended.inner_text())
+        self.assertIn("Estimated cost impact", recommended.inner_text())
+        self.assertIn("+$", page.locator("#act-options .rec-card").last.inner_text())
+        self.assertEqual(self.states()["intervene"], "Extend Date recommended")
         self.assertEqual(calls("recovery_analysis"), 1)
 
         # Previewing an AI scenario reuses its prediction instead of asking again.
-        page.locator("#act-options .rec-card").first.get_by_role("button", name="Preview this scenario").click()
+        page.locator("#act-options .rec-card").last.get_by_role("button", name="Preview this scenario").click()
         page.locator("#act-what-if-results").get_by_text("Predicted on-time").wait_for()
         self.assertIn("71%", page.locator("#act-what-if-results .rom-hero").inner_text())
         self.assertIn("AI PREDICTION", page.locator("#act-what-if-results").inner_text())

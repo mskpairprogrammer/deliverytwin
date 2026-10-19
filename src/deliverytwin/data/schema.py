@@ -105,9 +105,8 @@ TABLES: dict[str, Table] = {
 }
 
 
-# Tables the application itself writes (not loaded from the CSV dataset). They mirror the
-# SQLite tables in schema.sql so the Databricks migration has a target for each of them;
-# the application does not read or write these through the data layer yet.
+# Tables the application itself writes (not loaded from the CSV dataset). All four go through the portable
+# repositories in app_repository.py, so they run unchanged on DuckDB, SQLite and Databricks (Delta).
 APP_TABLES: dict[str, Table] = {
     table.name: table
     for table in (
@@ -139,6 +138,12 @@ APP_TABLES: dict[str, Table] = {
             "INTERVENE scenarios saved after a what-if preview.",
         ),
         Table(
+            "recovery_target_updates",
+            _cols("scenario_id:int source_key:string payload_json:string"),
+            ("scenario_id", "source_key"),
+            "Simulated per-system update records of a saved recovery scenario.",
+        ),
+        Table(
             "track_snapshots",
             _cols(
                 "snapshot_id:string initiative_id:string sprint_number:int as_of:date "
@@ -146,7 +151,7 @@ APP_TABLES: dict[str, Table] = {
                 "support_hours_per_week:double captured_at:timestamp"
             ),
             ("snapshot_id",),
-            "New: one TRACK outlook per sprint for trend history.",
+            "One TRACK outlook per sprint, kept for trend history.",
         ),
     )
 }

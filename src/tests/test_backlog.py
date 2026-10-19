@@ -126,19 +126,19 @@ class BacklogTests(unittest.TestCase):
         self.assertIsNone(backlog["plan"])
         self.assertTrue(any(a["hours"] for f in backlog["epic"]["features"] for a in f["assignments"]))
 
-        connection.execute(
-            "INSERT INTO recovery_scenarios (initiative_id, recommended_option, allocated_fte, scope_defer_pct, "
-            "target_date, incremental_cost_k, confidence_pct, saved_at) VALUES (?, 'phase_scope', 5, 40, '2027-05-01', 0, 70, ?)",
-            ("autopay-modernization", "2999-01-01T00:00:00+00:00"),
-        )
-        connection.commit()
+        scenarios = connection.app_database()
+        record = {
+            "scenario_id": 1, "initiative_id": "autopay-modernization", "recommended_option": "phase_scope",
+            "allocated_fte": 5, "scope_defer_pct": 40, "target_date": "2027-05-01", "incremental_cost_k": 0,
+            "confidence_pct": 70, "saved_at": "2999-01-01T00:00:00+00:00",
+        }
+        scenarios.upsert("recovery_scenarios", [record])
         followed = latest_backlog(connection, DAY)
         self.assertEqual(followed["plan"]["scenario"]["scope_defer_pct"], 40)
         self.assertEqual(followed["plan"]["epic"]["target_date"], "2027-05-01")
         self.assertTrue(followed["diff"])
         # A scenario saved before the current baseline was approved is not applied to it.
-        connection.execute("UPDATE recovery_scenarios SET saved_at = '2000-01-01T00:00:00+00:00'")
-        connection.commit()
+        scenarios.upsert("recovery_scenarios", [{**record, "saved_at": "2000-01-01T00:00:00+00:00"}])
         self.assertIsNone(latest_backlog(connection, DAY)["plan"])
 
 

@@ -7,11 +7,11 @@ sliders use, then answered by the deterministic commitment model. Approval stays
 from __future__ import annotations
 
 import json
-import sqlite3
 from datetime import date
 from typing import Any
 
 from .ai_common import INVALID_RESPONSE, llm_json, text, text_list
+from .data.connection import Connection
 from .llm import openai_model
 
 VERDICTS = ("ready", "ready_with_conditions", "not_ready")
@@ -19,7 +19,7 @@ SEVERITIES = ("high", "medium", "low")
 MAX_QUESTION_LENGTH = 300
 
 
-def _analog_context(connection: sqlite3.Connection, matches: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _analog_context(connection: Connection, matches: list[dict[str, Any]]) -> list[dict[str, Any]]:
     ids = [match["project_id"] for match in matches]
     details = {
         row["project_id"]: dict(row) for row in connection.execute(
@@ -103,7 +103,7 @@ def _rules_challenge(evaluation: dict[str, Any], reason: dict[str, str] | None) 
     }
 
 
-def challenge_commitment(connection: sqlite3.Connection, evaluation: dict[str, Any]) -> dict[str, Any]:
+def challenge_commitment(connection: Connection, evaluation: dict[str, Any]) -> dict[str, Any]:
     """Advisory pre-approval review; the feasibility gate and the approval remain deterministic."""
     commitment = evaluation["commitment"]
     context = {
@@ -174,7 +174,7 @@ def _lever_summary(commitment: dict[str, Any]) -> dict[str, Any]:
 
 
 def ask_whatif(
-    connection: sqlite3.Connection,
+    connection: Connection,
     question: object,
     today: date,
     evaluate: Any,

@@ -18,6 +18,30 @@ All source data is synthetic. There are no live connectors, and nothing is ever 
 
 **TRACK and INTERVENE only unlock after a baseline is approved in COMMIT.** The server enforces this (HTTP 409), and the UI explains it.
 
+## Demo walkthrough
+
+One synthetic request, end to end. The numbers below come from the deterministic rules path (no AI key) on the seeded demo data with the *Capacity collision* scenario; they are reproducible, and with an AI configured the narrative and forecast change but the decision math does not. Dates and weeks move with the calendar, so the figures are for the seeded demo day (2026-02-20).
+
+| Stage | What you do | What you see (sample numbers) |
+|---|---|---|
+| **SHAPE** | Click **Load full sample** (request + ROM + kickoff notes), **Analyze request** | 12 findings tagged `Stated in Request` (2) or `Found in Meeting Notes / ROM Document (Quote Verified)` (10, each with its quote); **3 external dependencies flagged, 0 named in the request text** (privacy review, consent management, CRM/MDM integration; the sample documents name them, the one-line request does not); closest analogs: Customer Data Lakehouse (96%), Customer Segmentation Feed (95%), Customer Identity Resolution Service (94%) |
+| **SHAPE** | **Run prediction** | ROM **P50 4,650 h / P80 5,750 h** (analog median plus a 19% integration buffer) |
+| **COMMIT** | Set 7.0 FTE and a 30 Sep 2026 target | P80 needs **4.5 FTE**; **7.0 of 8.5 FTE** allocated; confidence **68.5%** (69% historical × 99.3% capacity fit); feasible |
+| **COMMIT** | Read **Role × Phase capacity** | 4 roles × 4 phases; **QA has 0 FTE planned**, so Build, Test and Cutover are flagged *unstaffed* (635 h of Test work with no capacity); **Privacy Guardrail Active**, HR groups under N = 3 suppressed |
+| **COMMIT** | Look at the impact strip | **86% of dependencies caught at intake** (77 of 90, leave-one-out); **10% less estimate spread** than manual plans (error SD 16.1 → 14.5 points) |
+| **COMMIT** | **Approve baseline** | Backlog tree (Epic → Features → Stories) and **Copy as ADO CSV**; nothing is sent to Azure DevOps |
+| **TRACK** | **Simulate next sprint** ×3 | On-time odds fall to **26%**, projected slip **33 days** |
+| **INTERVENE** | **Review recovery options** | Ranked by confidence, then cost, then date: **Contractors 39% on-time, +$168,143** (recommended); Squad reallocation 34%, +$33,429; Phase and unblock 34%, $0 |
+| **INTERVENE** | **Apply simulated updates** | Per-system update records stored; the backlog gains a recovery-plan variant and a diff |
+
+## Architecture at a glance (for judges)
+
+- **Deterministic core, AI on the edges.** Feasibility, confidence, capacity-by-role, cost and ROI metrics are plain code you can unit test. The AI writes questions, narrative and scenario proposals, and every answer is validated or replaced by a labeled rules fallback.
+- **Portable analytical data layer.** The system of record runs on **DuckDB by default**, an embedded analytical engine whose SQL and types match Databricks closely, with SQLite and **Azure Databricks (Unity Catalog / Delta)** behind the same interface. The same repositories, parameter style (`?`), and upsert semantics run on all three, and one environment variable (`DELIVERYTWIN_DB_DIALECT`) switches between them. Only [`data/database.py`](src/deliverytwin/data/database.py) knows which engine is underneath.
+- **Cloud AI in priority order.** Databricks Model Serving, then Azure OpenAI, then OpenAI, then a labeled rules fallback.
+- **Read-only by design.** Sources are simulated and the Azure DevOps hierarchy is a preview and CSV; nothing is written to an enterprise system.
+- **Privacy built in.** Oracle HCM and UKG data are used only as role-level aggregates with an N ≥ 3 suppression threshold.
+
 ## The four stages
 
 ### SHAPE: estimate from similar completed projects
@@ -27,7 +51,7 @@ All source data is synthetic. There are no live connectors, and nothing is ever 
 SHAPE has three steps. Finished steps collapse to a summary with an **Edit** link, and an in-progress estimate is kept across a reload.
 
 1. **Describe the request** (10–2,000 characters), or use the sample. You can attach PDF, DOCX, XLSX or text ROM documents and meeting notes (2 MB per file, 5 MB total). Scanned PDFs need OCR first. **Load full sample** fills the request and attaches a ready-made ROM document and kickoff meeting notes (kept in [`data/samples/`](src/deliverytwin/data/samples)) in one click.
-2. **Confirm the approach.** The AI reads the request, the documents, and the most similar completed projects, then writes 4–6 tailored clarifying questions. Each carries a suggested answer and a rationale that names the projects behind it.
+2. **Confirm the approach.** The AI reads the request, the documents, and the most similar completed projects, then writes 4–6 tailored clarifying questions. Each carries a suggested answer and a rationale that names the projects behind it. Above the questions, **extracted facts, risks and dependencies** carry a source badge: `Stated in Request`, `Found in Meeting Notes (Quote Verified)` (or `ROM Document`), or `AI Inference (Confirm)`. When the AI attributes a finding to your request or an uploaded document it must supply a quote, and code checks that the quote appears **word for word** in that text (case and whitespace ignored, at least three words). A missing, too-short or non-matching quote is downgraded to `AI Inference (Confirm)` and says why. The same badges and verification apply to each question's rationale. See [`provenance.py`](src/deliverytwin/provenance.py).
 3. **Prediction analysis.** The AI forecasts P50, P80 and P90 effort, on-time probability, key risks, recommendations, and the completed projects that influenced it. The result is labeled `AI FORECAST · model` or `STATISTICAL ESTIMATE · AI FORECAST UNAVAILABLE`, and is compared with a deterministic ROM. The forecast becomes the proposed COMMIT baseline.
 
 ### COMMIT: challenge the commitment, then approve it
@@ -40,6 +64,10 @@ COMMIT compares the estimate with the time remaining and the team allocation. Re
 - **What-if questions** (`/api/intake/ask`). Ask "What if we lose an engineer?" in plain English. The AI only translates the question into the same FTE / date / scope levers as the sliders. The commitment model computes the before-and-after table, and **Use these values** applies it. Questions that cannot be expressed as those levers, or fall outside their limits, are reported rather than clamped.
 
 A collapsible **Estimate quality & portfolio impact** panel shows a leave-one-out backtest (MAPE of the plan and of the similarity-analog ROM against actual effort), time-to-first-ROM and seven-day intake volume. A **calibration** section checks the P50 and P80 bands the same way: how often real effort fell at or below each band (targets 50% and 80%), the average estimate bias, and how often projects finished on time. It is portfolio context only and does not affect any approval.
+
+- **Role × Phase capacity** ([`capacity.py`](src/deliverytwin/capacity.py)). Next to the unchanged aggregate FTE check, the P80 effort is spread across Discovery, Build, Test and Cutover and across Data Engineering, Integration / Backend, QA and Security & Privacy, using the delivery fingerprint (complexity, systems, roles, dependencies). Each cell compares required hours with the planned team's hours in that phase: above 100% is a *bottleneck*, above 85% is *tight*, and a role with no planned FTE is *unstaffed*. It is a deterministic planning aid, not a measurement of real utilization.
+- **HR privacy guardrail.** The badge reads *Privacy Guardrail Active: Oracle HCM & UKG capacity aggregated at role level only (minimum N >= 3 anonymity threshold; worker-level PII isolated).* The code enforces it: worker names and ids never leave `capacity.py`, a role group with fewer than three workers is suppressed rather than reported, and only one team-wide time-off factor is used. In the synthetic data every role has fewer than three people, so every role group is suppressed.
+- **Impact strip.** COMMIT and INTERVENE show two deterministic ROI metrics, with the same strip in the impact panel. *Early dependency detection*: the share of completed projects' approval-gate dependencies that SHAPE flags from the three closest analogs alone (leave-one-out; 77 of 90 = 86%, precision 79%). The history has no record of dependencies discovered mid-flight, so no mid-flight baseline is claimed; per request, the strip also shows how many dependencies SHAPE flagged versus how many the request text names. *Estimator variance reduction*: the spread (standard deviation) of the signed % error against actual effort, original plans versus the analog estimate (16.1 → 14.5 points, a 10% reduction). Both come from code over the synthetic history and are shown even when the improvement is small.
 
 **After approval**, COMMIT also shows the following. None of it involves a model, and each item is labeled with where its data came from (synthetic, uploaded, or computed by code).
 
@@ -67,7 +95,10 @@ The **AI sprint briefing** (`/api/track/brief`) explains in plain language what 
 
 ![INTERVENE showing the AI diagnosis, three recovery scenarios with predicted on-time odds, and the what-if](docs/screenshots/intervene.png)
 
-On entry, the AI diagnoses why the project is at risk and proposes 2–4 recovery scenarios (`/api/act/analyze`). Each scenario's FTE, date, scope-deferral and budget levers are validated against the same bounds as the manual what-if. A scenario outside those limits is removed and the page says so, and the recommended scenario is highlighted. Each card also shows a capacity-model cross-check next to the AI's predicted on-time odds, because the two can disagree.
+On entry, the AI diagnoses why the project is at risk and proposes 2–4 recovery scenarios (`/api/act/analyze`). Each scenario's FTE, date, scope-deferral and budget levers are validated against the same bounds as the manual what-if. A scenario outside those limits is removed and the page says so. Each card also shows a capacity-model cross-check next to the AI's predicted on-time odds, because the two can disagree.
+
+- **Estimated cost impact.** Every card and preview shows `+$XX,XXX` or `$0`, computed by code from the levers: extra FTE over today's allocation for every week to the new date, plus the whole team for each week the date moves out, plus the explicit budget lever, at a mock blended rate of **$150/hour** (set `DELIVERYTWIN_BLENDED_RATE` to change it). Deferring scope is not counted as a saving. It is a planning estimate, not payroll data.
+- **Recommendation ranking.** The recommended scenario is the one with the **highest predicted on-time chance, then the lowest cost, then the earliest finish date**, decided by code. If the AI recommended a different scenario, the response keeps that as `ai_recommended`.
 
 - **Preview this scenario** reuses the AI's prediction with no extra call. Editing a lever invalidates it, and **Predict with AI** asks the model for the new outcome with commentary and per-system update text.
 - **Apply simulated updates** stores per-system update records (Planview, Azure DevOps, ServiceNow, Oracle HR / HCM, UKG Pro WFM) in the local database. It is a simulation: no source data changes and nothing is written to a real system.
@@ -86,9 +117,12 @@ The AI backend is chosen from the environment, in this order:
 | Mode | Set | Notes |
 |---|---|---|
 | **Recorded sample** | `DELIVERYTWIN_AI_MODE=recorded` | No key and no internet. Answers are replayed deterministically from the data each prompt carries ([`recorded_ai.py`](src/deliverytwin/recorded_ai.py)); they are **not** produced by a model. Every AI label shows `recorded-sample`, and a banner says so. Use it for offline demos and for judging the product without a key. |
+| **Databricks Model Serving** | `DATABRICKS_SERVING_ENDPOINT` (or `COPILOT_AI_ENDPOINT`), `DATABRICKS_HOST`, and `DATABRICKS_TOKEN` or the `DATABRICKS_CLIENT_ID` / `DATABRICKS_CLIENT_SECRET` that Databricks Apps injects | First choice for SHAPE, COMMIT, TRACK and INTERVENE. Calls the endpoint's `/serving-endpoints/<name>/invocations` chat API. |
 | **Azure OpenAI** | `AZURE_OPENAI_ENDPOINT` (https), `AZURE_OPENAI_DEPLOYMENT`, optionally `AZURE_OPENAI_API_KEY` and `AZURE_OPENAI_API_VERSION` | Without a key it signs in with `DefaultAzureCredential` (a managed identity in Azure). The AI labels show the deployment name. |
 | **OpenAI** | `OPENAI_API_KEY`, optionally `OPENAI_MODEL` (default `gpt-4o-mini`) | Chat Completions. |
 | **Off** | nothing | Rules-based fallbacks, labeled as such. |
+
+If the chosen backend is unavailable or returns something invalid, the page says so and shows the rules-based result; it never silently switches to another model. The Databricks and Azure OpenAI paths are covered by unit tests against fake endpoints and have **not been run against live services**.
 
 Live calls take a few seconds each, and the SHAPE estimate can take up to a minute. `GET /api/ai/status` reports the active mode.
 
@@ -101,19 +135,22 @@ python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 cd src
 python -m pip install -r requirements.txt
-python -m deliverytwin demo     # create the database, load synthetic records, print a report
+python -m deliverytwin demo     # create the DuckDB database, load synthetic records, print a report
 python -m deliverytwin serve    # dashboard at http://127.0.0.1:8765/
 ```
 
 To enable the AI features, put `OPENAI_API_KEY=...` in a `.env` file in `src/` (or the repository root), or set it in the environment. `.env` is git-ignored. Restart the server after changing it.
 
-Other commands (all from `src/`; pass `--db PATH` before the subcommand to use another SQLite file):
+The local database is **DuckDB** (`deliverytwin.duckdb` in the working directory). Choose another engine with `--dialect duckdb|sqlite|databricks` after the subcommand (`init`, `seed-demo`, `report`, `demo`, `simulate`, `serve`) or with `DELIVERYTWIN_DB_DIALECT`. With neither, the default is `duckdb`, or `databricks` when `DATABRICKS_HOST` is set. `--db PATH` (before the subcommand) or `DELIVERYTWIN_DB_PATH` picks the file; `:memory:` works too. With `databricks`, the simulated source records stay in a local DuckDB file and the four application tables live in the warehouse.
+
+Other commands (all from `src/`):
 
 ```powershell
 python -m deliverytwin init                 # create the schema
 python -m deliverytwin seed-demo            # load synthetic source records
 python -m deliverytwin report               # print the signal report
 python -m deliverytwin simulate --sprints 3 # advance the simulation (--reset clears it)
+python -m deliverytwin serve --dialect sqlite --db demo.db   # run on SQLite instead
 python -m deliverytwin generate-data        # regenerate the portfolio dataset CSVs
 python -m deliverytwin ddl                  # print Databricks/Delta DDL
 python -m deliverytwin databricks-smoke     # verify a live Databricks workspace
@@ -130,7 +167,7 @@ python -m playwright install chromium       # once, for the browser tests
 python -m unittest discover -s tests
 ```
 
-The suite covers the data layer (SQLite and DuckDB contract tests), the AI features with a scripted model, the scenario packs, events, file import, backlog, decision pack, recorded and Azure OpenAI modes, and Playwright tests of the whole SHAPE → COMMIT → TRACK → INTERVENE journey. The browser tests are skipped if Chromium is unavailable, and the DuckDB tests need `requirements-dev.txt`.
+The suite covers the data layer (all four application tables and the full SHAPE → COMMIT → TRACK → INTERVENE workflow on both DuckDB and SQLite, plus concurrent access to one DuckDB file), the quote verifier, Databricks / Azure OpenAI / OpenAI routing, the dollar-cost model and scenario ranking, the Role × Phase guardrail (no worker names or ids in the output), the ROI metrics, the `app.yaml`, the AI features with a scripted model, the scenario packs, events, file import, backlog, decision pack, and Playwright tests of the whole journey. The browser tests are skipped if Chromium is unavailable. A full run takes about two to three minutes.
 
 ## Repository layout
 
@@ -140,14 +177,18 @@ docs/screenshots/            screenshots used above
 Delivery_Twin_Hackathon_Pitch.pdf
 src/                         the deployable unit: Docker build context
   Dockerfile
-  requirements.txt           runtime dependencies
-  requirements-dev.txt       + DuckDB and Playwright for tests
-  requirements-databricks.txt
+  requirements.txt           runtime dependencies (includes DuckDB)
+  requirements-dev.txt       + Playwright for tests
+  requirements-databricks.txt  Databricks SQL connector and SDK
+  app.yaml                   Azure Databricks Apps configuration
   deliverytwin/              the Python package
     app.py                   HTTP server, routes, CLI, security guards
     dashboard.html           the single-page UI
     workflow.py              Agent Framework stage graph and the forecast formula
     intake.py                SHAPE and COMMIT logic
+    provenance.py            source badges and the verbatim quote verifier for SHAPE findings
+    capacity.py              Role × Phase capacity breakdown and the HR privacy guardrail
+    analytics.py             portfolio backtest, calibration and the ROI metrics
     commit_ai.py             COMMIT review and what-if questions
     backlog.py               Azure DevOps Epic/Feature/Story backlog, CSV, REST JSON, recovery-plan diff
     pack.py                  decision pack (Markdown) for the latest approved baseline
@@ -155,8 +196,8 @@ src/                         the deployable unit: Docker build context
     importer.py              CSV/XLSX export import into TRACK signals, with a validation report
     extras.py                handlers for the demo-environment routes (baselines, samples, import, events)
     track_ai.py              TRACK variance attribution and briefing
-    recovery.py              INTERVENE scenarios and predictions
-    ai_common.py, llm.py     shared AI helpers; OpenAI, Azure OpenAI and recorded backends
+    recovery.py              INTERVENE scenarios, predictions, dollar cost impact and ranking
+    ai_common.py, llm.py     shared AI helpers; Databricks Model Serving, Azure OpenAI, OpenAI and recorded backends
     recorded_ai.py           deterministic recorded stand-in for the model (offline demos)
     chat.py                  read-only "Ask Delivery Twin" assistant
     data/                    portfolio data layer, dataset, Databricks DDL
@@ -181,7 +222,7 @@ flowchart LR
         RULES[Deterministic models: commitment, forecast, variance, capacity]
         AI[Validated AI features]
         WF[Agent Framework stage workflow]
-        DATA[(Data layer: SQLite today, Databricks target)]
+        DATA[(Analytical data layer: DuckDB by default, SQLite, Databricks Unity Catalog)]
         UI --> API --> RULES
         API --> AI
         RULES --> WF
@@ -189,7 +230,7 @@ flowchart LR
         AI --> RULES
     end
     Sources -. synthetic records only .-> DATA
-    AI --> MODEL[OpenAI, Azure OpenAI, or recorded sample answers; Microsoft Foundry for chat]
+    AI --> MODEL[Databricks Model Serving, Azure OpenAI, OpenAI, or recorded sample answers; Microsoft Foundry for chat]
     UPLOAD[Files a person exports and uploads] -.-> API
     API --> HUMAN[Human approval]
     HUMAN -. simulated only; no write-back .-> Sources
@@ -219,16 +260,19 @@ Microsoft Agent Framework runs the four stages as deterministic executors; it or
 
 ## Portfolio data layer
 
-[`src/deliverytwin/data/`](src/deliverytwin/data) is the seam for moving the system of record from SQLite to Databricks. Outside its SQLite adapter, the layer does not use `sqlite3`.
+[`src/deliverytwin/data/`](src/deliverytwin/data) is a portable analytical data layer. The app runs on **DuckDB** locally, keeps SQLite as an alternative, and targets **Azure Databricks Unity Catalog / Delta** for shared, durable data. Outside [`database.py`](src/deliverytwin/data/database.py) nothing assumes a particular engine, and callers catch `DatabaseError` / `IntegrityError` instead of `sqlite3` or `duckdb` exceptions.
 
 | Piece | Purpose |
 |---|---|
-| [`schema.py`](src/deliverytwin/data/schema.py) | One definition of the seven portfolio tables plus four the app writes (`commitment_baselines`, `intake_sessions`, `recovery_scenarios`, `track_snapshots`), rendered per dialect. [`databricks_ddl.sql`](src/deliverytwin/data/databricks_ddl.sql) is the generated Unity Catalog / Delta DDL. |
-| [`database.py`](src/deliverytwin/data/database.py) | A `Database` interface with positional `?` parameters, validated identifiers, and dialect upserts. Adapters: `SQLiteDatabase`, `DuckDBDatabase` (tests only), `DatabricksDatabase`. |
-| [`repository.py`](src/deliverytwin/data/repository.py), [`app_repository.py`](src/deliverytwin/data/app_repository.py) | Portable history access, plus `BaselineRepository` and `IntakeSessionRepository`. |
+| [`schema.py`](src/deliverytwin/data/schema.py) | One definition of the seven portfolio tables plus the application tables (`commitment_baselines`, `intake_sessions`, `recovery_scenarios` with `recovery_target_updates`, `track_snapshots`), rendered per dialect. [`databricks_ddl.sql`](src/deliverytwin/data/databricks_ddl.sql) is the generated Unity Catalog / Delta DDL; a test fails if it drifts. |
+| [`database.py`](src/deliverytwin/data/database.py) | A `Database` interface with positional `?` parameters, validated identifiers, and dialect upserts (`ON CONFLICT` on DuckDB and SQLite, `MERGE INTO` on Databricks). Adapters: `DuckDBDatabase` (persistent file or `:memory:`, one lock-guarded root with a cursor per operation so concurrent HTTP requests never collide), `SQLiteDatabase`, `DatabricksDatabase`. |
+| [`connection.py`](src/deliverytwin/data/connection.py) | The engine-neutral `Connection` the rest of the app uses, dialect resolution (`--dialect`, `DELIVERYTWIN_DB_DIALECT`, Databricks when `DATABRICKS_HOST` is set, else DuckDB), and nested transactions. |
+| [`repository.py`](src/deliverytwin/data/repository.py), [`app_repository.py`](src/deliverytwin/data/app_repository.py) | Portable history access, plus `BaselineRepository`, `IntakeSessionRepository`, `TrackSnapshotRepository` and `RecoveryScenarioRepository`. SHAPE, COMMIT, TRACK, INTERVENE and the reset route read and write the four application tables only through these. |
 | [`generator.py`](src/deliverytwin/data/generator.py) | A deterministic 50-project dataset (`HIST-001`…`HIST-050`) shaped like the `delivery_intel` Delta tables, checked in under [`delivery_intelligence/`](src/deliverytwin/data/delivery_intelligence). A test fails if the files drift from the generator. |
 
-**Status.** The app runs on SQLite. COMMIT approvals and intake timing already go through the portable repositories; recovery scenarios and TRACK snapshots do not yet. The Databricks adapter is tested against a fake connection and has **not been run against a live workspace**. When you have access, install `requirements-databricks.txt`, set `DATABRICKS_SERVER_HOSTNAME` (or `DATABRICKS_HOST`), `DATABRICKS_HTTP_PATH`, optionally `DATABRICKS_TOKEN` (otherwise SDK default credentials), and `DELIVERYTWIN_CATALOG` / `DELIVERYTWIN_SCHEMA` (default `dpm_dev.mlops`), then run `python -m deliverytwin databricks-smoke`. It creates a throwaway schema, loads the dataset, reads it back, writes a baseline, reports PASS/FAIL per check, and drops the schema. Use a separate schema: the dataset adds extension columns (`delivery_pattern`, `actual_duration_weeks`, `outcome`, `dependency`) that existing `delivery_intel` tables may lack.
+**Status.** DuckDB and SQLite are fully tested (all four application tables and the whole workflow run against both). The simulated source-system tables (Planview, Azure DevOps, ServiceNow, Oracle HCM, UKG) and the history tables are read through the same `Connection`, so in `databricks` mode they stay in a local DuckDB file and only the four application tables go to the warehouse. The Databricks adapter is tested against a fake connection and has **not been run against a live workspace**. When you have access, install `requirements-databricks.txt`, set `DATABRICKS_SERVER_HOSTNAME` (or `DATABRICKS_HOST`), `DATABRICKS_HTTP_PATH`, optionally `DATABRICKS_TOKEN` (otherwise SDK default credentials), and `DELIVERYTWIN_CATALOG` / `DELIVERYTWIN_SCHEMA` (default `dpm_dev.mlops`), then run `python -m deliverytwin databricks-smoke`. It creates a throwaway schema, loads the dataset, reads it back, writes a baseline, reports PASS/FAIL per check, and drops the schema. Use a separate schema: the dataset adds extension columns (`delivery_pattern`, `actual_duration_weeks`, `outcome`, `dependency`) that existing `delivery_intel` tables may lack.
+
+One DuckDB behavior to know: an upsert never rewrites a primary-key or unique column, because DuckDB turns such an update into a delete and insert that breaks foreign keys. Rows are keyed by those columns, so this only affects code that tried to re-key a row.
 
 ## Deploy to Azure
 
@@ -245,10 +289,10 @@ docker run --rm -p 8000:8000 -e DELIVERYTWIN_TRUSTED_AUTH=1 -e OPENAI_API_KEY=..
 
 | Option | Best for | Authentication | Secrets and identity | Scaling and storage | Effort |
 |---|---|---|---|---|---|
-| **Azure Container Apps** (recommended) | Hackathon demo through a pilot | Built-in authentication with Microsoft Entra ID | Managed identity, Key Vault secret references | Pin to 1 replica while on SQLite; scales out once data is in Databricks | Low |
-| **App Service for Containers** | Teams already standardized on App Service | Built-in authentication (Easy Auth) with Entra ID | Managed identity, Key Vault references in app settings | One instance while on SQLite; plan and slot features for blue/green | Low |
-| **Azure Databricks Apps** | Pairing with the Databricks data target | Workspace identity, built in | Workspace secrets and Unity Catalog | Data in Delta tables once the adapter is validated | Medium: needs an `app.yaml` (none in the repo) |
-| **Azure Kubernetes Service (AKS)** | Organizations with a platform team and shared clusters | You add it: ingress plus an auth proxy, or Application Gateway | Workload identity, Key Vault CSI driver | Full control; pin to 1 replica on SQLite | High: no manifests or Helm chart in the repo |
+| **Azure Container Apps** (recommended) | Hackathon demo through a pilot | Built-in authentication with Microsoft Entra ID | Managed identity, Key Vault secret references | Pin to 1 replica while on the local DuckDB file; scales out once the application tables are in Databricks | Low |
+| **App Service for Containers** | Teams already standardized on App Service | Built-in authentication (Easy Auth) with Entra ID | Managed identity, Key Vault references in app settings | One instance on the local DuckDB file; plan and slot features for blue/green | Low |
+| **Azure Databricks Apps** | Pairing with the Databricks data layer and Model Serving | Workspace identity, built in | Injected service principal, workspace secrets and Unity Catalog | Application tables in Delta; no container to build | Medium: [`src/app.yaml`](src/app.yaml) is included, but untested on a live workspace |
+| **Azure Kubernetes Service (AKS)** | Organizations with a platform team and shared clusters | You add it: ingress plus an auth proxy, or Application Gateway | Workload identity, Key Vault CSI driver | Full control; pin to 1 replica on the local file | High: no manifests or Helm chart in the repo |
 | **Azure Container Instances** | A short-lived demo inside a private network | None built in; needs Front Door or Application Gateway in front | Managed identity | Single container, storage lost on restart | Low, but not safe to expose alone |
 
 Whichever option you choose:
@@ -258,8 +302,8 @@ flowchart LR
     U[Users] --> GW[Entra ID sign-in at the host or gateway]
     GW --> APP[Delivery Twin container, port 8000]
     APP --> KV[Key Vault: OPENAI_API_KEY]
-    APP --> AI[OpenAI, or Microsoft Foundry for chat]
-    APP --> DBX[(Databricks Delta tables, target)]
+    APP --> AI[Databricks Model Serving, Azure OpenAI, OpenAI, or Microsoft Foundry for chat]
+    APP --> DBX[(Databricks Delta tables via DATABRICKS_HTTP_PATH)]
     APP --> COSMOS[(Cosmos DB workflow checkpoints, optional)]
     APP -. CSV the user downloads .-> ADO[Azure DevOps, imported by a person]
 ```
@@ -298,7 +342,21 @@ Enable authentication with `az webapp auth microsoft update` (Entra ID, require 
 
 #### Option 3: Azure Databricks Apps
 
-This is the natural fit once the data layer moves to Databricks: the platform provides sign-in, and the app can use the workspace's SQL warehouse and Unity Catalog. Install `requirements-databricks.txt`, start the server with `python -m deliverytwin serve` on the port the platform provides, and set the `DATABRICKS_*` and `DELIVERYTWIN_*` variables listed below. An `app.yaml` is not included, and the Databricks adapter has not been run against a live workspace (see [Portfolio data layer](#portfolio-data-layer)); run `databricks-smoke` first.
+This is the natural fit for the analytical data layer: the platform provides sign-in and a service principal, the four application tables live in Unity Catalog / Delta through a SQL warehouse, and SHAPE, COMMIT, TRACK and INTERVENE call a Databricks Model Serving endpoint first. [`src/app.yaml`](src/app.yaml) is the app definition:
+
+```yaml
+command: ["python", "-m", "deliverytwin", "serve"]
+env:
+  - name: DATABRICKS_HOST            # https://<workspace>.azuredatabricks.net
+  - name: DATABRICKS_HTTP_PATH       # /sql/1.0/warehouses/<warehouse-id>
+  - name: DELIVERYTWIN_DB_DIALECT    # databricks
+  - name: DELIVERYTWIN_CATALOG       # dpm_dev
+  - name: DELIVERYTWIN_SCHEMA        # mlops
+  - name: DATABRICKS_SERVING_ENDPOINT
+  - name: DELIVERYTWIN_TRUSTED_AUTH  # the Apps proxy authenticates users
+```
+
+Replace the `<placeholders>`, then deploy from `src/` (`databricks apps create`, `databricks sync`, `databricks apps deploy`; the commands are in the file's header). When `DATABRICKS_APP_PORT` is set, `serve` binds `0.0.0.0` on that port. The app signs in to the warehouse and the serving endpoint with the service principal Databricks injects (`DATABRICKS_CLIENT_ID` / `DATABRICKS_CLIENT_SECRET`); grant it `CAN USE` on the warehouse and endpoint and `USE CATALOG`, `USE SCHEMA` and `CREATE TABLE` on the schema. The Apps runtime must provide `databricks-sql-connector` and `databricks-sdk` (listed in `requirements-databricks.txt`); add them to `requirements.txt` if your runtime does not. **This configuration has not been deployed to a live workspace**, and the Databricks adapter has only been tested against a fake connection (see [Portfolio data layer](#portfolio-data-layer)); run `databricks-smoke` first.
 
 #### Option 4: Azure Kubernetes Service
 
@@ -313,8 +371,8 @@ Use this only if you already run AKS. You would need to write a Deployment (1 re
 - **Authentication.** The server has no built-in authentication and refuses a non-loopback bind unless `DELIVERYTWIN_TRUSTED_AUTH=1` confirms an authenticating gateway (Entra ID, App Service authentication, Databricks Apps) fronts it. Use that flag only behind such a gateway.
 - **Probes.** HTTP health probe at `/healthz` on port 8000.
 - **Secrets.** Provide `OPENAI_API_KEY` (or the Foundry settings) through Key Vault references, never in the image or source control.
-- **Storage.** The container's SQLite file (`/tmp/deliverytwin.db`) is ephemeral and local to one instance, so approved baselines and the Azure DevOps backlog (which is rebuilt from the latest baseline) are lost on restart, and running several replicas would give each its own database. Keep one replica, or move to Databricks (above) for durable, shared data.
-- **AI model.** Set `AZURE_OPENAI_ENDPOINT` and `AZURE_OPENAI_DEPLOYMENT` to keep model traffic inside your Azure tenant, signing in with the app's managed identity (no key), or set `OPENAI_API_KEY` to call `api.openai.com`, which needs outbound internet access. With neither, use `DELIVERYTWIN_AI_MODE=recorded` for replayed sample answers, or the app runs on its rules-based fallbacks. Azure OpenAI support is covered by unit tests against a fake endpoint and has **not been run against a live Azure OpenAI resource**.
+- **Storage.** In the container the local DuckDB file (`/tmp/deliverytwin.duckdb`) is ephemeral and local to one instance, so approved baselines and the Azure DevOps backlog (which is rebuilt from the latest baseline) are lost on restart, and running several replicas would give each its own database. Keep one replica, or set `DELIVERYTWIN_DB_DIALECT=databricks` (above) so the application tables are durable and shared; the simulated source records still live in the local file.
+- **AI model.** The first configured backend wins: Databricks Model Serving (`DATABRICKS_SERVING_ENDPOINT` plus `DATABRICKS_HOST` and a token or service principal), then Azure OpenAI (`AZURE_OPENAI_ENDPOINT` and `AZURE_OPENAI_DEPLOYMENT`, signing in with the app's managed identity or a key), then `OPENAI_API_KEY` for `api.openai.com`, which needs outbound internet access. The first two keep model traffic inside your tenant. With none, use `DELIVERYTWIN_AI_MODE=recorded` for replayed sample answers, or the app runs on its rules-based fallbacks. Databricks and Azure OpenAI support are covered by unit tests against fake endpoints and have **not been run against live services**.
 - **Foundry chat.** Set `FOUNDRY_PROJECT_ENDPOINT` and `FOUNDRY_MODEL` and use a managed identity with inference permission on the project. Chat prefers Foundry when both are set and otherwise falls back to `OPENAI_API_KEY`. Chat is read-only, limited to 1,200 characters per question and eight history messages, and treats conversation text as untrusted.
 - **Azure DevOps backlog.** It needs no Azure DevOps credentials or network access, because the app only produces a preview and a CSV for a person to import.
 
@@ -322,15 +380,20 @@ Use this only if you already run AKS. You would need to write a Deployment (1 re
 
 | Variable | Effect |
 |---|---|
+| `DATABRICKS_SERVING_ENDPOINT` (or `COPILOT_AI_ENDPOINT`), `DATABRICKS_HOST`, `DATABRICKS_TOKEN` | Use Databricks Model Serving first (highest priority after recorded mode) |
 | `OPENAI_API_KEY`, `OPENAI_MODEL` | Enable the AI features; model defaults to `gpt-4o-mini` |
-| `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_DEPLOYMENT`, `AZURE_OPENAI_API_KEY`, `AZURE_OPENAI_API_VERSION` | Use Azure OpenAI instead (takes precedence over `OPENAI_API_KEY`); without a key, `DefaultAzureCredential` signs in |
+| `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_DEPLOYMENT`, `AZURE_OPENAI_API_KEY`, `AZURE_OPENAI_API_VERSION` | Use Azure OpenAI before `OPENAI_API_KEY`; without a key, `DefaultAzureCredential` signs in |
 | `DELIVERYTWIN_AI_MODE=recorded` | Replay deterministic sample answers with no key or internet (takes precedence over everything else) |
+| `DELIVERYTWIN_DB_DIALECT` | `duckdb` (default), `sqlite` or `databricks` (default when `DATABRICKS_HOST` is set); `--dialect` overrides it |
+| `DELIVERYTWIN_DB_PATH` | Local database file (default `deliverytwin.duckdb` / `deliverytwin.db`) |
+| `DELIVERYTWIN_BLENDED_RATE` | Mock blended labor rate in USD per hour behind the recovery cost impact (default 150) |
 | `DELIVERYTWIN_SIMULATION` | Allow the simulation lab (`/api/simulate`, events, import) without demo mode |
 | `FOUNDRY_PROJECT_ENDPOINT`, `FOUNDRY_MODEL` | Use Microsoft Foundry for chat |
 | `DELIVERYTWIN_TRUSTED_AUTH` | Allow a non-loopback bind behind an authenticating gateway |
 | `DELIVERYTWIN_DEMO_MODE` | Allow `/api/reset-all`, simulation reset and the whole simulation lab (default on for loopback, off otherwise; the image sets `0`, so the simulation lab is disabled in the container unless you set this or `DELIVERYTWIN_SIMULATION=1`) |
+| `DELIVERYTWIN_HOST`, `DELIVERYTWIN_PORT`, `DATABRICKS_APP_PORT` | Default `serve` bind address and port (`DATABRICKS_APP_PORT` also defaults the host to `0.0.0.0`) |
 | `AZURE_COSMOS_ENDPOINT`, `AZURE_COSMOS_DATABASE_NAME`, `AZURE_COSMOS_CONTAINER_NAME` | Cosmos DB workflow checkpoints |
-| `DATABRICKS_*`, `DELIVERYTWIN_CATALOG`, `DELIVERYTWIN_SCHEMA` | Databricks adapter |
+| `DATABRICKS_HTTP_PATH`, `DELIVERYTWIN_CATALOG`, `DELIVERYTWIN_SCHEMA` | Databricks SQL warehouse and catalog / schema for the application tables |
 
 ## Scope and safety
 

@@ -186,6 +186,9 @@ class AppTableTests(unittest.TestCase):
             "scope_defer_pct": 10, "target_date": "2027-03-31", "incremental_cost_k": 0,
             "confidence_pct": 48, "saved_at": "2026-10-19T02:29:25+00:00",
         },
+        "recovery_target_updates": {
+            "scenario_id": 1, "source_key": "servicenow", "payload_json": "{\"action\": \"escalate\"}",
+        },
         "track_snapshots": {
             "snapshot_id": "t-1", "initiative_id": "x", "sprint_number": 1, "as_of": "2026-11-01",
             "on_time_pct": 53, "projected_slip_days": 21, "unplanned_story_points": 16,

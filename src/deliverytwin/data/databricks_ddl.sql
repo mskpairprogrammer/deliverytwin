@@ -144,6 +144,15 @@ CREATE TABLE IF NOT EXISTS dpm_dev.mlops.recovery_scenarios (
 USING DELTA
 COMMENT 'INTERVENE scenarios saved after a what-if preview.';
 
+CREATE TABLE IF NOT EXISTS dpm_dev.mlops.recovery_target_updates (
+  scenario_id BIGINT NOT NULL,
+  source_key STRING NOT NULL,
+  payload_json STRING,
+  PRIMARY KEY (scenario_id, source_key)
+)
+USING DELTA
+COMMENT 'Simulated per-system update records of a saved recovery scenario.';
+
 CREATE TABLE IF NOT EXISTS dpm_dev.mlops.track_snapshots (
   snapshot_id STRING NOT NULL,
   initiative_id STRING,
@@ -157,4 +166,4 @@ CREATE TABLE IF NOT EXISTS dpm_dev.mlops.track_snapshots (
   PRIMARY KEY (snapshot_id)
 )
 USING DELTA
-COMMENT 'New: one TRACK outlook per sprint for trend history.';
+COMMENT 'One TRACK outlook per sprint, kept for trend history.';

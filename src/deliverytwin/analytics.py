@@ -1,14 +1,15 @@
 from __future__ import annotations
 
 import re
-import sqlite3
 import uuid
 from datetime import datetime, timedelta, timezone
-from statistics import mean, median
+from statistics import mean, median, pstdev
 from typing import Any
 
+from .data.connection import Connection, Row
 
-def seed_synthetic_intake_activity(connection: sqlite3.Connection) -> None:
+
+def seed_synthetic_intake_activity(connection: Connection) -> None:
     """Populate rolling demo activity so portfolio process metrics have usable samples."""
     today = datetime.now(timezone.utc).date()
     rom_minutes = (5, 7, 8, 12, 15, 18, 23, 32, 46, None, None, None)
@@ -36,16 +37,16 @@ def seed_synthetic_intake_activity(connection: sqlite3.Connection) -> None:
                 approved.isoformat(timespec="seconds") if approved else None,
             )
         )
-    from .data import IntakeSessionRepository, SQLiteDatabase
+    from .data import IntakeSessionRepository
 
-    IntakeSessionRepository(SQLiteDatabase(connection)).replace_all([
+    IntakeSessionRepository(connection.app_database()).replace_all([
         {"session_id": sid, "started_at": started, "first_rom_at": first_rom, "approved_at": approved}
         for sid, started, first_rom, approved in rows
     ])
 
 
 def record_intake_activity(
-    connection: sqlite3.Connection,
+    connection: Connection,
     session_id: object,
     event: str,
     occurred_at: datetime | None = None,
@@ -62,9 +63,9 @@ def record_intake_activity(
     if event not in {"started", "rom_ready", "approved"}:
         raise ValueError(f"Unsupported intake activity event: {event}.")
 
-    from .data import IntakeSessionRepository, SQLiteDatabase
+    from .data import IntakeSessionRepository
 
-    IntakeSessionRepository(SQLiteDatabase(connection)).record(
+    IntakeSessionRepository(connection.app_database()).record(
         normalized_id, event, occurred_at or datetime.now(timezone.utc)
     )
 
@@ -73,7 +74,7 @@ def _tokens(value: str) -> set[str]:
     return set(re.findall(r"[a-z0-9]+", value.casefold()))
 
 
-def _similarity(left: sqlite3.Row, right: sqlite3.Row) -> float:
+def _similarity(left: Row, right: Row) -> float:
     left_tech = {
         item.strip().casefold() for item in left["technologies"].split(",") if item.strip()
     }
@@ -93,7 +94,7 @@ def _similarity(left: sqlite3.Row, right: sqlite3.Row) -> float:
     return 0.6 * technology_score + 0.2 * integration_score + 0.2 * team_score
 
 
-def _backtest(connection: sqlite3.Connection) -> dict[str, Any]:
+def _backtest(connection: Connection) -> dict[str, Any]:
     rows = connection.execute(
         """
         SELECT project_id, project_name, technologies, integrations, team_size,
@@ -106,6 +107,8 @@ def _backtest(connection: sqlite3.Connection) -> dict[str, Any]:
     points = []
     plan_errors = []
     analog_errors = []
+    plan_signed: list[float] = []
+    analog_signed: list[float] = []
     for target in rows:
         peers = [row for row in rows if row["project_id"] != target["project_id"]]
         if not peers:
@@ -118,6 +121,8 @@ def _backtest(connection: sqlite3.Connection) -> dict[str, Any]:
         actual = target["actual_effort_hours"]
         plan_errors.append(abs(target["planned_effort_hours"] - actual) / actual * 100)
         analog_errors.append(abs(analog_estimate - actual) / actual * 100)
+        plan_signed.append((target["planned_effort_hours"] - actual) / actual * 100)
+        analog_signed.append((analog_estimate - actual) / actual * 100)
         points.append(
             {
                 "project_id": target["project_id"],
@@ -136,13 +141,15 @@ def _backtest(connection: sqlite3.Connection) -> dict[str, Any]:
         "estimators": {
             "original_plan_mape_pct": round(mean(plan_errors), 1) if plan_errors else None,
             "analog_mape_pct": round(mean(analog_errors), 1) if analog_errors else None,
+            "original_plan_error_sd_pts": round(pstdev(plan_signed), 1) if len(plan_signed) > 1 else None,
+            "analog_error_sd_pts": round(pstdev(analog_signed), 1) if len(analog_signed) > 1 else None,
         },
         "sample_count": len(points),
         "points": points,
     }
 
 
-def _calibration(connection: sqlite3.Connection) -> dict[str, Any]:
+def _calibration(connection: Connection) -> dict[str, Any]:
     """Do the P50 and P80 bands from similar projects cover real outcomes as often as they should?"""
     rows = connection.execute(
         """
@@ -204,14 +211,14 @@ def _calibration(connection: sqlite3.Connection) -> dict[str, Any]:
 
 
 def build_impact_report(
-    connection: sqlite3.Connection,
+    connection: Connection,
     now: datetime | None = None,
 ) -> dict[str, Any]:
     """Build portfolio estimator metrics from completed history and instrumented UI sessions."""
     current_time = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
-    from .data import IntakeSessionRepository, SQLiteDatabase
+    from .data import IntakeSessionRepository
 
-    sessions = IntakeSessionRepository(SQLiteDatabase(connection)).sessions()
+    sessions = IntakeSessionRepository(connection.app_database()).sessions()
     elapsed_seconds = [
         max(0.0, (row["first_rom_at"] - row["started_at"]).total_seconds())
         for row in sessions
@@ -219,6 +226,7 @@ def build_impact_report(
     ]
     cutoff = current_time - timedelta(days=7)
     recent_starts = sum(row["started_at"] >= cutoff for row in sessions)
+    backtest = _backtest(connection)
     return {
         "as_of": current_time.isoformat(timespec="seconds"),
         "intake_metrics": {
@@ -228,6 +236,120 @@ def build_impact_report(
             "rom_sample_count": len(elapsed_seconds),
             "intake_starts_last_7_days": recent_starts,
         },
-        "backtest": _backtest(connection),
+        "backtest": backtest,
         "calibration": _calibration(connection),
+        "roi": build_roi(connection, backtest),
+    }
+
+
+# Words that show a requester already named an external dependency in their own text.
+DEPENDENCY_KEYWORDS = {
+    "privacy-review": ("privacy", "pii", "gdpr", "personal data"),
+    "consent-management": ("consent", "opt-in", "opt in", "opt-out"),
+    "crm-mdm-integration": ("crm", "mdm", "master data"),
+    "identity-provider": ("identity", "sso", "single sign", "okta", "entra"),
+    "vendor-contract": ("vendor", "contract", "procurement"),
+    "private-network": ("private network", "vpn", "private link", "firewall"),
+}
+
+
+def _dependency_set(value: str) -> set[str]:
+    return {item for item in (value or "").split(",") if item}
+
+
+def _flag_from_analogs(dependency_lists: list[set[str]]) -> set[str]:
+    """A dependency is flagged when most of the closest analogs needed it."""
+    counts: dict[str, int] = {}
+    for dependencies in dependency_lists:
+        for dependency in dependencies:
+            counts[dependency] = counts.get(dependency, 0) + 1
+    return {name for name, count in counts.items() if count * 2 > len(dependency_lists)}
+
+
+def _dependency_recall(connection: Connection) -> dict[str, Any]:
+    rows = connection.execute(
+        """
+        SELECT project_id, project_name, technologies, integrations, team_size, dependencies
+        FROM historical_projects ORDER BY project_id
+        """
+    ).fetchall()
+    caught = actual = flagged_total = 0
+    for target in rows:
+        peers = sorted(
+            (row for row in rows if row["project_id"] != target["project_id"]),
+            key=lambda peer: (-_similarity(target, peer), peer["project_id"]),
+        )[:3]
+        flagged = _flag_from_analogs([_dependency_set(peer["dependencies"]) for peer in peers])
+        gates = _dependency_set(target["dependencies"])
+        caught += len(flagged & gates)
+        actual += len(gates)
+        flagged_total += len(flagged)
+    return {
+        "projects": len(rows), "dependencies": actual, "caught": caught,
+        "recall_pct": round(caught / actual * 100) if actual else None,
+        "precision_pct": round(caught / flagged_total * 100) if flagged_total else None,
+    }
+
+
+def build_roi(connection: Connection, backtest: dict[str, Any]) -> dict[str, Any]:
+    """Two deterministic executive metrics; both are computed from history, never from the AI."""
+    recall = _dependency_recall(connection)
+    estimators = backtest["estimators"]
+    plan_sd, analog_sd = estimators.get("original_plan_error_sd_pts"), estimators.get("analog_error_sd_pts")
+    reduction = round((plan_sd - analog_sd) / plan_sd * 100) if plan_sd and analog_sd is not None else None
+    return {
+        "early_dependency_detection": {
+            **recall,
+            "headline": (
+                f"{recall['recall_pct']}% of external dependencies flagged at SHAPE "
+                f"({recall['caught']} of {recall['dependencies']})"
+                if recall["recall_pct"] is not None else "Not enough history"
+            ),
+            "method": (
+                "Leave-one-out: each completed project's approval-gate dependencies are predicted only from "
+                "its three closest other projects (a dependency is flagged when most of them needed it). "
+                "No requester input is used."
+            ),
+            "baseline_note": (
+                "The history has no record of dependencies found mid-flight, so no mid-flight baseline is "
+                "measured. Per session, SHAPE compares what it flags with what the request itself names."
+            ),
+        },
+        "estimator_variance": {
+            "original_plan_error_sd_pts": plan_sd, "analog_error_sd_pts": analog_sd,
+            "spread_reduction_pct": reduction,
+            "original_plan_mape_pct": estimators.get("original_plan_mape_pct"),
+            "analog_mape_pct": estimators.get("analog_mape_pct"),
+            "headline": (
+                f"Estimate spread {'down' if reduction >= 0 else 'up'} {abs(reduction)}% vs original plans "
+                f"({plan_sd} to {analog_sd} pts)" if reduction is not None else "Not enough history"
+            ),
+            "method": (
+                "Standard deviation of the signed % error against actual effort, original plan versus the "
+                "leave-one-out analog estimate. A smaller spread means more consistent estimates."
+            ),
+        },
+    }
+
+
+def session_dependency_detection(
+    text: str, fingerprint: dict[str, Any], matches: list[dict[str, Any]], documents_text: str = ""
+) -> dict[str, Any]:
+    """For one request: dependencies SHAPE flags versus those the request text (and any uploads) already name."""
+    analog_lists = [set(match["dimensions"]["dependencies"]["historical"]) for match in matches]
+    flagged = sorted(set(fingerprint.get("dependencies") or []) | _flag_from_analogs(analog_lists))
+
+    def named_in(value: str) -> list[str]:
+        lowered = (value or "").casefold()
+        return [name for name in flagged if any(word in lowered for word in DEPENDENCY_KEYWORDS.get(name, ()))]
+
+    stated = named_in(text)
+    in_documents = [name for name in named_in(documents_text) if name not in stated]
+    return {
+        "flagged": flagged, "stated_in_request": stated, "named_only_in_documents": in_documents,
+        "flagged_count": len(flagged), "stated_count": len(stated), "surfaced_by_shape": len(flagged) - len(stated),
+        "headline": (
+            f"{len(flagged)} external dependencies flagged at SHAPE; the request text named {len(stated)}"
+            if flagged else "No external dependencies flagged"
+        ),
     }

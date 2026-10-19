@@ -392,6 +392,38 @@
     .lineage .chip.synthetic { background: #fff4e5; color: #8a5a00; border-color: #f0d9b0; }
     .lineage .chip.upload { background: #eaf3ff; color: #1f5a99; border-color: #c9defa; }
     .lineage .chip.model { background: var(--teal-soft); color: var(--teal); border-color: #c5e8df; }
+    .findings { border: 1px solid var(--line); border-radius: 9px; background: #fbfdfc; padding: 10px 12px; margin: 10px 0; }
+    .findings[hidden] { display: none; }
+    .findings-title { margin: 0 0 6px; font-size: 12px; }
+    .findings-counts { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
+    .findings-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 11px; line-height: 1.5; }
+    .findings-list li { display: flex; gap: 8px; align-items: flex-start; flex-wrap: wrap; }
+    .finding-kind { font-size: 9px; font-weight: 800; letter-spacing: .06em; padding: 2px 6px; border-radius: 4px; background: #eef2f6; color: var(--muted); }
+    .finding-kind.risk { background: #fdecec; color: var(--red); }
+    .finding-kind.dependency { background: #fff4e5; color: #8a5a00; }
+    .src-badge { display: inline-block; font-size: 9px; font-weight: 800; letter-spacing: .03em; padding: 2px 8px; border-radius: 999px; border: 1px solid transparent; white-space: nowrap; }
+    .src-badge.request { background: #eaf3ff; color: #1f5a99; border-color: #c9defa; }
+    .src-badge.document { background: var(--teal-soft); color: var(--teal); border-color: #c5e8df; }
+    .src-badge.inference { background: #fff4e5; color: #8a5a00; border-color: #f0d9b0; }
+    .src-badge.rules { background: #eef2f6; color: var(--muted); border-color: var(--line); }
+    .rec-metrics .cost-impact { background: #fff4e5; }
+    .rec-metrics .cost-impact strong { color: #8a5a00; }
+    .roi-strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px; border: 1px solid #c5e8df; background: var(--teal-soft); border-radius: 10px; padding: 10px 12px; margin: 0 0 12px; }
+    .roi-strip .roi-title { grid-column: 1 / -1; font-size: 10px; font-weight: 800; letter-spacing: .05em; color: var(--teal); }
+    .roi-strip strong { display: block; font-size: 17px; }
+    .roi-strip span { font-size: 11px; color: var(--muted); }
+    .privacy-guardrail { display: flex; gap: 8px; align-items: flex-start; border: 1px solid #c5e8df; background: var(--teal-soft); color: var(--teal); border-radius: 8px; padding: 8px 10px; font-size: 12px; font-weight: 700; margin: 0 0 10px; }
+    .rp-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .rp-table th, .rp-table td { border-bottom: 1px solid var(--line); padding: 6px 8px; text-align: left; vertical-align: top; }
+    .rp-cell { display: block; height: 8px; border-radius: 4px; background: #e4ebf0; overflow: hidden; margin: 3px 0; }
+    .rp-cell i { display: block; height: 100%; background: var(--teal); }
+    .rp-cell.tight i { background: #d99a1c; }
+    .rp-cell.bottleneck i, .rp-cell.unstaffed i { background: #c8452f; }
+    .rp-status-bottleneck, .rp-status-unstaffed { color: #c8452f; font-weight: 800; }
+    .rp-status-tight { color: #8a5a00; font-weight: 800; }
+    .rp-note { font-size: 11px; color: var(--muted); }
+    .src-note { display: block; font-size: 10px; color: var(--muted); }
+    .src-quote { display: block; font-size: 10px; color: var(--muted); font-style: italic; }
     .variant-toggle { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0; }
     .variant-toggle[hidden], .backlog-diff[hidden], .baseline-history[hidden] { display: none; }
     .backlog-diff { border: 1px solid #f0d9b0; background: #fffaf0; border-radius: 8px; padding: 8px 12px; font-size: 11px; line-height: 1.6; margin: 8px 0; }
@@ -488,6 +520,12 @@
             <h4 class="step-title"><span class="step-num">2</span>Confirm the approach <span id="intake-clarity" class="clarity"></span><button type="button" class="link-btn" data-edit="2">Edit</button></h4>
             <div class="step-summary" id="summary-2"></div>
             <p class="step-help" id="intake-retrieval"></p>
+            <section class="findings" id="intake-findings" aria-labelledby="findings-title" hidden>
+              <h5 class="findings-title" id="findings-title">What we found, and where it came from</h5>
+              <div class="findings-counts" id="findings-counts"></div>
+              <ul class="findings-list" id="findings-list"></ul>
+              <p class="step-help">Quotes are checked by code against your request and uploaded documents, word for word. Anything that cannot be matched is shown as an AI inference for you to confirm.</p>
+            </section>
             <div id="intake-questions" class="q-grid"></div>
             <div class="intake-actions"><button id="intake-fingerprint-btn" class="intake-btn primary" type="button">Run prediction</button></div>
           </div>
@@ -536,6 +574,7 @@
           </div>
           <div class="intake-step" id="intake-step-5" hidden>
             <h4 class="step-title"><span class="step-num">5</span>Review and approve the commitment</h4>
+            <div id="commit-roi" class="roi-strip" hidden></div>
             <div id="intake-commitment" class="rom-hero"></div>
             <p id="intake-commit-explain" class="rom-explain"></p>
             <div class="lineage" id="commit-lineage"></div>
@@ -621,6 +660,12 @@
             <h4 class="chart-title">Assigned capacity by role</h4>
             <div id="commit-role-chart"></div>
           </div>
+        </div>
+        <div id="role-phase" class="role-phase" hidden>
+          <h4 class="chart-title">Role × Phase capacity</h4>
+          <div id="privacy-guardrail" class="privacy-guardrail" role="note"></div>
+          <div id="role-phase-table"></div>
+          <p id="role-phase-note" class="rp-note"></p>
         </div>
       </section>
       <details class="card impact-panel" id="impact-panel">
@@ -761,6 +806,7 @@
         <section class="card full">
           <div class="card-head"><div><h3 class="card-title">AI recovery analysis</h3><div class="card-kicker" id="act-kicker">Diagnosis and recovery scenarios written from the latest sprint signals and lessons from late projects.</div></div><span class="badge" id="act-recommendation">ANALYZING</span></div>
           <div id="act-working" class="intake-working" role="status" aria-live="polite" hidden></div>
+          <div id="act-roi" class="roi-strip" hidden></div>
           <div class="prediction-source" id="act-source"></div>
           <p class="prediction-headline" id="act-diagnosis"></p>
           <div class="rec-grid" id="act-options"></div>
@@ -883,6 +929,7 @@
         metric(`${deferredPoints} pts`, "Scope deferred"),
         metric(scenario.target_date, "Target date"),
         metric(`$${scenario.incremental_cost_k.toLocaleString()}K`, "Incremental budget"),
+        ...(scenario.cost_impact ? [metric(scenario.cost_impact.label, "Estimated cost impact")] : []),
       );
       if (prediction) {
         const generated = prediction.source === "llm";
@@ -957,7 +1004,7 @@
       byId("act-diagnosis").textContent = analysis.diagnosis;
       const recommended = actRecommended();
       byId("act-recommendation").textContent = recommended ? `RECOMMENDED: ${recommended.title.toUpperCase()}` : "DECISION REQUIRED";
-      byId("act-note").textContent = `${recommended ? `${recommended.title} is recommended. ` : ""}No scenario is approved; source-system write-back remains disabled.`;
+      byId("act-note").textContent = `${recommended ? `${recommended.title} is recommended${analysis.recommendation_basis ? ` (${analysis.recommendation_basis})` : ""}. ` : ""}No scenario is approved; source-system write-back remains disabled.`;
       byId("act-options").replaceChildren(...analysis.scenarios.map((scenario) => {
         const card = el("div", `rec-card${scenario.id === analysis.recommended ? " recommended" : ""}`);
         const title = el("h4", "", scenario.title);
@@ -967,7 +1014,8 @@
           [`${scenario.predicted_on_time_pct}%`, "On-time"], [`${scenario.predicted_slip_days} d`, "Slip"],
           [`${scenario.allocated_fte.toFixed(1)}`, "FTE"], [scenario.target_date, "Target"],
           [`${scenario.scope_defer_pct}%`, "Scope deferred"], [`$${scenario.incremental_cost_k}K`, "Budget"],
-        ].forEach(([value, label]) => { const cell = el("div"); cell.append(el("strong", "", value), el("span", "", label)); metrics.append(cell); });
+          [scenario.cost_impact ? scenario.cost_impact.label : "—", "Estimated cost impact"],
+        ].forEach(([value, label]) => { const cell = el("div"); cell.append(el("strong", "", value), el("span", "", label)); if (label === "Estimated cost impact") { cell.className = "cost-impact"; cell.title = scenario.cost_impact ? scenario.cost_impact.method : ""; } metrics.append(cell); });
         const list = (items) => { const ul = el("ul"); items.forEach((text) => ul.append(el("li", "", text))); return ul; };
         const button = el("button", "intake-btn", "Preview this scenario");
         button.type = "button";
@@ -1629,6 +1677,42 @@
       });
       root.replaceChildren(svg);
     }
+    function renderRolePhase(rolePhase) {
+      const section = byId("role-phase");
+      if (!rolePhase) { section.hidden = true; return; }
+      const guardrail = rolePhase.privacy_guardrail;
+      const badge = byId("privacy-guardrail");
+      badge.replaceChildren(el("span", "", "🔒"), el("span", "", guardrail.message));
+      badge.title = guardrail.suppressed_groups
+        ? `${guardrail.suppressed_groups} HR role group(s) have fewer than ${guardrail.min_group_size} workers and are suppressed.`
+        : `All HR role groups meet the N >= ${guardrail.min_group_size} threshold.`;
+      const table = el("table", "rp-table");
+      const head = el("tr");
+      head.append(el("th", "", "Role"), ...rolePhase.phases.map((phase) => el("th", "", phase)));
+      const thead = el("thead"); thead.append(head);
+      const tbody = el("tbody");
+      rolePhase.roles.forEach((role) => {
+        const row = el("tr");
+        const label = el("td"); label.append(el("strong", "", role.label), el("div", "rp-note", `${role.planned_fte.toFixed(1)} FTE planned`));
+        row.append(label);
+        role.cells.forEach((cell) => {
+          const td = el("td");
+          td.dataset.status = cell.status;
+          const bar = el("span", `rp-cell ${cell.status}`);
+          const fill = el("i");
+          fill.style.width = `${Math.min(100, cell.utilization_pct === null ? 100 : cell.utilization_pct)}%`;
+          bar.append(fill);
+          const text = cell.status === "unstaffed" ? "No FTE planned" : `${cell.utilization_pct}% of capacity`;
+          td.append(bar, el("div", `rp-status-${cell.status}`, text), el("div", "rp-note", `${hours(cell.required_hours)} needed · ${hours(cell.capacity_hours)} available`));
+          row.append(td);
+        });
+        tbody.append(row);
+      });
+      table.append(thead, tbody);
+      byId("role-phase-table").replaceChildren(table);
+      byId("role-phase-note").textContent = `${rolePhase.bottleneck_count} role-phase bottleneck${rolePhase.bottleneck_count === 1 ? "" : "s"}. ${rolePhase.method}`;
+      section.hidden = false;
+    }
     function renderScenarioComparison(commitment) {
       const baseline = intake.baselineCommitment || commitment;
       const rows = [
@@ -1657,7 +1741,34 @@
       if (seconds < 3600) return `${(seconds / 60).toFixed(1)} min`;
       return `${(seconds / 3600).toFixed(1)} hr`;
     }
+    let impactRoi = null;
+    function renderRoiStrips() {
+      const roi = impactRoi;
+      const detection = intake.result && intake.result.dependency_detection;
+      ["commit-roi", "act-roi"].forEach((id) => {
+        const strip = byId(id);
+        if (!roi) { strip.hidden = true; return; }
+        const early = roi.early_dependency_detection, variance = roi.estimator_variance;
+        const cell = (value, label, title) => {
+          const box = el("div"); box.title = title || "";
+          box.append(el("strong", "", value), el("span", "", label));
+          return box;
+        };
+        const cells = [
+          el("div", "roi-title", "PORTFOLIO IMPACT · DETERMINISTIC, FROM COMPLETED PROJECTS"),
+          cell(early.recall_pct === null ? "—" : `${early.recall_pct}% caught at intake`,
+            `Early dependency detection · ${early.caught} of ${early.dependencies} gate dependencies flagged at SHAPE`, `${early.method} ${early.baseline_note}`),
+          cell(variance.spread_reduction_pct === null ? "—" : `${variance.spread_reduction_pct >= 0 ? "−" : "+"}${Math.abs(variance.spread_reduction_pct)}% spread`,
+            `Estimator variance vs manual plans · ${variance.original_plan_error_sd_pts} to ${variance.analog_error_sd_pts} pts`, variance.method),
+        ];
+        if (detection) cells.push(cell(`${detection.flagged_count} flagged · ${detection.stated_count} stated`, "This request · dependencies SHAPE flagged vs named in the request text", `${detection.flagged.join(", ")}${detection.named_only_in_documents && detection.named_only_in_documents.length ? ` · also named in uploaded documents: ${detection.named_only_in_documents.join(", ")}` : ""}`));
+        strip.replaceChildren(...cells);
+        strip.hidden = false;
+      });
+    }
     function renderImpactReport(data) {
+      impactRoi = data.roi || null;
+      renderRoiStrips();
       const metrics = data.backtest.estimators;
       const intakeMetrics = data.intake_metrics;
       byId("impact-status").textContent =
@@ -1667,6 +1778,10 @@
         metric(metrics.analog_mape_pct === null ? "—" : `${percent(metrics.analog_mape_pct)}%`, "Similarity-analog MAPE"),
         metric(formatDuration(intakeMetrics.median_seconds_to_first_rom), `Median time to ROM · n=${intakeMetrics.rom_sample_count}`),
         metric(String(intakeMetrics.intake_starts_last_7_days), "Intake starts · last 7 days"),
+        ...(impactRoi ? [
+          metric(impactRoi.early_dependency_detection.recall_pct === null ? "—" : `${impactRoi.early_dependency_detection.recall_pct}%`, `Early dependency detection · precision ${impactRoi.early_dependency_detection.precision_pct}%`),
+          metric(impactRoi.estimator_variance.spread_reduction_pct === null ? "—" : `${impactRoi.estimator_variance.spread_reduction_pct}%`, "Estimator variance reduction vs manual plans"),
+        ] : []),
       );
       byId("impact-method").textContent =
         `${data.backtest.method} MAPE is the mean absolute percentage error across the held-out projects. Lower is better. Intake metrics are instrumented from successful requests in this prototype; they are not historical estimates.`;
@@ -1788,11 +1903,45 @@
       if (code === "invalid_response") {
         return `The AI answered, but its response did not pass validation. Showing ${fallback} instead.`;
       }
-      return `No AI model is configured (set OPENAI_API_KEY and restart). Showing ${fallback} instead.`;
+      return `No AI model is configured (set DATABRICKS_SERVING_ENDPOINT, AZURE_OPENAI_*, or OPENAI_API_KEY and restart). Showing ${fallback} instead.`;
+    }
+    function sourceBadge(source) {
+      const badge = el("span", `src-badge ${source.category}`, source.label);
+      badge.title = source.quote ? `“${source.quote}”` : (source.downgrade_reason || "");
+      return badge;
+    }
+    function sourceDetail(source) {
+      const box = el("span", "");
+      box.append(sourceBadge(source));
+      if (source.downgrade_reason) box.append(el("span", "src-note", `Downgraded: ${source.downgrade_reason}.`));
+      if (source.verified && source.quote) {
+        box.append(el("span", "src-quote", `“${source.quote}”${source.document ? ` · ${source.document}` : ""}`));
+      }
+      return box;
+    }
+    function renderFindings(analysis) {
+      const findings = analysis.findings || [];
+      const panel = byId("intake-findings");
+      panel.hidden = findings.length === 0;
+      if (!findings.length) return;
+      const counts = analysis.source_counts || {};
+      const names = { request: "Stated in Request", document: "Found in documents (quote verified)", inference: "AI Inference (Confirm)", rules: "Rules-based (Confirm)" };
+      byId("findings-counts").replaceChildren(...Object.entries(names)
+        .filter(([key]) => counts[key])
+        .map(([key, label]) => el("span", `src-badge ${key}`, `${counts[key]} · ${label}`)));
+      byId("findings-list").replaceChildren(...findings.map((finding) => {
+        const row = el("li");
+        const body = el("span", "", finding.text);
+        const detail = el("span", "");
+        detail.append(body, sourceDetail(finding.source));
+        row.append(el("span", `finding-kind ${finding.kind}`, finding.kind.toUpperCase()), detail);
+        return row;
+      }));
     }
     function renderQuestions(analysis) {
       const container = byId("intake-questions");
       container.replaceChildren();
+      renderFindings(analysis);
       const generated = analysis.question_source && analysis.question_source.type === "llm";
       byId("intake-clarity").textContent = generated ? "" : `· ${analysis.clarity.specified} of ${analysis.clarity.total} already covered in your request`;
       const retry = el("button", "link-btn-inline", "Try again with AI");
@@ -1832,6 +1981,7 @@
         } else if (item.support) {
           card.append(el("div", "q-support", `Suggested by ${item.support.agree} of the ${item.support.of} closest projects.`));
         }
+        if (item.source) card.append(sourceDetail(item.source));
         const evidence = document.createElement("details");
         evidence.className = "evidence";
         evidence.append(el("summary", "", "Why this is suggested"));
@@ -1844,10 +1994,6 @@
       structure: "Structure", complexity: "Complexity", systems: "Systems",
       roles: "Roles", dependencies: "Dependencies", delivery_pattern: "Delivery pattern",
     };
-    function chip(score) {
-      const level = score >= 1 ? "full" : score > 0 ? "part" : "none";
-      return el("span", `dim-chip ${level}`, `${Math.round(score * 100)}%`);
-    }
     function renderEvidence(result) {
       intake.baselineCommitment = { ...result.commitment };
       byId("shape-stage-status").textContent = "INTAKE READY";
@@ -1960,6 +2106,8 @@
       renderConfidenceBridge(c);
       renderAssignedRoles({ resource_allocations: c.resource_allocations });
       renderScenarioComparison(c);
+      renderRolePhase(result.role_phase);
+      renderRoiStrips();
     }
     function commitmentAdjustments() {
       return {
@@ -2338,10 +2486,10 @@
       try {
         const status = await (await fetch("/api/ai/status", { cache: "no-store" })).json();
         const banner = byId("ai-banner");
-        banner.hidden = status.mode === "openai" || status.mode === "azure_openai";
+        banner.hidden = ["openai", "azure_openai", "databricks_serving"].includes(status.mode);
         banner.textContent = status.mode === "recorded"
           ? "RECORDED SAMPLE AI · answers are replayed from a deterministic script, not produced by a live model."
-          : "NO AI MODEL CONFIGURED · rules-based fallbacks are shown. Set OPENAI_API_KEY, or DELIVERYTWIN_AI_MODE=recorded for a recorded demo.";
+          : "NO AI MODEL CONFIGURED · rules-based fallbacks are shown. Set DATABRICKS_SERVING_ENDPOINT, AZURE_OPENAI_*, or OPENAI_API_KEY, or DELIVERYTWIN_AI_MODE=recorded for a recorded demo.";
       } catch (error) {
         byId("ai-banner").hidden = true;
       }

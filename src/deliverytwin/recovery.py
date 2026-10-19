@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import date
 import json
 import math
+import os
 import re
 from typing import Any
 
@@ -27,6 +28,62 @@ SYSTEM_NAMES = {
     "oracle_hcm": "Oracle HR / HCM",
     "ukg_wfm": "UKG Pro WFM",
 }
+DEFAULT_BLENDED_RATE = 150.0
+HOURS_PER_FTE_WEEK = 40
+RECOMMENDATION_BASIS = "highest predicted on-time chance, then lowest cost, then earliest finish date"
+
+
+def blended_rate() -> float:
+    """Mock blended labor rate in dollars per hour; DELIVERYTWIN_BLENDED_RATE overrides the $150 default."""
+    try:
+        rate = float(os.environ.get("DELIVERYTWIN_BLENDED_RATE", ""))
+    except ValueError:
+        return DEFAULT_BLENDED_RATE
+    return rate if math.isfinite(rate) and rate > 0 else DEFAULT_BLENDED_RATE
+
+
+def format_usd(amount: float) -> str:
+    """`+$18,000` for a cost, `$0` for none."""
+    rounded = round(amount)
+    return f"+${rounded:,}" if rounded > 0 else "$0"
+
+
+def cost_impact(report: dict[str, Any], fte: float, target_date: date, cost_k: float,
+                rate: float | None = None) -> dict[str, Any]:
+    """Deterministic estimated cost of a recovery scenario from its three levers.
+
+    * Added capacity: extra FTE over today's allocation, for every week until the new date.
+    * Extension: the whole team carried for each week the date moves out.
+    * Budget: the explicit spend lever (contractors, tooling), in thousands of dollars.
+    Deferring scope is not counted as a saving. A mock blended rate is used, not real payroll data.
+    """
+    rate = blended_rate() if rate is None else rate
+    as_of = date.fromisoformat(report["as_of"])
+    current_target = date.fromisoformat(report["initiative"]["target_end"])
+    added_fte = max(0.0, fte - float(report["signals"]["allocated_fte"]))
+    weeks_remaining = max(0, (target_date - as_of).days) / 7
+    extra_weeks = max(0, (target_date - current_target).days) / 7
+    components = {
+        "added_capacity_usd": round(added_fte * HOURS_PER_FTE_WEEK * weeks_remaining * rate),
+        "extension_usd": round(fte * HOURS_PER_FTE_WEEK * extra_weeks * rate),
+        "budget_usd": round(cost_k * 1000),
+    }
+    total = sum(components.values())
+    return {
+        "usd": total, "label": format_usd(total), "rate_per_hour": rate, "components": components,
+        "method": (
+            f"Added FTE × {HOURS_PER_FTE_WEEK} h × weeks to the new date, plus the team carried for each extra week, "
+            f"plus the budget lever, at a mock blended rate of ${rate:,.0f}/h."
+        ),
+    }
+
+
+def rank_scenarios(scenarios: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Order scenarios by predicted on-time chance (high first), then cost (low first), then date (early first)."""
+    return sorted(
+        scenarios,
+        key=lambda s: (-s["predicted_on_time_pct"], s["cost_impact"]["usd"], s["target_date"], s["id"]),
+    )
 
 
 def preview_recovery_scenario(report: dict[str, Any], payload: object) -> dict[str, Any]:
@@ -117,6 +174,7 @@ def preview_recovery_scenario(report: dict[str, Any], payload: object) -> dict[s
         "remaining_unplanned_scope_points": retained_points,
         "target_date": target_date.isoformat(),
         "incremental_cost_k": cost_k,
+        "cost_impact": cost_impact(report, fte, target_date, cost_k),
         "confidence_pct": confidence,
         "confidence_method": CONFIDENCE_METHOD,
         "target_updates": [
@@ -232,6 +290,7 @@ def _scenario_params(report: dict[str, Any], raw: dict[str, Any]) -> dict[str, A
     return {
         "allocated_fte": base["allocated_fte"], "target_date": base["target_date"],
         "scope_defer_pct": base["scope_defer_pct"], "incremental_cost_k": base["incremental_cost_k"],
+        "cost_impact": base["cost_impact"],
         "model_check_pct": base["confidence_pct"],
     }
 
@@ -260,7 +319,7 @@ def _rules_analysis(report: dict[str, Any], reason: dict[str, str] | None) -> di
             "commentary": "Capacity-versus-load model; no AI prediction available.",
             "trade_offs": [option["tradeoff"]], "risks": [], "actions": dict(intervention["actions"]),
         })
-    recommended = next(item["id"] for item, option in zip(scenarios, intervention["options"]) if option["recommended"])
+    ranked = rank_scenarios(scenarios)
     return {
         "source": "rules", "model": None, "fallback_reason": reason,
         "diagnosis": (
@@ -268,7 +327,7 @@ def _rules_analysis(report: dict[str, Any], reason: dict[str, str] | None) -> di
             f"({signals['unplanned_story_points']:g} unplanned points, {signals['lead_production_support_hours_per_week']:g} "
             "h/week of lead support)."
         ),
-        "scenarios": scenarios, "recommended": recommended,
+        "scenarios": ranked, "recommended": ranked[0]["id"], "recommendation_basis": RECOMMENDATION_BASIS,
     }
 
 
@@ -319,9 +378,11 @@ def analyze_intervention(report: dict[str, Any], late_projects: list[dict[str, A
     recommended = data.get("recommended")
     if len(scenarios) < MIN_SCENARIOS or recommended not in seen:
         return _rules_analysis(report, invalid)
+    ranked = rank_scenarios(scenarios)
     return {
         "source": "llm", "model": openai_model(), "fallback_reason": None, "diagnosis": diagnosis,
-        "scenarios": scenarios, "recommended": recommended, "dropped_scenarios": dropped,
+        "scenarios": ranked, "recommended": ranked[0]["id"], "ai_recommended": recommended,
+        "recommendation_basis": RECOMMENDATION_BASIS, "dropped_scenarios": dropped,
     }
 
 

@@ -258,25 +258,6 @@ CREATE TABLE IF NOT EXISTS historical_project_lessons (
     suggested_option TEXT NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS recovery_scenarios (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    initiative_id TEXT NOT NULL REFERENCES delivery_initiatives(id),
-    recommended_option TEXT NOT NULL,
-    allocated_fte REAL NOT NULL CHECK (allocated_fte >= 0),
-    scope_defer_pct INTEGER NOT NULL CHECK (scope_defer_pct BETWEEN 0 AND 100),
-    target_date TEXT NOT NULL,
-    incremental_cost_k REAL NOT NULL CHECK (incremental_cost_k >= 0),
-    confidence_pct INTEGER NOT NULL CHECK (confidence_pct BETWEEN 0 AND 100),
-    saved_at TEXT NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS recovery_target_updates (
-    scenario_id INTEGER NOT NULL REFERENCES recovery_scenarios(id) ON DELETE CASCADE,
-    source_key TEXT NOT NULL REFERENCES source_systems(source_key),
-    payload_json TEXT NOT NULL,
-    PRIMARY KEY (scenario_id, source_key)
-);
-
 CREATE INDEX IF NOT EXISTS idx_ingestion_runs_source_time
     ON ingestion_runs(source_key, started_at);
 CREATE INDEX IF NOT EXISTS idx_ado_items_project_unplanned

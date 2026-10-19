@@ -6,9 +6,10 @@ a dependency slips). The forecast formula in `workflow.py` is unchanged; only it
 """
 from __future__ import annotations
 
-import sqlite3
 from dataclasses import dataclass, replace
 from typing import Callable
+
+from .data.connection import Connection
 
 DEFAULT_SCENARIO = "collision"
 POINTS_PER_UNPLANNED_ITEM = 4
@@ -82,12 +83,12 @@ EVENTS: dict[str, EventKind] = {
 }
 
 
-def scenario_key(connection: sqlite3.Connection) -> str:
+def scenario_key(connection: Connection) -> str:
     row = connection.execute("SELECT value FROM simulation_settings WHERE key = 'scenario'").fetchone()
     return row["value"] if row and (row["value"] in SCENARIOS or row["value"] == IMPORT_SCENARIO) else DEFAULT_SCENARIO
 
 
-def set_scenario(connection: sqlite3.Connection, key: str) -> None:
+def set_scenario(connection: Connection, key: str) -> None:
     if key not in SCENARIOS and key != IMPORT_SCENARIO:
         raise ValueError(f"Unknown scenario. Choose one of: {', '.join(SCENARIOS)}.")
     with connection:
@@ -97,7 +98,7 @@ def set_scenario(connection: sqlite3.Connection, key: str) -> None:
         )
 
 
-def list_events(connection: sqlite3.Connection) -> list[dict[str, object]]:
+def list_events(connection: Connection) -> list[dict[str, object]]:
     return [
         {"id": row["id"], "sprint_number": row["sprint_number"], "kind": row["kind"],
          "label": EVENTS[row["kind"]].label if row["kind"] in EVENTS else row["kind"]}
@@ -105,7 +106,7 @@ def list_events(connection: sqlite3.Connection) -> list[dict[str, object]]:
     ]
 
 
-def add_event(connection: sqlite3.Connection, kind: str, sprint_number: int) -> None:
+def add_event(connection: Connection, kind: str, sprint_number: int) -> None:
     if kind not in EVENTS:
         raise ValueError(f"Unknown event. Choose one of: {', '.join(EVENTS)}.")
     with connection:
@@ -114,7 +115,7 @@ def add_event(connection: sqlite3.Connection, kind: str, sprint_number: int) -> 
         )
 
 
-def clear_events(connection: sqlite3.Connection) -> None:
+def clear_events(connection: Connection) -> None:
     with connection:
         connection.execute("DELETE FROM simulation_events")
 

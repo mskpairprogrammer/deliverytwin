@@ -39,8 +39,10 @@ class RecoveryAiTests(unittest.TestCase):
         with configured, complete:
             analysis = analyze_intervention(self.report, self.late)
         self.assertEqual((analysis["source"], analysis["fallback_reason"]), ("llm", None))
-        self.assertEqual(analysis["recommended"], "phase_scope")
-        self.assertEqual([s["id"] for s in analysis["scenarios"]], ["add_contractors", "phase_scope", "extend_date"])
+        self.assertEqual(analysis["recommended"], "extend_date")
+        self.assertEqual(analysis["ai_recommended"], "phase_scope")
+        self.assertIn("highest predicted on-time", analysis["recommendation_basis"])
+        self.assertEqual([s["id"] for s in analysis["scenarios"]], ["extend_date", "phase_scope", "add_contractors"])
         phase = analysis["scenarios"][1]
         self.assertEqual((phase["predicted_on_time_pct"], phase["predicted_slip_days"], phase["scope_defer_pct"]), (78, 5, 40))
         self.assertIsInstance(phase["model_check_pct"], int)
@@ -59,8 +61,8 @@ class RecoveryAiTests(unittest.TestCase):
             with configured, complete:
                 analysis = analyze_intervention(self.report, self.late)
             self.assertEqual(analysis["source"], "rules")
-            self.assertEqual([s["id"] for s in analysis["scenarios"]], ["contractors", "squad_reallocation", "phase_and_unblock"])
-            self.assertIn(analysis["recommended"], {s["id"] for s in analysis["scenarios"]})
+            self.assertEqual([s["id"] for s in analysis["scenarios"]], ["contractors", "phase_and_unblock", "squad_reallocation"])
+            self.assertEqual(analysis["recommended"], analysis["scenarios"][0]["id"])
             codes[name] = analysis["fallback_reason"]
         self.assertEqual(codes["invalid"]["code"], "invalid_response")
         self.assertEqual(codes["failed"]["code"], "request_failed")
@@ -73,8 +75,8 @@ class RecoveryAiTests(unittest.TestCase):
         with configured, complete:
             analysis = analyze_intervention(self.report, self.late)
         self.assertEqual((analysis["source"], analysis["dropped_scenarios"]), ("llm", 1))
-        self.assertEqual([s["id"] for s in analysis["scenarios"]], ["phase_scope", "extend_date"])
-        self.assertEqual(analysis["recommended"], "phase_scope")
+        self.assertEqual([s["id"] for s in analysis["scenarios"]], ["extend_date", "phase_scope"])
+        self.assertEqual(analysis["recommended"], "extend_date")
 
     def test_what_if_prediction_is_ai_driven_with_a_rules_cross_check(self) -> None:
         llm = ScriptedLLM()

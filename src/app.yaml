@@ -1,0 +1,36 @@
+# Azure Databricks Apps configuration for Delivery Twin.
+# Deploy from this folder (the app root is `src/`):
+#   databricks apps create delivery-twin
+#   databricks sync . /Workspace/Users/<you>/delivery-twin
+#   databricks apps deploy delivery-twin --source-code-path /Workspace/Users/<you>/delivery-twin
+# Replace every <placeholder> below. Nothing here is a secret: the app authenticates with the
+# service principal that Databricks Apps injects (DATABRICKS_CLIENT_ID / DATABRICKS_CLIENT_SECRET).
+command: ["python", "-m", "deliverytwin", "serve"]
+
+env:
+  # Workspace and SQL warehouse that hold the four application tables (Unity Catalog / Delta).
+  - name: DATABRICKS_HOST
+    value: "https://<workspace>.azuredatabricks.net"
+  - name: DATABRICKS_HTTP_PATH
+    value: "/sql/1.0/warehouses/<warehouse-id>"
+  - name: DELIVERYTWIN_DB_DIALECT
+    value: "databricks"
+  - name: DELIVERYTWIN_CATALOG
+    value: "dpm_dev"
+  - name: DELIVERYTWIN_SCHEMA
+    value: "mlops"
+
+  # Databricks Model Serving chat endpoint that SHAPE, COMMIT, TRACK and INTERVENE call first.
+  # Without it the app falls back to Azure OpenAI, then OpenAI, then the labeled rules-based mode.
+  - name: DATABRICKS_SERVING_ENDPOINT
+    value: "<model-serving-endpoint-name>"
+
+  # Databricks Apps puts an authenticating proxy in front of the app, so binding beyond loopback is allowed.
+  - name: DELIVERYTWIN_TRUSTED_AUTH
+    value: "1"
+  # Synthetic data only: let judges reload and reset the demo, and use the simulation lab.
+  - name: DELIVERYTWIN_DEMO_MODE
+    value: "1"
+  # Mock blended labor rate (USD/hour) behind the Estimated Cost Impact on recovery scenarios.
+  - name: DELIVERYTWIN_BLENDED_RATE
+    value: "150"

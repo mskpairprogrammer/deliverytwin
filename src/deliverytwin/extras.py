@@ -6,10 +6,11 @@ approved baselines already stored in the local database.
 from __future__ import annotations
 
 import re
-import sqlite3
 from datetime import date, timedelta
 from pathlib import Path
 from typing import Any
+
+from .data.connection import Connection
 
 SAMPLES_DIR = Path(__file__).with_name("data") / "samples"
 SAMPLE_DOCUMENTS = (
@@ -26,10 +27,10 @@ class BaselineRequired(Exception):
     pass
 
 
-def baseline_history(connection: sqlite3.Connection) -> dict[str, Any]:
-    from .data import BaselineRepository, SQLiteDatabase
+def baseline_history(connection: Connection) -> dict[str, Any]:
+    from .data import BaselineRepository
 
-    history = BaselineRepository(SQLiteDatabase(connection)).history()
+    history = BaselineRepository(connection.app_database()).history()
     result = []
     previous = None
     for baseline in history:
@@ -49,7 +50,7 @@ def baseline_history(connection: sqlite3.Connection) -> dict[str, Any]:
     return {"baselines": list(reversed(result))}
 
 
-def simulation_catalog(connection: sqlite3.Connection) -> dict[str, Any]:
+def simulation_catalog(connection: Connection) -> dict[str, Any]:
     from .app import simulation_state
     from .importer import load_import
     from .scenarios import IMPORT_SCENARIO, catalog, list_events, scenario_key
@@ -67,7 +68,7 @@ def simulation_catalog(connection: sqlite3.Connection) -> dict[str, Any]:
     }
 
 
-def apply_import(connection: sqlite3.Connection, files: object) -> dict[str, Any]:
+def apply_import(connection: Connection, files: object) -> dict[str, Any]:
     from .app import SPRINT_DAYS, baseline_approved, simulate_sprints
     from .importer import parse_exports, save_import
     from .scenarios import IMPORT_SCENARIO, clear_events
@@ -102,7 +103,7 @@ def load_samples() -> dict[str, Any]:
     return {"documents": documents, "exports": exports}
 
 
-def handle_get(route: str, connection: sqlite3.Connection | None) -> dict[str, Any]:
+def handle_get(route: str, connection: Connection | None) -> dict[str, Any]:
     if route == "/api/ai/status":
         from .llm import ai_status
 
@@ -115,7 +116,7 @@ def handle_get(route: str, connection: sqlite3.Connection | None) -> dict[str, A
     return simulation_catalog(connection)
 
 
-def handle_post(route: str, payload: dict[str, Any], connection: sqlite3.Connection) -> dict[str, Any]:
+def handle_post(route: str, payload: dict[str, Any], connection: Connection) -> dict[str, Any]:
     from .app import baseline_approved, inject_event
 
     if route == "/api/import/signals":
