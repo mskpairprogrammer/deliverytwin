@@ -726,9 +726,10 @@ def _latest_recovery_scenario(connection: sqlite3.Connection) -> dict[str, Any] 
             (row["id"],),
         )
     ]
+    from .recovery import CONFIDENCE_METHOD
+
     scenario["confidence_method"] = (
-        "Illustrative adjustment to the current forecast: +5 points per additional FTE, "
-        "+0.2 per deferred scope point, and +0.15 per target-date day moved later; bounded to 5–95%."
+        f"{CONFIDENCE_METHOD} When an AI prediction was applied, its on-time figure is stored instead."
     )
     scenario["status"] = "simulated_updates_persisted"
     scenario["writeback_performed"] = False
@@ -1124,7 +1125,7 @@ def serve_dashboard(database: str | Path, host: str, port: int) -> None:
                         if not baseline_approved(connection):
                             raise BaselineRequiredError(BASELINE_REQUIRED)
                         if simulation_state(connection) is None:
-                            raise ValueError("Simulate a sprint before creating an ACT recovery scenario.")
+                            raise ValueError("Simulate a sprint in TRACK before creating an intervention scenario.")
                         report = build_workflow_report(connection)
                         late = [
                             dict(row) for row in connection.execute(
@@ -1194,7 +1195,7 @@ def serve_dashboard(database: str | Path, host: str, port: int) -> None:
                     if simulation_state(connection) is None:
                         self.send_json(
                             409,
-                            {"error": "No delivery data yet. Run simulate.py to load test data first."},
+                            {"error": "No delivery data yet. Approve a baseline in COMMIT, then use Simulate next sprint in TRACK."},
                         )
                         return
                     report = build_workflow_report(connection)

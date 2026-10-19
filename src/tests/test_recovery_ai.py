@@ -68,6 +68,14 @@ class RecoveryAiTests(unittest.TestCase):
         with patch("deliverytwin.recovery.openai_configured", return_value=False):
             self.assertEqual(analyze_intervention(self.report, self.late)["fallback_reason"], {"code": "not_configured"})
 
+    def test_an_out_of_bounds_scenario_is_dropped_without_discarding_the_rest(self) -> None:
+        configured, complete = self.with_llm(ScriptedLLM(recovery="one_bad"))
+        with configured, complete:
+            analysis = analyze_intervention(self.report, self.late)
+        self.assertEqual((analysis["source"], analysis["dropped_scenarios"]), ("llm", 1))
+        self.assertEqual([s["id"] for s in analysis["scenarios"]], ["phase_scope", "extend_date"])
+        self.assertEqual(analysis["recommended"], "phase_scope")
+
     def test_what_if_prediction_is_ai_driven_with_a_rules_cross_check(self) -> None:
         llm = ScriptedLLM()
         configured, complete = self.with_llm(llm)

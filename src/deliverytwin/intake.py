@@ -1495,7 +1495,7 @@ def evaluate_intake(
     checked_basis = _validate_basis(connection, basis)
     matches = match_analogs(connection, fingerprint, _document_tokens(docs))
     if not matches:
-        raise IntakeError("No historical analogs are loaded. Click Simulate next sprint on the SENSE tab first.")
+        raise IntakeError("No historical analogs are loaded. Run seed-demo or use Simulate next sprint in TRACK first.")
     rom = build_rom(matches)
     commitment = build_commitment(connection, matches, rom, as_of or date.today(), adjustments, checked_basis)
     return {

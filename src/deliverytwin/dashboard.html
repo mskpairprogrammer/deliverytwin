@@ -841,7 +841,7 @@
       source.replaceChildren(
         el("span", `source-pill ${generated ? "llm" : "fallback"}`, generated ? `AI RECOVERY ANALYSIS · ${analysis.model}` : "RULES-BASED OPTIONS · AI UNAVAILABLE"),
         el("span", "", generated
-          ? "Scenarios are validated against capacity, date, scope, and budget limits before they are shown."
+          ? `Scenarios are validated against capacity, date, scope, and budget limits before they are shown.${analysis.dropped_scenarios ? ` ${analysis.dropped_scenarios} proposed scenario(s) outside those limits were removed.` : ""}`
           : aiUnavailableText(analysis.fallback_reason, "rules-based options")),
       );
       if (!generated && analysis.fallback_reason && analysis.fallback_reason.code !== "not_configured") {

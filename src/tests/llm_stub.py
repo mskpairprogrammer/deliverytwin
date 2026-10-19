@@ -181,6 +181,8 @@ class ScriptedLLM:
             scenario("extend_date", alloc, later, 0, 0, 83, 0),
         ]
         if self.recovery == "invalid":
+            scenarios[1]["allocated_fte"] = cap + 10  # the recommended scenario is out of bounds
+        if self.recovery == "one_bad":
             scenarios[0]["allocated_fte"] = cap + 10
         return json.dumps({
             "diagnosis": "Capacity is draining into production support while scope grows.",

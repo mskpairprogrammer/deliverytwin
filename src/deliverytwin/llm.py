@@ -21,20 +21,25 @@ class LLMError(RuntimeError):
 
 
 def load_env_file(path: Path | None = None) -> None:
-    """Load KEY=VALUE lines from .env without overriding existing variables."""
-    env_path = path or Path(__file__).resolve().parent.parent / ".env"
-    try:
-        lines = env_path.read_text(encoding="utf-8").splitlines()
-    except OSError:
-        return
-    for line in lines:
-        line = line.strip()
-        if not line or line.startswith("#") or "=" not in line:
+    """Load KEY=VALUE lines from .env without overriding existing variables.
+
+    Without an explicit path, the app folder's .env is read first, then the repository root's.
+    """
+    app_dir = Path(__file__).resolve().parent.parent
+    candidates = [path] if path else [app_dir / ".env", app_dir.parent / ".env"]
+    for env_path in candidates:
+        try:
+            lines = env_path.read_text(encoding="utf-8").splitlines()
+        except OSError:
             continue
-        name, _, value = line.partition("=")
-        name, value = name.strip(), value.strip().strip('"').strip("'")
-        if name and name not in os.environ:
-            os.environ[name] = value
+        for line in lines:
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            name, _, value = line.partition("=")
+            name, value = name.strip(), value.strip().strip('"').strip("'")
+            if name and name not in os.environ:
+                os.environ[name] = value
 
 
 load_env_file()
