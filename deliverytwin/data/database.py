@@ -41,8 +41,12 @@ class Database:
     def close(self) -> None:
         raise NotImplementedError
 
-    def create_tables(self, include_app: bool = True) -> None:
-        for table in (ALL_TABLES if include_app else TABLES).values():
+    def create_tables(self, include_app: bool = True, names: tuple[str, ...] | None = None) -> None:
+        if names is not None:
+            tables = [ALL_TABLES[name] for name in names]
+        else:
+            tables = list((ALL_TABLES if include_app else TABLES).values())
+        for table in tables:
             self.execute(render_create_table(table, self.dialect, self.table(table.name)))
 
     def coerce(self, column_type: str, value: Any) -> Any:

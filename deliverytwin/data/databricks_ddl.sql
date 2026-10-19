@@ -102,7 +102,7 @@ USING DELTA
 COMMENT 'Extension: lesson per clarification category and the option it supports.';
 
 CREATE TABLE IF NOT EXISTS dpm_dev.mlops.commitment_baselines (
-  baseline_id BIGINT NOT NULL,
+  baseline_id STRING NOT NULL,
   request_text STRING,
   answers_json STRING,
   fingerprint_json STRING,

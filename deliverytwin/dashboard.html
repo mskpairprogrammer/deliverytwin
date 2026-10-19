@@ -1536,7 +1536,7 @@
       byId("shape-baseline-status").textContent = "Approved";
       byId("shape-stage-status").textContent = "BASELINE APPROVED";
       byId("intake-approved").textContent =
-        `Baseline #${baseline.id} approved ${baseline.approved_at}: P50 ${hours(baseline.p50_hours)} · P80 ${hours(baseline.p80_hours)} · ` +
+        `Baseline ${String(baseline.id).slice(0, 8)} approved ${baseline.approved_at}: P50 ${hours(baseline.p50_hours)} · P80 ${hours(baseline.p80_hours)} · ` +
         `${baseline.allocated_fte.toFixed(1)}/${baseline.capacity_fte.toFixed(1)} FTE · ${baseline.target_date} · ${percent(baseline.confidence_pct)}% confidence.`;
       byId("intake-approved").hidden = false;
       byId("intake-approve").hidden = true;

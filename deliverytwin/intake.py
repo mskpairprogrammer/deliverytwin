@@ -1217,47 +1217,25 @@ def approve_baseline(
     commitment, rom = result["commitment"], result["rom"]
     if not commitment["feasible"]:
         raise IntakeError("The commitment is not feasible with the current capacity; it cannot be approved.")
-    approved_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
-    with connection:
-        cursor = connection.execute(
-            """
-            INSERT INTO baseline_approvals
-                (request_text, answers_json, fingerprint_json, p50_hours, p80_hours,
-                 integration_buffer_pct, allocated_fte, capacity_fte, target_date,
-                 confidence_pct, approved_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                result["request"], json.dumps(result["answers"]), json.dumps(result["fingerprint"]),
-                commitment["p50_hours"], commitment["p80_hours"], rom["integration_buffer_pct"],
-                commitment["allocated_fte"], commitment["capacity_fte"], commitment["target_date"],
-                commitment["confidence_pct"], approved_at,
-            ),
-        )
-    baseline_id = cursor.lastrowid
-    return {**result, "baseline": _baseline_summary(connection, baseline_id)}
+    from .data import BaselineRepository, SQLiteDatabase
 
-
-def _baseline_summary(connection: sqlite3.Connection, baseline_id: int | None) -> dict[str, Any] | None:
-    row = connection.execute(
-        "SELECT * FROM baseline_approvals WHERE id = ?", (baseline_id,)
-    ).fetchone()
-    if row is None:
-        return None
-    return {
-        "id": row["id"],
-        "status": "approved",
-        "approved_at": row["approved_at"],
-        "p50_hours": row["p50_hours"],
-        "p80_hours": row["p80_hours"],
-        "integration_buffer_pct": row["integration_buffer_pct"],
-        "allocated_fte": row["allocated_fte"],
-        "capacity_fte": row["capacity_fte"],
-        "target_date": row["target_date"],
-        "confidence_pct": row["confidence_pct"],
-    }
+    repository = BaselineRepository(SQLiteDatabase(connection))
+    baseline_id = repository.save({
+        "request_text": result["request"],
+        "answers_json": json.dumps(result["answers"]),
+        "fingerprint_json": json.dumps(result["fingerprint"]),
+        "p50_hours": commitment["p50_hours"],
+        "p80_hours": commitment["p80_hours"],
+        "integration_buffer_pct": rom["integration_buffer_pct"],
+        "allocated_fte": commitment["allocated_fte"],
+        "capacity_fte": commitment["capacity_fte"],
+        "target_date": commitment["target_date"],
+        "confidence_pct": commitment["confidence_pct"],
+    })
+    return {**result, "baseline": repository.get(baseline_id)}
 
 
 def latest_baseline(connection: sqlite3.Connection) -> dict[str, Any] | None:
-    row = connection.execute("SELECT MAX(id) AS id FROM baseline_approvals").fetchone()
-    return _baseline_summary(connection, row["id"]) if row and row["id"] is not None else None
+    from .data import BaselineRepository, SQLiteDatabase
+
+    return BaselineRepository(SQLiteDatabase(connection)).latest()

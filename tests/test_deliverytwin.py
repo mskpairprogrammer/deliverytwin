@@ -792,7 +792,8 @@ class DeliveryTwinTests(unittest.TestCase):
             "ukg_time_entries",
             "historical_lessons",
             "historical_projects",
-            "baseline_approvals",
+            "commitment_baselines",
+            "intake_sessions",
         ):
             with self.subTest(table=table):
                 count = self.connection.execute(f'SELECT COUNT(*) FROM "{table}"').fetchone()[0]

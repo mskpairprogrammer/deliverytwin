@@ -114,7 +114,7 @@ APP_TABLES: dict[str, Table] = {
         Table(
             "commitment_baselines",
             _cols(
-                "baseline_id:int request_text:string answers_json:string fingerprint_json:string "
+                "baseline_id:string request_text:string answers_json:string fingerprint_json:string "
                 "p50_hours:double p80_hours:double integration_buffer_pct:double "
                 "allocated_fte:double capacity_fte:double target_date:date "
                 "confidence_pct:double approved_at:timestamp"

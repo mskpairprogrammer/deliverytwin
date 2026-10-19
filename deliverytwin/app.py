@@ -1171,8 +1171,19 @@ def main(argv: list[str] | None = None) -> int:
     ddl_parser.add_argument("--dialect", choices=("databricks", "duckdb", "sqlite"), default="databricks")
     ddl_parser.add_argument("--catalog", default="dpm_dev")
     ddl_parser.add_argument("--schema", default="mlops")
+    subparsers.add_parser(
+        "databricks-smoke",
+        help="Verify the Databricks adapter in a throwaway schema (needs workspace access)",
+    )
     args = parser.parse_args(argv)
 
+    if args.command == "databricks-smoke":
+        from .data.smoke import run_databricks_smoke
+
+        try:
+            return run_databricks_smoke()
+        except RuntimeError as error:
+            parser.error(str(error))
     if args.command == "generate-data":
         from .data import DATASET_DIR, write_dataset
 

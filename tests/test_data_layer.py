@@ -8,13 +8,15 @@ import tempfile
 import threading
 import time
 import unittest
-from datetime import date, datetime
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import patch
 
 from deliverytwin import connect, initialize_database, seed_demo
 from deliverytwin.app import _is_loopback, serve_dashboard
 from deliverytwin.data import (
+    BaselineRepository,
+    IntakeSessionRepository,
     DATASET_DIR,
     ALL_TABLES,
     APP_TABLES,
@@ -170,7 +172,7 @@ class DataLayerContractTests(unittest.TestCase):
 class AppTableTests(unittest.TestCase):
     ROW = {
         "commitment_baselines": {
-            "baseline_id": 1, "request_text": "r", "answers_json": "{}", "fingerprint_json": "{}",
+            "baseline_id": "b-1", "request_text": "r", "answers_json": "{}", "fingerprint_json": "{}",
             "p50_hours": 4650, "p80_hours": 5750, "integration_buffer_pct": 19,
             "allocated_fte": 7.0, "capacity_fte": 8.5, "target_date": "2027-03-31",
             "confidence_pct": 62.2, "approved_at": "2026-10-19T02:29:25+00:00",
@@ -218,6 +220,109 @@ class AppTableTests(unittest.TestCase):
         _, params = connection.log[-1]
         self.assertIsInstance(params[1], datetime)
         self.assertIsNone(params[3])
+
+
+BASELINE = {
+    "request_text": "r", "answers_json": "{}", "fingerprint_json": "{}", "p50_hours": 4650,
+    "p80_hours": 5750, "integration_buffer_pct": 19, "allocated_fte": 7.0, "capacity_fte": 8.5,
+    "target_date": "2027-03-31", "confidence_pct": 62.2,
+}
+
+
+class AppRepositoryTests(unittest.TestCase):
+    def test_baselines_get_unique_ids_and_the_latest_wins_on_every_backend(self) -> None:
+        for backend, database in _backends():
+            with self.subTest(backend=backend):
+                repository = BaselineRepository(database)
+                self.assertIsNone(repository.latest())
+                first = repository.save(BASELINE)
+                second = repository.save({**BASELINE, "p50_hours": 5000, "target_date": "2027-06-30"})
+                self.assertNotEqual(first, second)
+                latest = repository.latest()
+                self.assertEqual((latest["id"], latest["p50_hours"], latest["target_date"]),
+                                 (second, 5000, "2027-06-30"))
+                self.assertEqual(repository.get(first)["p50_hours"], 4650)
+                self.assertEqual(latest["status"], "approved")
+                self.assertIsNone(repository.get("missing"))
+
+    def test_intake_sessions_keep_the_first_timestamps_on_every_backend(self) -> None:
+        start = datetime(2026, 10, 17, 12, tzinfo=timezone.utc)
+        for backend, database in _backends():
+            with self.subTest(backend=backend):
+                repository = IntakeSessionRepository(database)
+                repository.record("s-1", "started", start)
+                repository.record("s-1", "rom_ready", start + timedelta(minutes=2))
+                repository.record("s-1", "rom_ready", start + timedelta(minutes=5))
+                repository.record("s-1", "approved", start + timedelta(minutes=10))
+                repository.record("s-1", "approved", start + timedelta(minutes=30))
+                repository.record("s-2", "started", start)
+                sessions = {row["session_id"]: row for row in repository.sessions()}
+                self.assertEqual(sessions["s-1"]["started_at"], start)
+                self.assertEqual(sessions["s-1"]["first_rom_at"], start + timedelta(minutes=2))
+                self.assertEqual(sessions["s-1"]["approved_at"], start + timedelta(minutes=10))
+                self.assertIsNone(sessions["s-2"]["first_rom_at"])
+                with self.assertRaises(ValueError):
+                    repository.record("s-1", "bogus", start)
+
+    def test_repositories_only_create_their_own_table(self) -> None:
+        database = DuckDBDatabase()
+        BaselineRepository(database)
+        names = {row["table_name"] for row in database.query("SELECT table_name FROM information_schema.tables")}
+        self.assertEqual(names, {"commitment_baselines"})
+
+    def test_databricks_returns_datetimes_and_dates_normalised(self) -> None:
+        columns = [(name,) for name in (
+            "baseline_id", "request_text", "answers_json", "fingerprint_json", "p50_hours",
+            "p80_hours", "integration_buffer_pct", "allocated_fte", "capacity_fte",
+            "target_date", "confidence_pct", "approved_at")]
+
+        class Cursor(FakeCursor):
+            def execute(self, sql, params=None):
+                super().execute(sql, params)
+                self.description = columns if sql.startswith("SELECT") else None
+
+            def fetchall(self):
+                return [("b", "r", "{}", "{}", 1, 2, 3, 4, 5, date(2027, 3, 31),
+                         6, datetime(2026, 10, 19, 2, 29, 25))]
+
+        class Connection(FakeConnection):
+            def cursor(self):
+                return Cursor(self.log)
+
+        database = DatabricksDatabase(DatabricksSettings("h", "/p"), Connection())
+        latest = BaselineRepository(database).latest()
+        self.assertEqual((latest["target_date"], latest["approved_at"]), ("2027-03-31", "2026-10-19T02:29:25"))
+        self.assertIn("ORDER BY approved_at DESC", database.connection.log[-1][0])
+        self.assertTrue(database.connection.log[-1][0].startswith("SELECT"))
+
+
+class SmokeTests(unittest.TestCase):
+    def test_smoke_checks_pass_on_every_local_backend(self) -> None:
+        from deliverytwin.data.smoke import format_report, run_checks
+
+        for backend, database in _backends():
+            with self.subTest(backend=backend):
+                results = run_checks(database)
+                self.assertEqual([name for name, ok, _ in results if not ok], [], format_report(results))
+                self.assertEqual(len(results), 8)
+
+    def test_smoke_reports_failures_instead_of_raising(self) -> None:
+        from deliverytwin.data.smoke import format_report, run_checks
+
+        class Broken(DuckDBDatabase):
+            def execute(self, sql, params=()):
+                raise RuntimeError("permission denied")
+
+        results = run_checks(Broken())
+        self.assertTrue(any(not ok and "permission denied" in detail for _, ok, detail in results))
+        self.assertIn("checks passed", format_report(results))
+
+    def test_databricks_smoke_requires_workspace_settings(self) -> None:
+        with patch.dict(os.environ, {}, clear=True):
+            from deliverytwin.app import main
+
+            with self.assertRaises(SystemExit):
+                main(["databricks-smoke"])
 
 
 class DatabricksAdapterTests(unittest.TestCase):

@@ -36,18 +36,12 @@ def seed_synthetic_intake_activity(connection: sqlite3.Connection) -> None:
                 approved.isoformat(timespec="seconds") if approved else None,
             )
         )
-    with connection:
-        connection.executemany(
-            """
-            INSERT INTO intake_sessions (session_id, started_at, first_rom_at, approved_at)
-            VALUES (?, ?, ?, ?)
-            ON CONFLICT(session_id) DO UPDATE SET
-                started_at = excluded.started_at,
-                first_rom_at = excluded.first_rom_at,
-                approved_at = excluded.approved_at
-            """,
-            rows,
-        )
+    from .data import IntakeSessionRepository, SQLiteDatabase
+
+    IntakeSessionRepository(SQLiteDatabase(connection)).replace_all([
+        {"session_id": sid, "started_at": started, "first_rom_at": first_rom, "approved_at": approved}
+        for sid, started, first_rom, approved in rows
+    ])
 
 
 def record_intake_activity(
@@ -68,36 +62,11 @@ def record_intake_activity(
     if event not in {"started", "rom_ready", "approved"}:
         raise ValueError(f"Unsupported intake activity event: {event}.")
 
-    stamp = (occurred_at or datetime.now(timezone.utc)).astimezone(timezone.utc).isoformat(
-        timespec="seconds"
+    from .data import IntakeSessionRepository, SQLiteDatabase
+
+    IntakeSessionRepository(SQLiteDatabase(connection)).record(
+        normalized_id, event, occurred_at or datetime.now(timezone.utc)
     )
-    with connection:
-        connection.execute(
-            """
-            INSERT INTO intake_sessions (session_id, started_at)
-            VALUES (?, ?)
-            ON CONFLICT(session_id) DO NOTHING
-            """,
-            (normalized_id, stamp),
-        )
-        if event == "rom_ready":
-            connection.execute(
-                """
-                UPDATE intake_sessions SET first_rom_at = COALESCE(first_rom_at, ?)
-                WHERE session_id = ?
-                """,
-                (stamp, normalized_id),
-            )
-        elif event == "approved":
-            connection.execute(
-                """
-                UPDATE intake_sessions
-                SET first_rom_at = COALESCE(first_rom_at, ?),
-                    approved_at = COALESCE(approved_at, ?)
-                WHERE session_id = ?
-                """,
-                (stamp, stamp, normalized_id),
-            )
 
 
 def _tokens(value: str) -> set[str]:
@@ -179,26 +148,16 @@ def build_impact_report(
 ) -> dict[str, Any]:
     """Build portfolio estimator metrics from completed history and instrumented UI sessions."""
     current_time = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
-    sessions = connection.execute(
-        """
-        SELECT started_at, first_rom_at
-        FROM intake_sessions
-        WHERE first_rom_at IS NOT NULL
-        """
-    ).fetchall()
+    from .data import IntakeSessionRepository, SQLiteDatabase
+
+    sessions = IntakeSessionRepository(SQLiteDatabase(connection)).sessions()
     elapsed_seconds = [
-        max(
-            0.0,
-            (datetime.fromisoformat(row["first_rom_at"]) - datetime.fromisoformat(row["started_at"]))
-            .total_seconds(),
-        )
+        max(0.0, (row["first_rom_at"] - row["started_at"]).total_seconds())
         for row in sessions
+        if row["first_rom_at"] is not None
     ]
     cutoff = current_time - timedelta(days=7)
-    recent_starts = sum(
-        datetime.fromisoformat(row["started_at"]) >= cutoff
-        for row in connection.execute("SELECT started_at FROM intake_sessions")
-    )
+    recent_starts = sum(row["started_at"] >= cutoff for row in sessions)
     return {
         "as_of": current_time.isoformat(timespec="seconds"),
         "intake_metrics": {
