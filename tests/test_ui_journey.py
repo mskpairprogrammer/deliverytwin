@@ -43,6 +43,8 @@ class JourneyUiTests(unittest.TestCase):
         cls.patches = [
             patch("deliverytwin.intake.openai_configured", side_effect=lambda: cls.llm_enabled),
             patch("deliverytwin.intake.complete", side_effect=lambda *a, **k: cls.llm(*a, **k)),
+            patch("deliverytwin.recovery.openai_configured", side_effect=lambda: cls.llm_enabled),
+            patch("deliverytwin.recovery.complete", side_effect=lambda *a, **k: cls.llm(*a, **k)),
         ]
         for active in cls.patches:
             active.start()
@@ -213,7 +215,9 @@ class JourneyUiTests(unittest.TestCase):
 
         page.get_by_role("button", name="Review recovery options →").click()
         self.assertEqual(page.locator("#tab-intervene").get_attribute("aria-selected"), "true")
-        self.assertRegex(self.states()["intervene"], r"^Option [ABC] recommended$")
+        page.wait_for_function("document.querySelectorAll('#act-options .rec-card').length === 3")
+        self.assertIn("RULES-BASED OPTIONS", page.locator("#act-source").inner_text())
+        self.assertRegex(self.states()["intervene"], r"^.+ recommended$")
 
         page.reload()
         page.wait_for_function("document.getElementById('state-commit').textContent === 'Baseline approved'")
@@ -347,6 +351,78 @@ class JourneyUiTests(unittest.TestCase):
         page.locator('[data-edit="1"]').click()
         self.assertTrue(page.locator("#intake-step-1").is_visible())
         self.assertEqual(page.locator("#intake-doc-list li").count(), 2)
+
+    def test_ai_drives_the_intervention_analysis_and_what_if_predictions(self) -> None:
+        type(self).llm_enabled = True
+        page = self.page
+        self.run_shape_to_commit()
+        page.get_by_role("button", name="Approve baseline").click()
+        page.locator("#intake-approved").wait_for(state="visible")
+        page.get_by_role("button", name="Continue to TRACK →").click()
+        page.get_by_role("button", name="Simulate next sprint").click()
+        page.locator("#track-next").wait_for(state="visible")
+        llm = type(self).llm
+        calls = lambda name: llm.calls.count(name)
+
+        page.get_by_role("button", name="Review recovery options →").click()
+        page.wait_for_function("document.querySelectorAll('#act-options .rec-card').length === 3")
+        self.assertIn("AI RECOVERY ANALYSIS", page.locator("#act-source").inner_text())
+        self.assertIn("production support", page.locator("#act-diagnosis").inner_text())
+        self.assertIn("RECOMMENDED: PHASE SCOPE", page.locator("#act-recommendation").inner_text())
+        recommended = page.locator("#act-options .rec-card.recommended")
+        self.assertEqual(recommended.count(), 1)
+        self.assertIn("78%", recommended.inner_text())
+        self.assertEqual(self.states()["intervene"], "Phase Scope recommended")
+        self.assertEqual(calls("recovery_analysis"), 1)
+
+        # Previewing an AI scenario reuses its prediction instead of asking again.
+        page.locator("#act-options .rec-card").first.get_by_role("button", name="Preview this scenario").click()
+        page.locator("#act-what-if-results").get_by_text("Predicted on-time").wait_for()
+        self.assertIn("71%", page.locator("#act-what-if-results .rom-hero").inner_text())
+        self.assertIn("AI PREDICTION", page.locator("#act-what-if-results").inner_text())
+        self.assertIn("Escalate the identity-matching CAB blocker", page.locator("#act-sync-servicenow").inner_text())
+        self.assertEqual(calls("recovery_prediction"), 0)
+
+        # Editing a lever invalidates the preview; Predict with AI asks the model.
+        page.locator("#act-fte").fill("7.5")
+        self.assertIn("Inputs changed", page.locator("#act-scenario-status").inner_text())
+        self.assertTrue(page.locator("#act-apply").is_disabled())
+        page.get_by_role("button", name="Predict with AI").click()
+        page.locator("#act-what-if-results").get_by_text("Predicted on-time").wait_for()
+        self.assertIn("66%", page.locator("#act-what-if-results .rom-hero").inner_text())
+        self.assertIn("Extra capacity helps", page.locator("#act-what-if-results").inner_text())
+        self.assertIn("Capacity-model cross-check", page.locator("#act-what-if-results").inner_text())
+        self.assertEqual(calls("recovery_prediction"), 1)
+
+        page.get_by_role("button", name="Apply simulated updates").click()
+        page.wait_for_function("document.getElementById('act-scenario-status').textContent.includes('saved')")
+        self.assertEqual(calls("recovery_prediction"), 1)
+        page.reload()
+        page.locator("#act-what-if-results").wait_for(state="attached")
+        self.assertIn("saved", page.locator("#act-scenario-status").inner_text())
+
+    def test_a_failing_ai_in_intervene_falls_back_and_can_retry(self) -> None:
+        type(self).llm_enabled = True
+        type(self).llm = ScriptedLLM(fail=("recovery",))
+        page = self.page
+        self.run_shape_to_commit()
+        page.get_by_role("button", name="Approve baseline").click()
+        page.locator("#intake-approved").wait_for(state="visible")
+        page.get_by_role("button", name="Continue to TRACK →").click()
+        page.get_by_role("button", name="Simulate next sprint").click()
+        page.locator("#track-next").wait_for(state="visible")
+        page.get_by_role("button", name="Review recovery options →").click()
+        page.wait_for_function("document.querySelectorAll('#act-options .rec-card').length === 3")
+        source = page.locator("#act-source").inner_text()
+        self.assertIn("RULES-BASED OPTIONS", source)
+        self.assertIn("HTTP 503", source)
+        page.get_by_role("button", name="Predict with AI").click()
+        page.locator("#act-what-if-results").get_by_text("Projected slip", exact=True).wait_for()
+        self.assertIn("CAPACITY-MODEL ESTIMATE", page.locator("#act-what-if-results").inner_text())
+        type(self).llm = ScriptedLLM()
+        page.locator("#act-source button").click()
+        page.wait_for_function("document.getElementById('act-source').textContent.includes('AI RECOVERY ANALYSIS')")
+        self.assertEqual(page.locator("#act-options .rec-card").count(), 3)
 
     def test_demo_data_can_be_cleared_from_the_footer(self) -> None:
         page = self.page

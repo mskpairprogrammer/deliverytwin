@@ -43,7 +43,8 @@ def llm_questions():
 class ScriptedLLM:
     """Stands in for the OpenAI client; each call type can succeed or fail independently."""
 
-    def __init__(self, questions=None, forecast="valid", fail=()):
+    def __init__(self, questions=None, forecast="valid", fail=(), recovery="valid"):
+        self.recovery = recovery
         self.fail = set(fail)
         self.prompts = []
         self.questions = questions if questions is not None else llm_questions()
@@ -72,5 +73,53 @@ class ScriptedLLM:
                 "key_risks": ["Identity matching rules are shared"], "recommendations": ["Phase scope"],
                 "historical_projects_used": [first],
             })
+        if "recovery advisor" in system:
+            return self._recovery(system, payload)
         self.calls.append("rerank")
         raise LLMError("rerank not scripted")
+
+    def _recovery(self, system, payload):
+        analysis = "propose 3 distinct recovery scenarios" in system
+        self.calls.append("recovery_analysis" if analysis else "recovery_prediction")
+        if "recovery" in self.fail:
+            raise LLMError("OpenAI request failed with HTTP 503.")
+        actions = {
+            "milestone": "Rebaseline the milestone with the AI-predicted slip.",
+            "azure_devops": "Defer the lowest-value unplanned stories.",
+            "servicenow": "Escalate the identity-matching CAB blocker to its sponsor.",
+            "workforce": "Move one engineer onto production support.",
+        }
+        if not analysis:
+            if self.recovery == "invalid":
+                return json.dumps({"predicted_on_time_pct": 400})
+            return json.dumps({
+                "predicted_on_time_pct": 66, "predicted_slip_days": 11,
+                "commentary": "Extra capacity helps but the CAB blocker still gates the work.",
+                "trade_offs": ["Higher burn rate"], "risks": ["Onboarding delay"], "actions": actions,
+            })
+        context = payload
+        alloc, cap = context["signals"]["allocated_fte"], context["signals"]["capacity_fte"]
+        target = context["initiative"]["current_target_date"]
+        year, month, day = (int(part) for part in target.split("-"))
+        later = f"{year + 1}-{month:02d}-{min(day, 28):02d}"
+
+        def scenario(identifier, fte, date, scope, cost, pct, slip):
+            return {
+                "id": identifier, "title": identifier.replace("_", " ").title(),
+                "summary": f"Scenario {identifier}.", "allocated_fte": fte, "target_date": date,
+                "scope_defer_pct": scope, "incremental_cost_k": cost, "predicted_on_time_pct": pct,
+                "predicted_slip_days": slip, "commentary": f"Because of {identifier}.",
+                "trade_offs": ["Trade-off"], "risks": ["Risk"], "actions": actions,
+            }
+
+        scenarios = [
+            scenario("add_contractors", min(cap, alloc + 1.5), target, 0, 118, 71, 9),
+            scenario("phase_scope", alloc, target, 40, 0, 78, 5),
+            scenario("extend_date", alloc, later, 0, 0, 83, 0),
+        ]
+        if self.recovery == "invalid":
+            scenarios[0]["allocated_fte"] = cap + 10
+        return json.dumps({
+            "diagnosis": "Capacity is draining into production support while scope grows.",
+            "recommended": "phase_scope", "scenarios": scenarios,
+        })

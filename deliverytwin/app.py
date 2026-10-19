@@ -29,7 +29,7 @@ INTAKE_POST_ROUTES = (
     "/api/intake/analyze", "/api/intake/evaluate", "/api/intake/approve", "/api/intake/what-if",
     "/api/intake/forecast", "/api/intake/estimate",
 )
-ACT_POST_ROUTES = ("/api/act/what-if", "/api/act/apply")
+ACT_POST_ROUTES = ("/api/act/analyze", "/api/act/what-if", "/api/act/apply")
 MAX_CHAT_QUESTION_LENGTH = 1_200
 logger = logging.getLogger(__name__)
 
@@ -1056,16 +1056,28 @@ def serve_dashboard(database: str | Path, host: str, port: int) -> None:
                 self.send_json(200, result)
                 return
             if route in ACT_POST_ROUTES:
-                from .recovery import preview_recovery_scenario
+                from .recovery import analyze_intervention, predict_scenario
 
                 try:
                     with connect(database) as connection:
                         if simulation_state(connection) is None:
                             raise ValueError("Simulate a sprint before creating an ACT recovery scenario.")
                         report = build_workflow_report(connection)
-                        result = preview_recovery_scenario(report, payload)
-                        if route == "/api/act/apply":
-                            result = save_recovery_scenario(connection, result)
+                        late = [
+                            dict(row) for row in connection.execute(
+                                "SELECT project_name, planned_effort_hours, actual_effort_hours, "
+                                "planned_duration_weeks, actual_duration_weeks, outcome, lessons_learned "
+                                "FROM historical_projects WHERE actual_duration_weeks > planned_duration_weeks "
+                                "ORDER BY (actual_duration_weeks - planned_duration_weeks) * 1.0 / planned_duration_weeks DESC "
+                                "LIMIT 6"
+                            )
+                        ]
+                        if route == "/api/act/analyze":
+                            result = analyze_intervention(report, late)
+                        else:
+                            result = predict_scenario(report, payload, late)
+                            if route == "/api/act/apply":
+                                result = save_recovery_scenario(connection, result)
                 except ValueError as error:
                     self.send_json(400, {"error": str(error)})
                     return

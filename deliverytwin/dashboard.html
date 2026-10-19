@@ -188,6 +188,17 @@
     }
     .intake { margin-bottom: 16px; padding-bottom: 18px; }
     .intake-body { padding: 14px 19px 0; display: grid; gap: 14px; }
+    .rec-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; margin: 10px 0; }
+    .rec-card { border: 1px solid var(--line); border-radius: 10px; background: white; padding: 12px 14px; display: grid; gap: 8px; align-content: start; font-size: 11px; line-height: 1.5; }
+    .rec-card.recommended { border-color: var(--teal); box-shadow: inset 0 0 0 1px var(--teal); }
+    .rec-card h4 { margin: 0; font-size: 13px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .rec-pill { font-size: 9px; font-weight: 800; letter-spacing: .06em; color: var(--teal); background: var(--teal-soft); border-radius: 999px; padding: 3px 8px; }
+    .rec-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+    .rec-metrics div { background: #f7f9fb; border-radius: 7px; padding: 6px 8px; }
+    .rec-metrics strong { display: block; font-size: 13px; }
+    .rec-metrics span { color: var(--muted); font-size: 9px; }
+    .rec-card ul { margin: 0; padding-left: 16px; }
+    .rec-card small { color: var(--muted); }
     .prediction-source { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 6px 0 10px; font-size: 11px; color: var(--muted); }
     .source-pill { border-radius: 999px; padding: 4px 10px; font-weight: 800; font-size: 10px; letter-spacing: .04em; }
     .source-pill.llm { background: var(--teal-soft); color: var(--teal); }
@@ -563,31 +574,16 @@
       <div class="awaiting" role="status">No intervention options yet. Use <strong>Simulate next sprint</strong> on the TRACK tab.</div>
       <div class="grid">
         <section class="card full">
-          <div class="card-head"><div><h3 class="card-title">Intervention scenario comparison</h3><div class="card-kicker" id="act-kicker">Options recalculated from the latest simulated sprint signals.</div></div><span class="badge" id="act-recommendation">DECISION REQUIRED</span></div>
-          <div class="option-list">
-            <div class="option" id="act-option-a">
-              <div class="option-name"><strong id="act-title-a">OPTION A · Contractors</strong><span id="act-description-a">Adds temporary capacity after onboarding.</span></div>
-              <div class="option-metric"><span>Incremental cost</span><strong id="act-cost-a">+$118K</strong></div>
-              <div class="option-metric"><span>Confidence</span><strong id="act-confidence-a">—</strong></div>
-              <div class="option-metric"><span>Trade-off</span><strong id="act-tradeoff-a">One-sprint onboarding</strong></div>
-            </div>
-            <div class="option" id="act-option-b">
-              <div class="option-name"><strong id="act-title-b">OPTION B · Squad reallocation</strong><span id="act-description-b">Moves capacity from Product Analytics.</span></div>
-              <div class="option-metric"><span>Incremental cost</span><strong id="act-cost-b">$0</strong></div>
-              <div class="option-metric"><span>Confidence</span><strong id="act-confidence-b">—</strong></div>
-              <div class="option-metric"><span>Trade-off</span><strong id="act-tradeoff-b">Analytics +4 weeks</strong></div>
-            </div>
-            <div class="option" id="act-option-c">
-              <div class="option-name"><strong id="act-title-c">OPTION C · Phase + unblock</strong><span id="act-description-c">Defer historical profile enrichment and protect critical capacity.</span></div>
-              <div class="option-metric"><span>Incremental cost</span><strong id="act-cost-c">$0</strong></div>
-              <div class="option-metric"><span>Confidence</span><strong id="act-confidence-c">—</strong></div>
-              <div class="option-metric"><span>Trade-off</span><strong id="act-tradeoff-c">Historical profile enrichment deferred</strong></div>
-            </div>
-          </div>
+          <div class="card-head"><div><h3 class="card-title">AI recovery analysis</h3><div class="card-kicker" id="act-kicker">Diagnosis and recovery scenarios written from the latest sprint signals and lessons from late projects.</div></div><span class="badge" id="act-recommendation">ANALYZING</span></div>
+          <div id="act-working" class="intake-working" role="status" aria-live="polite" hidden></div>
+          <div class="prediction-source" id="act-source"></div>
+          <p class="prediction-headline" id="act-diagnosis"></p>
+          <div class="rec-grid" id="act-options"></div>
+          <div class="intake-actions"><button id="act-reanalyze" class="intake-btn" type="button">Re-run AI analysis</button></div>
           <p class="approval-note" id="act-note">The recommendation is advisory. No option is approved and no source-system write-back occurs.</p>
         </section>
         <section class="card full act-what-if">
-          <div class="card-head"><div><h3 class="card-title">Intervention what-if</h3><div class="card-kicker">Adjust the recommended path, preview impacts, then persist simulated target updates.</div></div><span class="badge">LOCAL SIMULATION</span></div>
+          <div class="card-head"><div><h3 class="card-title">Intervention what-if</h3><div class="card-kicker">Adjust any lever and ask the AI to predict the outcome, then persist simulated target updates.</div></div><span class="badge">AI PREDICTION · LOCAL SIMULATION</span></div>
           <div class="tune-grid">
             <label for="act-fte"><span>Team allocation (FTE)</span><input id="act-fte" type="number" min="0.5" step="0.5"></label>
             <label for="act-target-date"><span>Target date</span><input id="act-target-date" type="date"></label>
@@ -595,14 +591,14 @@
             <label for="act-scope-defer"><span>Scope to defer <output id="act-scope-defer-value" for="act-scope-defer">0%</output></span><input id="act-scope-defer" type="range" min="0" max="100" step="5" value="0"></label>
           </div>
           <div class="intake-actions">
-            <button id="act-preview" class="intake-btn" type="button">Preview what-if</button>
+            <button id="act-preview" class="intake-btn" type="button">Predict with AI</button>
             <button id="act-apply" class="intake-btn primary" type="button" disabled>Apply simulated updates</button>
           </div>
           <div id="act-scenario-status" class="act-scenario-status" role="status" aria-live="polite"></div>
           <div id="act-what-if-results" class="act-what-if-results" hidden></div>
         </section>
         <section class="card full">
-          <div class="card-head"><div><h3 class="card-title">If approved · proposed synchronization</h3><div class="card-kicker">The production design routes an approved action to the owning systems</div></div><span class="badge">SIMULATED · NO REAL WRITE-BACK</span></div>
+          <div class="card-head"><div><h3 class="card-title">If approved · proposed synchronization</h3><div class="card-kicker" id="act-sync-kicker">The production design routes an approved action to the owning systems</div></div><span class="badge">SIMULATED · NO REAL WRITE-BACK</span></div>
           <div class="detail-list">
             <div class="detail-row"><span>Milestone</span><strong id="act-sync-milestone">Awaiting simulation</strong></div>
             <div class="detail-row"><span>Azure DevOps</span><strong id="act-sync-ado">Awaiting simulation</strong></div>
@@ -633,6 +629,8 @@
   <script>
     const byId = (id) => document.getElementById(id);
     const stageTabs = [...document.querySelectorAll('[role="tab"]')];
+    let currentReport = null;
+    let serverBaseline = null;
     function selectStage(tab, moveFocus = false) {
       stageTabs.forEach((item) => {
         const selected = item === tab;
@@ -644,6 +642,7 @@
         history.replaceState(null, "", `#${tab.dataset.stage}`);
       }
       if (moveFocus) tab.focus();
+      if (tab.dataset.stage === "intervene" && typeof loadActAnalysis === "function") loadActAnalysis();
     }
     function goToStage(stage) {
       const tab = byId(`tab-${stage}`);
@@ -666,21 +665,63 @@
     const initialStage = stageTabs.find((tab) => tab.dataset.stage === location.hash.slice(1));
     if (initialStage) selectStage(initialStage);
 
+    let actAnalysis = null;
+    let actLoading = false;
+    let actLastPrediction = null;
+    const ACT_STORE = "deliverytwin.act.v1";
+    function setActSync(actions, kicker) {
+      byId("act-sync-milestone").textContent = actions.milestone;
+      byId("act-sync-ado").textContent = actions.azure_devops;
+      byId("act-sync-servicenow").textContent = actions.servicenow;
+      byId("act-sync-workforce").textContent = actions.workforce;
+      if (kicker) byId("act-sync-kicker").textContent = kicker;
+    }
     function renderActScenario(scenario, persisted = false) {
       const root = byId("act-what-if-results");
       const updates = scenario.target_updates || [];
+      const prediction = scenario.prediction || null;
+      actLastPrediction = persisted ? null : prediction;
       const adoUpdate = updates.find((update) => update.source_key === "azure_devops")?.payload || {};
       const deferredPoints = adoUpdate.deferred_scope_points ?? scenario.deferred_scope_points ?? 0;
       const remainingPoints = adoUpdate.remaining_unplanned_scope_points ?? scenario.remaining_unplanned_scope_points ?? 0;
       const rootElement = el("div");
       const hero = el("div", "rom-hero");
       hero.replaceChildren(
-        metric(`${scenario.confidence_pct}%`, "Adjusted on-time confidence"),
+        metric(`${scenario.confidence_pct}%`, prediction ? "Predicted on-time" : "Adjusted on-time confidence"),
+        metric(scenario.projected_slip_days !== undefined ? `${scenario.projected_slip_days} days` : "—", "Projected slip"),
         metric(`${scenario.allocated_fte.toFixed(1)} FTE`, "Team allocation"),
         metric(`${deferredPoints} pts`, "Scope deferred"),
         metric(scenario.target_date, "Target date"),
         metric(`$${scenario.incremental_cost_k.toLocaleString()}K`, "Incremental budget"),
       );
+      if (prediction) {
+        const generated = prediction.source === "llm";
+        const header = el("div", "prediction-source");
+        header.append(
+          el("span", `source-pill ${generated ? "llm" : "fallback"}`, generated ? `AI PREDICTION · ${prediction.model || "model"}` : "CAPACITY-MODEL ESTIMATE · AI UNAVAILABLE"),
+          el("span", "", generated
+            ? `Capacity-model cross-check: ${scenario.model_check_pct}%`
+            : aiUnavailableText(prediction.fallback_reason, "the capacity-versus-load estimate")),
+        );
+        rootElement.append(header);
+      }
+      rootElement.append(hero);
+      if (prediction) {
+        rootElement.append(el("p", "prediction-headline", prediction.commentary));
+        const columns = el("div", "prediction-columns");
+        [["Trade-offs", prediction.trade_offs], ["Risks", prediction.risks]].forEach(([title, items]) => {
+          const section = el("section");
+          section.append(el("h5", "", title));
+          const ul = el("ul");
+          (items.length ? items : ["None flagged."]).forEach((text) => ul.append(el("li", "", text)));
+          section.append(ul);
+          columns.append(section);
+        });
+        rootElement.append(columns);
+        if (!persisted) setActSync(prediction.actions, `Proposed by the ${prediction.source === "llm" ? "AI prediction" : "capacity model"} for this scenario; nothing is written back.`);
+      } else {
+        rootElement.append(el("p", "rom-explain", scenario.confidence_method || "Illustrative forecast adjustment; cost is a budget assumption and is not included in confidence."));
+      }
       const list = el("div", "detail-list act-target-updates");
       updates.forEach((update) => {
         const row = el("div", "detail-row");
@@ -691,8 +732,6 @@
         list.append(row);
       });
       rootElement.append(
-        hero,
-        el("p", "rom-explain", scenario.confidence_method || "Illustrative forecast adjustment; cost is a budget assumption and is not included in confidence."),
         el("h4", "step-title", "Simulated target-system updates"),
         el("p", "step-help",
           `${adoUpdate.unplanned_scope_points ?? 0} unplanned points considered; ${deferredPoints} deferred and ${remainingPoints} remain active.`),
@@ -705,11 +744,99 @@
         ? `Scenario #${scenario.id} saved ${scenario.saved_at}. Simulated update records are stored locally; real external systems are unchanged.`
         : "Preview only — no records have changed. Apply to persist these simulated updates in SQLite.";
     }
+    function actRecommended() {
+      return actAnalysis ? actAnalysis.scenarios.find((item) => item.id === actAnalysis.recommended) : null;
+    }
+    function renderActAnalysis() {
+      const analysis = actAnalysis;
+      if (!analysis) return;
+      const generated = analysis.source === "llm";
+      const source = byId("act-source");
+      source.replaceChildren(
+        el("span", `source-pill ${generated ? "llm" : "fallback"}`, generated ? `AI RECOVERY ANALYSIS · ${analysis.model}` : "RULES-BASED OPTIONS · AI UNAVAILABLE"),
+        el("span", "", generated
+          ? "Scenarios are validated against capacity, date, scope, and budget limits before they are shown."
+          : aiUnavailableText(analysis.fallback_reason, "rules-based options")),
+      );
+      if (!generated && analysis.fallback_reason && analysis.fallback_reason.code !== "not_configured") {
+        const retry = el("button", "link-btn-inline", "Try again with AI");
+        retry.type = "button";
+        retry.addEventListener("click", () => loadActAnalysis(true));
+        source.append(retry);
+      }
+      byId("act-diagnosis").textContent = analysis.diagnosis;
+      const recommended = actRecommended();
+      byId("act-recommendation").textContent = recommended ? `RECOMMENDED: ${recommended.title.toUpperCase()}` : "DECISION REQUIRED";
+      byId("act-note").textContent = `${recommended ? `${recommended.title} is recommended. ` : ""}No scenario is approved; source-system write-back remains disabled.`;
+      byId("act-options").replaceChildren(...analysis.scenarios.map((scenario) => {
+        const card = el("div", `rec-card${scenario.id === analysis.recommended ? " recommended" : ""}`);
+        const title = el("h4", "", scenario.title);
+        if (scenario.id === analysis.recommended) title.append(el("span", "rec-pill", "RECOMMENDED"));
+        const metrics = el("div", "rec-metrics");
+        [
+          [`${scenario.predicted_on_time_pct}%`, "On-time"], [`${scenario.predicted_slip_days} d`, "Slip"],
+          [`${scenario.allocated_fte.toFixed(1)}`, "FTE"], [scenario.target_date, "Target"],
+          [`${scenario.scope_defer_pct}%`, "Scope deferred"], [`$${scenario.incremental_cost_k}K`, "Budget"],
+        ].forEach(([value, label]) => { const cell = el("div"); cell.append(el("strong", "", value), el("span", "", label)); metrics.append(cell); });
+        const list = (items) => { const ul = el("ul"); items.forEach((text) => ul.append(el("li", "", text))); return ul; };
+        const button = el("button", "intake-btn", "Preview this scenario");
+        button.type = "button";
+        button.addEventListener("click", () => selectActScenario(scenario, button));
+        card.append(title, el("div", "", scenario.summary), metrics, el("small", "", scenario.commentary));
+        if (scenario.trade_offs.length) card.append(el("strong", "", "Trade-offs"), list(scenario.trade_offs));
+        if (scenario.risks.length) card.append(el("strong", "", "Risks"), list(scenario.risks));
+        card.append(el("small", "", `Capacity-model check: ${scenario.model_check_pct}%`), button);
+        return card;
+      }));
+      updateJourney();
+    }
+    async function loadActAnalysis(force = false) {
+      if (!currentReport || !currentReport.simulated || actLoading) return;
+      const key = `${currentReport.as_of}|${currentReport.workflow.stages.track.sprint_number}`;
+      if (!force && actAnalysis && actAnalysis.key === key) return;
+      if (!force) {
+        try {
+          const saved = JSON.parse(sessionStorage.getItem(ACT_STORE) || "null");
+          if (saved && saved.key === key && saved.source === "llm") { actAnalysis = saved; renderActAnalysis(); return; }
+        } catch (error) { /* fall through to a fresh analysis */ }
+      }
+      actLoading = true;
+      const working = byId("act-working");
+      working.textContent = "Analyzing the latest signals and lessons from late projects…";
+      working.hidden = false;
+      byId("act-reanalyze").disabled = true;
+      try {
+        const data = await intakePost("/api/act/analyze", {});
+        actAnalysis = { ...data, key };
+        sessionStorage.setItem(ACT_STORE, JSON.stringify(actAnalysis));
+        renderActAnalysis();
+      } catch (error) {
+        byId("act-source").textContent = `AI analysis failed: ${error.message}`;
+      } finally {
+        actLoading = false;
+        working.hidden = true;
+        byId("act-reanalyze").disabled = false;
+      }
+    }
+    function selectActScenario(scenario, button) {
+      byId("act-fte").value = scenario.allocated_fte;
+      byId("act-target-date").value = scenario.target_date;
+      byId("act-cost").value = scenario.incremental_cost_k;
+      byId("act-scope-defer").value = scenario.scope_defer_pct;
+      byId("act-scope-defer-value").textContent = `${scenario.scope_defer_pct}%`;
+      const prediction = {
+        predicted_on_time_pct: scenario.predicted_on_time_pct, predicted_slip_days: scenario.predicted_slip_days,
+        commentary: scenario.commentary, trade_offs: scenario.trade_offs, risks: scenario.risks,
+        actions: scenario.actions, source: actAnalysis.source, model: actAnalysis.model,
+      };
+      submitActScenario("/api/act/what-if", button, prediction);
+      byId("act-what-if-results").scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
 
-    async function submitActScenario(path, button) {
+    async function submitActScenario(path, button, reuse = null) {
       button.disabled = true;
       let persisted = false;
-      byId("act-scenario-status").textContent = "Calculating…";
+      byId("act-scenario-status").textContent = "";
       if (!byId("act-fte").value || !byId("act-target-date").value || !byId("act-cost").value) {
         byId("act-scenario-status").textContent = "Enter FTE, a target date, and a budget before previewing.";
         button.disabled = false;
@@ -721,6 +848,9 @@
         scope_defer_pct: Number(byId("act-scope-defer").value),
         incremental_cost_k: Number(byId("act-cost").value),
       };
+      const echoed = reuse || (path === "/api/act/apply" ? actLastPrediction : null);
+      if (echoed) body.prediction = echoed;
+      byId("act-scenario-status").textContent = echoed ? "Applying…" : "Asking the AI to predict this scenario…";
       try {
         const data = await intakePost(path, body);
         persisted = data.status === "simulated_updates_persisted";
@@ -733,8 +863,6 @@
       }
     }
 
-    let currentReport = null;
-    let serverBaseline = null;
     async function refreshReport() {
       try {
         const response = await fetch("/api/report", { cache: "no-store" });
@@ -747,7 +875,8 @@
           byId("workflow-status").textContent = "NO SPRINT DATA YET";
           byId("as-of").textContent = "BEFORE KICKOFF";
           byId("shape-stage-status").textContent = "NO DEMO DATA";
-          byId("updated").textContent = `Updated ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
+          if (!byId("panel-intervene").hidden) loadActAnalysis();
+        byId("updated").textContent = `Updated ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
           byId("error").style.display = "none";
           return;
         }
@@ -777,24 +906,10 @@
         byId("forecast-sprint").textContent = `Sprint ${sprintNumber}`;
         byId("forecast-signal-count").textContent =
           `${signals.unplanned_work_item_count} items · ${signals.active_priority_1_incidents} incidents`;
-        byId("act-recommendation").textContent = `RECOMMEND OPTION ${act.recommended_option}`;
-        byId("act-kicker").textContent =
-          `Option confidence reflects the current sprint ${sprintNumber} signal mix.`;
-        for (const option of act.options) {
-          const id = option.id.toLowerCase();
-          byId(`act-title-${id}`).textContent = option.title;
-          byId(`act-description-${id}`).textContent = option.description;
-          byId(`act-cost-${id}`).textContent = option.cost;
-          byId(`act-confidence-${id}`).textContent = `${option.confidence_pct}%`;
-          byId(`act-tradeoff-${id}`).textContent = option.tradeoff;
-          byId(`act-option-${id}`).classList.toggle("recommended", option.recommended);
-        }
         byId("act-sync-milestone").textContent = act.actions.milestone;
         byId("act-sync-ado").textContent = act.actions.azure_devops;
         byId("act-sync-servicenow").textContent = act.actions.servicenow;
         byId("act-sync-workforce").textContent = act.actions.workforce;
-        byId("act-note").textContent =
-          `Option ${act.recommended_option} is recommended for the simulated signals. No option is approved; source-system write-back remains disabled.`;
         byId("act-fte").max = signals.capacity_fte;
         if (report.recovery_scenario) {
           const saved = report.recovery_scenario;
@@ -855,6 +970,7 @@
         byId("act-scenario-status").textContent = "Inputs changed — preview the scenario again.";
       });
     });
+    byId("act-reanalyze").addEventListener("click", () => loadActAnalysis(true));
     byId("act-preview").addEventListener("click", (event) =>
       submitActScenario("/api/act/what-if", event.currentTarget));
     byId("act-apply").addEventListener("click", (event) =>
@@ -1071,7 +1187,7 @@
           ? ["ready", `Sprint ${sim.simulation.sprints_advanced}${act ? ` · ${act.track.on_time_pct}% on time` : ""}`]
           : ["pending", "Not started"],
         intervene: sim && act
-          ? ["ready", `Option ${act.intervene.recommended_option} recommended`]
+          ? ["ready", actRecommended() ? `${actRecommended().title} recommended` : `Option ${act.intervene.recommended_option} recommended`]
           : ["pending", "Waiting for signals"],
       };
       JOURNEY_STAGES.forEach((stage, index) => {
