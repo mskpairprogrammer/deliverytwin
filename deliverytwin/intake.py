@@ -32,6 +32,7 @@ ANALOG_COUNT = 3
 HOURS_PER_FTE_WEEK = 40
 TARGET_MONTH, TARGET_DAY = 3, 31
 EVIDENCE_PER_QUESTION = 2
+SUGGESTION_VOTERS = 7
 
 DIMENSIONS = ("structure", "complexity", "systems", "roles", "dependencies", "delivery_pattern")
 SET_DIMENSIONS = ("systems", "roles", "dependencies")
@@ -139,138 +140,9 @@ QUESTIONS: tuple[dict[str, Any], ...] = (
 )
 QUESTIONS_BY_ID = {question["id"]: question for question in QUESTIONS}
 
-_ANALOGS = (
-    ("hist-card-rewards", "Customer Profile Unification",
-     "CRM and commerce customer records were unified using identity resolution and consent-aware profile APIs.",
-     "legacy-modernization", "high", "customer-data-platform,crm,commerce,service-management,identity-resolution",
-     "data-engineer,delivery-engineer,lead-engineer,privacy-engineer",
-     "privacy-review,consent-management,crm-mdm-integration",
-     "incremental-integration", 3890, 4330, 14, 83),
-    ("hist-bill-pay", "CRM and Service Profile Consolidation",
-     "Customer support and CRM records were reconciled into a governed master profile using existing match rules.",
-     "legacy-modernization", "high", "customer-data-platform,crm,service-management,mdm,identity-resolution,profile-api",
-     "data-engineer,delivery-engineer,lead-engineer,privacy-engineer",
-     "privacy-review,consent-management,crm-mdm-integration",
-     "incremental-integration", 3900, 4340, 14, 84),
-    ("hist-merchant-settlement", "Customer Identity Resolution Service",
-     "Customer profile updates from CRM, commerce, and service systems were delivered through governed events.",
-     "legacy-modernization", "high", "customer-data-platform,crm,commerce,service-management,event-streaming,identity-resolution",
-     "data-engineer,delivery-engineer,lead-engineer,privacy-engineer",
-     "privacy-review,consent-management,crm-mdm-integration",
-     "incremental-integration", 3915, 4355, 14, 85),
-    ("hist-mobile-wallet", "Customer Profile Workspace",
-     "Greenfield customer service workspace launched with a new profile API and explicit data contracts.",
-     "greenfield-service", "medium", "customer-portal,customer-profile-service",
-     "delivery-engineer,lead-engineer,customer-experience-engineer", "identity-provider",
-     "iterative-greenfield", 2100, 2500, 14, 71),
-    ("hist-erp-vendor", "CRM Vendor Integration",
-     "A hosted CRM was integrated with ERP and service records using scheduled customer data loads.",
-     "vendor-integration", "high", "batch-integration,crm,erp,service-management",
-     "data-engineer,delivery-engineer,vendor-liaison", "vendor-contract,privacy-review",
-     "big-bang-cutover", 5200, 6100, 14, 62),
-)
-
-# (initiative_id, category, lesson, suggested option)
-_LESSONS = (
-    ("hist-card-rewards", "architecture",
-     "Adding customer profiles alongside CRM kept existing service teams online during migration.", "incremental"),
-    ("hist-card-rewards", "data",
-     "CRM and commerce events supported timely profile updates with replay and reconciliation controls.", "event_sync"),
-    ("hist-card-rewards", "security",
-     "Consent and PII handling were reviewed before customer profiles were shared across teams.", "pii_consent"),
-    ("hist-card-rewards", "reuse",
-     "Existing MDM match rules reduced duplicate customer records without building a new identity engine.", "reuse_mdm"),
-    ("hist-bill-pay", "architecture",
-     "A phased CRM and service-profile rollout kept current customer workflows available.", "incremental"),
-    ("hist-bill-pay", "data",
-     "Scheduled customer-record reconciliation exposed mismatches before profiles were published.", "batch_sync"),
-    ("hist-bill-pay", "security",
-     "Consent and retention checks were included in every customer-profile release review.", "pii_consent"),
-    ("hist-bill-pay", "reuse",
-     "Reusing CRM and MDM identity rules avoided duplicate customer matching logic.", "reuse_mdm"),
-    ("hist-merchant-settlement", "architecture",
-     "Customer profile consumers were moved in phases while existing CRM flows remained available.", "incremental"),
-    ("hist-merchant-settlement", "data",
-     "Event-based CRM and service updates required a data engineer to manage profile quality.", "event_sync"),
-    ("hist-merchant-settlement", "security",
-     "New profile consumers required privacy and consent approval before production access.", "pii_consent"),
-    ("hist-merchant-settlement", "reuse",
-     "Existing profile APIs and identity resolution were reused instead of creating another customer store.", "reuse_mdm"),
-    ("hist-mobile-wallet", "architecture",
-     "The customer workspace used a new profile service with independent data contracts.", "greenfield"),
-    ("hist-mobile-wallet", "data",
-     "The first release used one authoritative customer source and did not synchronize other systems.", "single_source"),
-    ("hist-mobile-wallet", "security",
-     "Standard access review was sufficient because sensitive customer attributes were excluded.", "standard"),
-    ("hist-mobile-wallet", "reuse",
-     "The team built new profile services because no suitable CRM or MDM capability existed.", "build_new"),
-    ("hist-erp-vendor", "architecture",
-     "The hosted CRM integration required a coordinated cutover from the previous profile store.", "big_bang"),
-    ("hist-erp-vendor", "data",
-     "Scheduled batch integration reconciled customer profiles between CRM and ERP.", "batch_sync"),
-    ("hist-erp-vendor", "security",
-     "Customer data-sharing terms and standard access controls were reviewed with the vendor.", "standard"),
-    ("hist-erp-vendor", "reuse",
-     "The vendor supplied identity matching components, so little of the internal profile stack was reused.", "build_new"),
-)
-
 
 class IntakeError(ValueError):
     """Raised when an intake request or answer set is invalid."""
-
-
-# (project_id, name, description, technologies, integrations, team_size, planned_weeks,
-#  actual_weeks, planned_hours, actual_hours, outcome, lessons_learned)
-_PROJECTS = (
-    ("proj-profile-unification", "Customer Profile Unification",
-     "Domain: customer data. Delivery model: incremental-integration. CRM and commerce records unified with identity resolution and consent-aware profile APIs.",
-     "customer-data-platform,crm,commerce,service-management,identity-resolution", 4, 8, 26, 29, 4300, 4690,
-     "late", "Consent review queued behind a shared privacy team and added three weeks."),
-    ("proj-service-consolidation", "CRM and Service Profile Consolidation",
-     "Domain: customer data. Delivery model: incremental-integration. Support and CRM records reconciled into a governed master profile using existing match rules.",
-     "customer-data-platform,crm,service-management,mdm,identity-resolution,profile-api", 4, 7, 24, 26, 4200, 4380,
-     "on_time", "Reusing existing MDM match rules avoided building a second identity engine."),
-    ("proj-identity-service", "Customer Identity Resolution Service",
-     "Domain: customer data. Delivery model: incremental-integration. Profile updates from CRM, commerce and service systems delivered through governed events.",
-     "customer-data-platform,crm,commerce,service-management,event-streaming,identity-resolution", 5, 8, 28, 33, 4600, 5340,
-     "late", "Event replay and reconciliation were underestimated; cross-system dependencies stalled integration testing."),
-    ("proj-profile-workspace", "Customer Profile Workspace",
-     "Domain: customer service. Delivery model: iterative-greenfield. New profile API and explicit data contracts behind a service workspace.",
-     "customer-portal,customer-profile-service", 2, 5, 18, 18, 2400, 2350,
-     "on_time", "A single authoritative source and standard access review kept scope stable."),
-    ("proj-crm-vendor", "CRM Vendor Integration",
-     "Domain: customer data. Delivery model: big-bang-cutover. Hosted CRM integrated with ERP and service records using scheduled data loads.",
-     "batch-integration,crm,erp,service-management", 4, 9, 30, 40, 5600, 6900,
-     "late", "Vendor release dates and the coordinated cutover caused a ten-week slip."),
-    ("proj-consent-hub", "Marketing Consent Hub",
-     "Domain: privacy. Delivery model: incremental-integration. Central consent store consumed by CRM and commerce.",
-     "crm,commerce,consent-management", 3, 6, 16, 17, 2600, 2780,
-     "on_time", "Early privacy review prevented late rework."),
-    ("proj-order-sync", "Order History Sync",
-     "Domain: commerce. Delivery model: incremental-integration. Near-real-time order history published to customer profiles.",
-     "commerce,event-streaming,crm", 3, 6, 14, 14, 2200, 2150,
-     "on_time", "A stable event schema from the commerce team removed integration churn."),
-    ("proj-knowledge-migration", "Service Desk Knowledge Migration",
-     "Domain: customer service. Delivery model: big-bang-cutover. Knowledge articles and customer cases migrated with scheduled reconciliation.",
-     "service-management,crm,batch-integration", 3, 7, 20, 24, 3100, 3720,
-     "late", "Data quality defects found late in reconciliation extended the migration."),
-    ("proj-loyalty-platform", "Loyalty Data Platform",
-     "Domain: customer data. Delivery model: incremental-integration. Loyalty and commerce events combined in a shared customer data platform.",
-     "customer-data-platform,commerce,event-streaming,identity-resolution", 5, 8, 30, 34, 4900, 5450,
-     "late", "A shared integration team was a bottleneck in three consecutive sprints."),
-    ("proj-billing-master", "Billing Profile Master",
-     "Domain: finance. Delivery model: incremental-integration. Billing and CRM profiles aligned through MDM and profile APIs.",
-     "mdm,crm,erp,profile-api", 4, 8, 26, 27, 4400, 4530,
-     "on_time", "Existing profile APIs were reused, so integration effort stayed close to plan."),
-    ("proj-partner-sso", "Partner Portal Single Sign-On",
-     "Domain: identity. Delivery model: iterative-greenfield. Federated sign-on for a partner portal.",
-     "identity-provider,customer-portal", 2, 4, 12, 12, 1500, 1480,
-     "on_time", "Small team and one dependency; no surprises."),
-    ("proj-data-residency", "Regional Data Residency Program",
-     "Domain: privacy. Delivery model: big-bang-cutover. Customer data split by region across CRM, platform and privacy controls.",
-     "customer-data-platform,crm,consent-management,privacy-review,identity-resolution,event-streaming", 6, 10, 36, 46, 7000, 8900,
-     "late", "Cross-region legal review and many dependent systems drove a 27% effort overrun."),
-)
 
 
 _PROJECT_HISTORY_COLUMNS = {
@@ -299,71 +171,29 @@ def _ensure_project_history_columns(connection: sqlite3.Connection) -> None:
 
 
 def seed_historical_projects(connection: sqlite3.Connection) -> None:
-    """Idempotently load the synthetic completed projects used for evidence-based forecasting."""
+    """Idempotently load the completed-project portfolio through the data layer."""
+    from .data import HistoryRepository, SQLiteDatabase, dataset_loaded, load_dataset
+
     _ensure_project_history_columns(connection)
+    database = SQLiteDatabase(connection)
+    if not dataset_loaded(database):
+        load_dataset(database)
+    projects = HistoryRepository(database).list_projects()
+    columns = (
+        "project_id", "project_name", "description", "technologies", "integrations", "team_size",
+        "planned_duration_weeks", "actual_duration_weeks", "planned_effort_hours",
+        "actual_effort_hours", "outcome", "lessons_learned", "structure", "complexity",
+        "systems", "roles", "dependencies", "delivery_pattern", "base_p50_hours",
+        "base_p80_hours", "integration_buffer_pct", "on_time_confidence_pct",
+    )
+    updates = ", ".join(f"{name}=excluded.{name}" for name in columns[1:])
     with connection:
         connection.executemany(
-            """
-            INSERT INTO historical_projects
-                (project_id, project_name, description, technologies, integrations, team_size,
-                 planned_duration_weeks, actual_duration_weeks, planned_effort_hours,
-                 actual_effort_hours, outcome, lessons_learned)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(project_id) DO UPDATE SET
-                project_name=excluded.project_name, description=excluded.description,
-                technologies=excluded.technologies, integrations=excluded.integrations,
-                team_size=excluded.team_size,
-                planned_duration_weeks=excluded.planned_duration_weeks,
-                actual_duration_weeks=excluded.actual_duration_weeks,
-                planned_effort_hours=excluded.planned_effort_hours,
-                actual_effort_hours=excluded.actual_effort_hours,
-                outcome=excluded.outcome, lessons_learned=excluded.lessons_learned
-            """,
-            _PROJECTS,
+            f"INSERT INTO historical_projects ({', '.join(columns)}) "
+            f"VALUES ({', '.join('?' for _ in columns)}) "
+            f"ON CONFLICT(project_id) DO UPDATE SET {updates}",
+            [tuple(project[name] for name in columns) for project in projects],
         )
-
-
-def seed_historical_data(connection: sqlite3.Connection) -> None:
-    """Load the shared completed-project history and its 6D match metadata."""
-    seed_historical_projects(connection)
-    _sync_project_fingerprint_metadata(connection)
-    _seed_project_lessons(connection)
-
-
-def _sync_project_fingerprint_metadata(connection: sqlite3.Connection) -> None:
-    """Attach 6D ROM metadata to the matching completed-project record."""
-    with connection:
-        for analog in _ANALOGS:
-            connection.execute(
-                """
-                UPDATE historical_projects
-                SET structure=?, complexity=?, systems=?, roles=?, dependencies=?,
-                    delivery_pattern=?, base_p50_hours=?, base_p80_hours=?,
-                    integration_buffer_pct=?, on_time_confidence_pct=?
-                WHERE project_name=?
-                """,
-                (
-                    analog[3], analog[4], analog[5], analog[6], analog[7], analog[8],
-                    analog[9], analog[10], analog[11], analog[12], analog[1],
-                ),
-            )
-
-
-def _seed_project_lessons(connection: sqlite3.Connection) -> None:
-    initiative_to_name = {analog[0]: analog[1] for analog in _ANALOGS}
-    project_ids = {
-        row["project_name"]: row["project_id"]
-        for row in connection.execute("SELECT project_id, project_name FROM historical_projects")
-    }
-    project_lessons = []
-    for initiative, category, lesson, option in _LESSONS:
-        project_name = initiative_to_name[initiative]
-        project_id = project_ids.get(project_name)
-        if project_id is not None:
-            project_lessons.append(
-                (f"{project_id}:{category}", project_id, category, lesson, option)
-            )
-    with connection:
         connection.executemany(
             """
             INSERT INTO historical_project_lessons
@@ -373,8 +203,18 @@ def _seed_project_lessons(connection: sqlite3.Connection) -> None:
                 project_id=excluded.project_id, category=excluded.category,
                 lesson=excluded.lesson, suggested_option=excluded.suggested_option
             """,
-            project_lessons,
+            [
+                (f"{project['project_id']}:{lesson['category']}", project["project_id"],
+                 lesson["category"], lesson["lesson"], lesson["suggested_option"])
+                for project in projects
+                for lesson in project["lessons"]
+            ],
         )
+
+
+def seed_historical_data(connection: sqlite3.Connection) -> None:
+    """Load the shared completed-project history and its 6D match metadata."""
+    seed_historical_projects(connection)
 
 
 def _tokens(text: str) -> set[str]:
@@ -576,6 +416,10 @@ def analyze_intake(
             ranked.append((len(matched), row, sorted(matched)))
         ranked.sort(key=lambda item: (-item[0], item[1]["id"]))
         top = ranked[:EVIDENCE_PER_QUESTION]
+        votes: dict[str, int] = {}
+        for matched_count, row, _terms in ranked[:SUGGESTION_VOTERS]:
+            votes[row["suggested_option"]] = votes.get(row["suggested_option"], 0) + matched_count + 1
+        suggested = max(votes, key=lambda option: (votes[option], option == top[0][1]["suggested_option"]))
         clarifications.append(
             {
                 "id": question["id"],
@@ -586,7 +430,7 @@ def analyze_intake(
                     {"value": value, "label": option["label"]}
                     for value, option in question["options"].items()
                 ],
-                "suggested": top[0][1]["suggested_option"],
+                "suggested": suggested,
                 "evidence": [
                     {"project": row["name"], "lesson": row["lesson"], "matched_terms": terms}
                     for _, row, terms in top
@@ -725,7 +569,6 @@ def match_analogs(
 ) -> list[dict[str, Any]]:
     """Rank the shared completed-project records by 6D similarity for the deterministic ROM."""
     _historical_count(connection)
-    legacy_ids = {analog[1]: analog[0] for analog in _ANALOGS}
     lessons: dict[str, str] = {}
     if doc_tokens:
         for row in connection.execute("SELECT project_id, lesson FROM historical_project_lessons"):
@@ -746,12 +589,10 @@ def match_analogs(
             overlap = len(matched) / len(reference) if reference else 0.0
             similarity = (1 - DOCUMENT_WEIGHT) * similarity + DOCUMENT_WEIGHT * min(1.0, overlap * 4)
         scored.append((similarity, row, scores, terms))
-    scored.sort(
-        key=lambda item: (-item[0], legacy_ids.get(item[1]["project_name"], item[1]["project_id"]))
-    )
+    scored.sort(key=lambda item: (-item[0], item[1]["project_id"]))
     return [
         {
-            "id": legacy_ids.get(row["project_name"], row["project_id"]),
+            "id": row["project_id"],
             "project_id": row["project_id"],
             "name": row["project_name"],
             "similarity_pct": round(similarity * 100),
@@ -1302,6 +1143,19 @@ def build_commitment(
         "weeks_to_target": round(weeks, 1),
         "allocated_fte": fte,
         "capacity_fte": plan["capacity_fte"],
+        "resource_allocations": [
+            dict(row)
+            for row in connection.execute(
+                """
+                SELECT role_name, ROUND(SUM(allocated_fte), 1) AS allocated_fte
+                FROM planview_resource_assignments
+                WHERE initiative_id = ?
+                GROUP BY role_name
+                ORDER BY role_name
+                """,
+                (INITIATIVE_ID,),
+            )
+        ],
         "required_fte_p80": required_fte,
         "hours_per_fte_week": HOURS_PER_FTE_WEEK,
         "scope_change_pct": scope,

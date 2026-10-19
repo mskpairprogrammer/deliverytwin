@@ -7,7 +7,7 @@ import random
 import sqlite3
 import unittest
 from docx import Document
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
 from openpyxl import Workbook
 from pypdf import PdfWriter
 from pypdf.generic import DecodedStreamObject, DictionaryObject, NameObject
@@ -19,6 +19,7 @@ from deliverytwin.chat import (
     chat_configuration_status,
     validate_chat_history,
 )
+from deliverytwin.analytics import build_impact_report, record_intake_activity
 from deliverytwin.intake import (
     IntakeError,
     analyze_intake,
@@ -60,6 +61,70 @@ class DeliveryTwinTests(unittest.TestCase):
         self.assertTrue(all(row["integration_mode"] == "simulated" for row in sources))
         self.assertTrue(all(row["writeback_enabled"] == 0 for row in sources))
 
+    def test_impact_report_backtest_excludes_each_target_from_its_analogs(self) -> None:
+        seed_demo(self.connection, date(2026, 2, 20))
+        report = build_impact_report(self.connection)
+        backtest = report["backtest"]
+
+        self.assertGreater(backtest["sample_count"], 1)
+        self.assertEqual(backtest["sample_count"], 50)
+        self.assertEqual(backtest["sample_count"], len(backtest["points"]))
+        self.assertIsNotNone(backtest["estimators"]["original_plan_mape_pct"])
+        self.assertIsNotNone(backtest["estimators"]["analog_mape_pct"])
+        self.assertLess(
+            backtest["estimators"]["analog_mape_pct"],
+            backtest["estimators"]["original_plan_mape_pct"],
+        )
+        for point in backtest["points"]:
+            self.assertNotIn(point["project_id"], point["peer_ids"])
+            self.assertGreater(point["actual_hours"], 0)
+
+    def test_demo_seeds_synthetic_intake_metrics_idempotently(self) -> None:
+        seed_demo(self.connection, date.today())
+        seed_demo(self.connection, date.today())
+
+        report = build_impact_report(self.connection)
+        metrics = report["intake_metrics"]
+        self.assertEqual(metrics["intake_starts_last_7_days"], 12)
+        self.assertEqual(metrics["rom_sample_count"], 9)
+        self.assertEqual(metrics["median_seconds_to_first_rom"], 15 * 60)
+        self.assertEqual(
+            self.connection.execute("SELECT COUNT(*) FROM intake_sessions").fetchone()[0],
+            12,
+        )
+
+    def test_intake_activity_records_first_rom_and_recent_start_metrics(self) -> None:
+        from uuid import uuid4
+
+        start = datetime(2026, 10, 17, 12, tzinfo=timezone.utc)
+        session_id = str(uuid4())
+        record_intake_activity(self.connection, session_id, "started", start)
+        record_intake_activity(
+            self.connection, session_id, "rom_ready", start + timedelta(minutes=2)
+        )
+        record_intake_activity(
+            self.connection, session_id, "rom_ready", start + timedelta(minutes=5)
+        )
+        record_intake_activity(
+            self.connection, session_id, "approved", start + timedelta(minutes=10)
+        )
+
+        report = build_impact_report(self.connection, start + timedelta(days=1))
+        self.assertEqual(report["intake_metrics"]["rom_sample_count"], 1)
+        self.assertEqual(report["intake_metrics"]["median_seconds_to_first_rom"], 120)
+        self.assertEqual(report["intake_metrics"]["intake_starts_last_7_days"], 1)
+        session = self.connection.execute(
+            "SELECT started_at, first_rom_at, approved_at FROM intake_sessions"
+        ).fetchone()
+        self.assertEqual(session["first_rom_at"], (start + timedelta(minutes=2)).isoformat(timespec="seconds"))
+        self.assertEqual(session["approved_at"], (start + timedelta(minutes=10)).isoformat(timespec="seconds"))
+
+    def test_intake_activity_rejects_invalid_session_ids_and_events(self) -> None:
+        with self.assertRaisesRegex(ValueError, "UUID"):
+            record_intake_activity(self.connection, "not-a-uuid", "started")
+        with self.assertRaisesRegex(ValueError, "Unsupported"):
+            record_intake_activity(self.connection, "0b1fbd26-0ce8-4b36-9e6a-47b1c3aa4a74", "unknown")
+
     def test_demo_loads_expected_records_and_finds_cross_system_collision(self) -> None:
         demo_day = date(2026, 2, 20)
         seed_demo(self.connection, demo_day)
@@ -73,6 +138,15 @@ class DeliveryTwinTests(unittest.TestCase):
         self.assertEqual(report["signals"]["lead_approved_pto_hours"], 40)
         self.assertEqual(report["signals"]["oldest_blocking_change_age_days"], 9)
         self.assertEqual(
+            report["resource_allocations"],
+            [
+                {"role_name": "CRM Integration Engineer", "allocated_fte": 2.8},
+                {"role_name": "Customer 360 Lead", "allocated_fte": 1.0},
+                {"role_name": "Customer Data Engineer", "allocated_fte": 2.0},
+                {"role_name": "Customer Privacy Engineer", "allocated_fte": 1.2},
+            ],
+        )
+        self.assertEqual(
             self.connection.execute(
                 "SELECT short_description FROM servicenow_change_requests"
             ).fetchone()["short_description"],
@@ -80,7 +154,7 @@ class DeliveryTwinTests(unittest.TestCase):
         )
         self.assertEqual(
             self.connection.execute("SELECT name FROM delivery_milestones").fetchone()["name"],
-            "",
+            "Customer profile API v1",
         )
         self.assertEqual(
             self.connection.execute("SELECT COUNT(*) FROM skills WHERE name = 'Kafka'").fetchone()[0],
@@ -113,15 +187,19 @@ class DeliveryTwinTests(unittest.TestCase):
         workflow = report["workflow"]
         self.assertEqual(workflow["framework"], "Microsoft Agent Framework")
         self.assertEqual(
-            workflow["completed_stages"], ["shape", "sense", "forecast", "act"]
+            workflow["completed_stages"], ["shape", "commit", "track", "intervene"]
         )
-        self.assertTrue(workflow["stages"]["sense"]["collision_detected"])
-        self.assertTrue(workflow["stages"]["forecast"]["calculated"])
         self.assertEqual(
-            workflow["stages"]["forecast"]["source"], "simulated_source_records"
+            workflow["stages"]["commit"]["target_end"],
+            report["initiative"]["target_end"],
         )
-        self.assertEqual(len(workflow["stages"]["act"]["options"]), 3)
-        self.assertFalse(workflow["stages"]["act"]["writeback_performed"])
+        self.assertTrue(workflow["stages"]["track"]["collision_detected"])
+        self.assertTrue(workflow["stages"]["track"]["calculated"])
+        self.assertEqual(
+            workflow["stages"]["track"]["source"], "simulated_source_records"
+        )
+        self.assertEqual(len(workflow["stages"]["intervene"]["options"]), 3)
+        self.assertFalse(workflow["stages"]["intervene"]["writeback_performed"])
         self.assertFalse(report["writeback_performed"])
 
     def test_foundry_chat_reports_missing_configuration_explicitly(self) -> None:
@@ -187,16 +265,16 @@ class DeliveryTwinTests(unittest.TestCase):
 
         self.assertEqual(
             [match["id"] for match in result["matches"]],
-            ["hist-bill-pay", "hist-merchant-settlement", "hist-card-rewards"],
+            ["HIST-008", "HIST-010", "HIST-003"],
         )
         self.assertEqual(result["fingerprint"]["complexity"], "high")
-        self.assertEqual(result["rom"]["p50_hours"], 4450)
-        self.assertEqual(result["rom"]["p80_hours"], 4950)
-        self.assertEqual(result["rom"]["integration_buffer_pct"], 14)
+        self.assertEqual(result["rom"]["p50_hours"], 4650)
+        self.assertEqual(result["rom"]["p80_hours"], 5750)
+        self.assertEqual(result["rom"]["integration_buffer_pct"], 19)
         commitment = result["commitment"]
-        self.assertEqual((commitment["allocated_fte"], commitment["capacity_fte"]), (7.5, 8.0))
+        self.assertEqual((commitment["allocated_fte"], commitment["capacity_fte"]), (7.0, 8.5))
         self.assertEqual(commitment["target_date"], "2027-03-31")
-        self.assertEqual(commitment["confidence_pct"], 84)
+        self.assertEqual(commitment["confidence_pct"], 62.5)
         self.assertTrue(commitment["feasible"])
 
     def test_intake_uses_uploaded_documents_to_rank_analogs(self) -> None:
@@ -288,14 +366,14 @@ class DeliveryTwinTests(unittest.TestCase):
         seed_demo(self.connection, demo_day)
         default = evaluate_intake(self.connection, VAGUE_REQUEST, self._intake_answers(), demo_day)["commitment"]
         self.assertFalse(default["adjusted"])
-        self.assertEqual(default["confidence_pct"], 84)
+        self.assertEqual(default["confidence_pct"], 62.5)
 
         reduced_capacity = evaluate_intake(
             self.connection,
             VAGUE_REQUEST,
             self._intake_answers(),
             demo_day,
-            adjustments={"allocated_fte": 7.0},
+            adjustments={"allocated_fte": 6.0},
         )["commitment"]
         self.assertLess(reduced_capacity["fit_probability_pct"], 100)
         self.assertLess(reduced_capacity["confidence_pct"], default["confidence_pct"])
@@ -320,6 +398,18 @@ class DeliveryTwinTests(unittest.TestCase):
             approve_baseline(
                 self.connection, VAGUE_REQUEST, self._intake_answers(), demo_day, adjustments=tight
             )
+
+        constrained_and_expanded = evaluate_intake(
+            self.connection,
+            VAGUE_REQUEST,
+            self._intake_answers(),
+            demo_day,
+            adjustments={"allocated_fte": 5.0, "scope_change_pct": 20},
+        )["commitment"]
+        self.assertLess(constrained_and_expanded["fit_probability_pct"], 50)
+        self.assertLess(
+            constrained_and_expanded["confidence_pct"], default["confidence_pct"] - 30
+        )
 
         relaxed = {"allocated_fte": 6.0, "target_date": "2027-06-30", "scope_change_pct": 10}
         approved = approve_baseline(
@@ -358,7 +448,7 @@ class DeliveryTwinTests(unittest.TestCase):
             evaluate_intake(
                 self.connection, VAGUE_REQUEST, self._intake_answers(), date(2026, 10, 17)
             )["rom"]["p50_hours"],
-            4450,
+            4650,
         )
 
     def test_history_forecast_accepts_valid_llm_reply_and_rejects_invalid_ones(self) -> None:
@@ -367,7 +457,7 @@ class DeliveryTwinTests(unittest.TestCase):
             "p50_effort_hours": 4600, "p80_effort_hours": 5500, "p90_effort_hours": 6000,
             "on_time_probability": 0.74, "confidence": 0.81,
             "key_risks": ["shared integration team"], "recommendations": ["Phase scope"],
-            "historical_projects_used": ["Customer Profile Unification"],
+            "historical_projects_used": ["Customer Data Lakehouse"],
         }
 
         def run(reply: dict) -> dict:
@@ -396,7 +486,8 @@ class DeliveryTwinTests(unittest.TestCase):
         )["fingerprint"]
         projects = retrieve_similar_projects(self.connection, fingerprint, 7.5)
         self.assertEqual(projects[0]["similarity_pct"], max(p["similarity_pct"] for p in projects))
-        self.assertIn(projects[0]["project_id"], {"proj-service-consolidation", "proj-profile-unification", "proj-identity-service"})
+        self.assertEqual(projects[0]["project_id"], "HIST-008")
+        self.assertTrue(projects[0]["shared_technologies"])
 
     def test_rom_matches_and_forecast_share_completed_project_records(self) -> None:
         seed_demo(self.connection, date(2026, 10, 17))
@@ -421,7 +512,7 @@ class DeliveryTwinTests(unittest.TestCase):
         self.assertEqual(forecast["matching_source"], "similarity")
         self.assertEqual(
             self.connection.execute("SELECT COUNT(*) FROM historical_project_lessons").fetchone()[0],
-            20,
+            200,
         )
 
     def test_llm_reranks_only_retrieved_projects_and_returns_match_reasons(self) -> None:
@@ -506,7 +597,7 @@ class DeliveryTwinTests(unittest.TestCase):
 
         baseline = approved["baseline"]
         self.assertEqual(baseline["status"], "approved")
-        self.assertEqual((baseline["p50_hours"], baseline["p80_hours"]), (4450, 4950))
+        self.assertEqual((baseline["p50_hours"], baseline["p80_hours"]), (4650, 5750))
         self.assertEqual(latest_baseline(self.connection)["id"], baseline["id"])
         source_writebacks = self.connection.execute(
             "SELECT COUNT(*) FROM source_systems WHERE writeback_enabled = 1"
@@ -553,12 +644,12 @@ class DeliveryTwinTests(unittest.TestCase):
         self.assertEqual(second_report["signals"]["unplanned_story_points"], 32)
         self.assertEqual(second_report["signals"]["lead_production_support_hours_per_week"], 8)
         self.assertNotEqual(
-            first_report["workflow"]["stages"]["forecast"]["on_time_pct"],
-            second_report["workflow"]["stages"]["forecast"]["on_time_pct"],
+            first_report["workflow"]["stages"]["track"]["on_time_pct"],
+            second_report["workflow"]["stages"]["track"]["on_time_pct"],
         )
         self.assertNotEqual(
-            first_report["workflow"]["stages"]["act"]["recommended_option"],
-            second_report["workflow"]["stages"]["act"]["recommended_option"],
+            first_report["workflow"]["stages"]["intervene"]["recommended_option"],
+            second_report["workflow"]["stages"]["intervene"]["recommended_option"],
         )
 
     def test_simulation_seeds_source_records_and_updates_forecast_and_act(self) -> None:
@@ -582,8 +673,8 @@ class DeliveryTwinTests(unittest.TestCase):
         self.assertEqual(report["signals"]["unplanned_story_points"], 80)
         self.assertEqual(report["signals"]["lead_production_support_hours_per_week"], 20)
         self.assertEqual(len(report["signals"]["blocking_change_requests"]), 1)
-        self.assertEqual(report["workflow"]["stages"]["forecast"]["sprint_number"], 5)
-        self.assertEqual(report["workflow"]["stages"]["act"]["recommended_option"], "C")
+        self.assertEqual(report["workflow"]["stages"]["track"]["sprint_number"], 5)
+        self.assertEqual(report["workflow"]["stages"]["intervene"]["recommended_option"], "C")
 
     def test_act_suggestions_track_the_current_sprint_signals(self) -> None:
         from deliverytwin.app import advance_one_sprint, simulate_sprints
@@ -593,35 +684,35 @@ class DeliveryTwinTests(unittest.TestCase):
         simulate_sprints(self.connection, 1, start)
 
         sprint_one = build_workflow_report(self.connection)
-        sprint_one_actions = sprint_one["workflow"]["stages"]["act"]["actions"]
+        sprint_one_actions = sprint_one["workflow"]["stages"]["intervene"]["actions"]
         self.assertEqual(
-            sprint_one["workflow"]["stages"]["forecast"]["sprint_number"], 1
+            sprint_one["workflow"]["stages"]["track"]["sprint_number"], 1
         )
         self.assertIn("Sprint 1", sprint_one_actions["milestone"])
 
         advance_one_sprint(self.connection)
         sprint_two = build_workflow_report(self.connection)
-        sprint_two_actions = sprint_two["workflow"]["stages"]["act"]["actions"]
+        sprint_two_actions = sprint_two["workflow"]["stages"]["intervene"]["actions"]
         self.assertEqual(
-            sprint_two["workflow"]["stages"]["forecast"]["sprint_number"], 2
+            sprint_two["workflow"]["stages"]["track"]["sprint_number"], 2
         )
         self.assertNotEqual(sprint_one_actions, sprint_two_actions)
         self.assertIn("32 unplanned points", sprint_two_actions["azure_devops"])
 
         advance_one_sprint(self.connection)
         sprint_three = build_workflow_report(self.connection)
-        sprint_three_actions = sprint_three["workflow"]["stages"]["act"]["actions"]
+        sprint_three_actions = sprint_three["workflow"]["stages"]["intervene"]["actions"]
         self.assertEqual(
-            sprint_three["workflow"]["stages"]["forecast"]["sprint_number"], 3
+            sprint_three["workflow"]["stages"]["track"]["sprint_number"], 3
         )
         self.assertIn("14 days", sprint_three_actions["servicenow"])
         self.assertIn("40h for approved PTO", sprint_three_actions["workforce"])
 
         advance_one_sprint(self.connection)
         sprint_four = build_workflow_report(self.connection)
-        sprint_four_actions = sprint_four["workflow"]["stages"]["act"]["actions"]
+        sprint_four_actions = sprint_four["workflow"]["stages"]["intervene"]["actions"]
         self.assertEqual(
-            sprint_four["workflow"]["stages"]["forecast"]["sprint_number"], 4
+            sprint_four["workflow"]["stages"]["track"]["sprint_number"], 4
         )
         self.assertIn("Escalate", sprint_four_actions["servicenow"])
         self.assertIn("16h/week", sprint_four_actions["workforce"])
@@ -644,7 +735,7 @@ class DeliveryTwinTests(unittest.TestCase):
 
         preview = preview_recovery_scenario(report, payload)
         self.assertEqual(preview["status"], "preview")
-        self.assertGreater(preview["confidence_pct"], report["workflow"]["stages"]["forecast"]["on_time_pct"])
+        self.assertGreater(preview["confidence_pct"], report["workflow"]["stages"]["track"]["on_time_pct"])
         self.assertEqual(preview["deferred_scope_points"], 4)
         self.assertEqual(len(preview["target_updates"]), 5)
         self.assertIsNone(report["recovery_scenario"])
@@ -660,7 +751,7 @@ class DeliveryTwinTests(unittest.TestCase):
             self.connection.execute(
                 "SELECT allocated_fte FROM planview_projects"
             ).fetchone()["allocated_fte"],
-            7.5,
+            7.0,
         )
         self.assertIsNotNone(build_report(self.connection)["recovery_scenario"])
 
@@ -685,6 +776,12 @@ class DeliveryTwinTests(unittest.TestCase):
 
         self.assertGreater(deleted, 0)
         self.assertIsNone(simulation_state(self.connection))
+        impact = build_impact_report(self.connection)
+        self.assertEqual(impact["backtest"]["sample_count"], 0)
+        self.assertEqual(
+            self.connection.execute("SELECT COUNT(*) FROM historical_projects").fetchone()[0],
+            0,
+        )
         for table in (
             "source_systems",
             "delivery_initiatives",
@@ -694,6 +791,7 @@ class DeliveryTwinTests(unittest.TestCase):
             "oracle_workers",
             "ukg_time_entries",
             "historical_lessons",
+            "historical_projects",
             "baseline_approvals",
         ):
             with self.subTest(table=table):

@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import argparse
+import ipaddress
 import json
 import logging
+import os
 import sqlite3
 from datetime import date, datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -74,7 +76,10 @@ def _upsert_many(
 
 def seed_demo(connection: sqlite3.Connection, as_of: date | None = None) -> dict[str, Any]:
     """Load the synthetic Customer 360 source-system scenario."""
+    from .analytics import seed_synthetic_intake_activity
+
     initialize_database(connection)
+    seed_synthetic_intake_activity(connection)
     demo_date = as_of or date.today()
     opened_nine_days_ago = (demo_date - timedelta(days=9)).isoformat()
     target_date = (demo_date + timedelta(days=39)).isoformat()
@@ -87,7 +92,7 @@ def seed_demo(connection: sqlite3.Connection, as_of: date | None = None) -> dict
             ("id", "name", "portfolio", "planned_start", "target_end", "baseline_p50_hours",
              "baseline_p80_hours", "integration_buffer_pct", "initial_confidence_pct"),
             [(INITIATIVE_ID, "Customer 360", "Q4 value stream",
-              demo_date.isoformat(), target_date, 4450, 4950, 14, 84)],
+              demo_date.isoformat(), target_date, 4650, 5750, 19, 62)],
             ("name", "portfolio", "planned_start", "target_end", "baseline_p50_hours",
              "baseline_p80_hours", "integration_buffer_pct", "initial_confidence_pct"),
         )
@@ -133,7 +138,7 @@ def seed_demo(connection: sqlite3.Connection, as_of: date | None = None) -> dict
             connection,
             "delivery_milestones",
             ("id", "initiative_id", "name", "target_date", "status"),
-            [("shared-api-gateway", INITIATIVE_ID, "", target_date, "at_risk")],
+            [("customer-profile-api-v1", INITIATIVE_ID, "Customer profile API v1", target_date, "at_risk")],
             ("name", "target_date", "status"),
         )
 
@@ -141,23 +146,24 @@ def seed_demo(connection: sqlite3.Connection, as_of: date | None = None) -> dict
             connection,
             "planview_projects",
             ("external_id", "initiative_id", "project_status", "capacity_fte", "allocated_fte", "planned_hours"),
-            [("PV-AUTO-001", INITIATIVE_ID, "approved_baseline", 8.0, 7.5, 4450)],
+            [("PV-AUTO-001", INITIATIVE_ID, "approved_baseline", 8.5, 7.0, 4650)],
             ("project_status", "capacity_fte", "allocated_fte", "planned_hours"),
         )
         _upsert_many(
             connection,
             "planview_milestones",
             ("external_id", "initiative_id", "name", "baseline_date", "status"),
-            [("PV-MS-API", INITIATIVE_ID, "", target_date, "at_risk")],
+            [("PV-MS-API", INITIATIVE_ID, "Customer profile API v1", target_date, "at_risk")],
             ("name", "baseline_date", "status"),
         )
         _upsert_many(
             connection,
             "planview_resource_assignments",
             ("external_id", "initiative_id", "person_id", "role_name", "allocated_fte"),
-            [("PV-RES-LEAD", INITIATIVE_ID, "lead-engineer", "Customer 360 Lead", 2.5),
-             ("PV-RES-DATA", INITIATIVE_ID, "data-engineer", "Customer Data Engineer", 2.5),
-             ("PV-RES-DELIVERY", INITIATIVE_ID, "delivery-engineer", "CRM Integration Engineer", 2.5)],
+            [("PV-RES-LEAD", INITIATIVE_ID, "lead-engineer", "Customer 360 Lead", 1.0),
+             ("PV-RES-DATA", INITIATIVE_ID, "data-engineer", "Customer Data Engineer", 2.0),
+             ("PV-RES-DELIVERY", INITIATIVE_ID, "delivery-engineer", "CRM Integration Engineer", 2.8),
+             ("PV-RES-PRIVACY", INITIATIVE_ID, "privacy-engineer", "Customer Privacy Engineer", 1.2)],
             ("person_id", "role_name", "allocated_fte"),
         )
 
@@ -659,6 +665,19 @@ def build_report(connection: sqlite3.Connection, as_of: date | None = None) -> d
         "connectors": source_modes,
         "writeback_performed": False,
         "recovery_scenario": _latest_recovery_scenario(connection),
+        "resource_allocations": [
+            dict(row)
+            for row in connection.execute(
+                """
+                SELECT role_name, ROUND(SUM(allocated_fte), 1) AS allocated_fte
+                FROM planview_resource_assignments
+                WHERE initiative_id = ?
+                GROUP BY role_name
+                ORDER BY role_name
+                """,
+                (INITIATIVE_ID,),
+            )
+        ],
         **({"simulation": simulation} if simulation else {}),
     }
 
@@ -741,8 +760,34 @@ def save_recovery_scenario(
     return _latest_recovery_scenario(connection) or {}
 
 
+def _is_loopback(host: str) -> bool:
+    if host in ("localhost", ""):
+        return host == "localhost"
+    try:
+        return ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        return False
+
+
+def _env_flag(name: str) -> bool | None:
+    value = os.environ.get(name)
+    return None if value is None else value.strip().lower() in ("1", "true", "yes", "on")
+
+
+DESTRUCTIVE_ROUTES = ("/api/reset-all", "/api/simulate")
+
+
 def serve_dashboard(database: str | Path, host: str, port: int) -> None:
-    """Serve the read-only dashboard and report endpoint on a local HTTP server."""
+    """Serve the dashboard and API; refuse unauthenticated exposure beyond loopback."""
+    loopback = _is_loopback(host)
+    if not loopback and not _env_flag("DELIVERYTWIN_TRUSTED_AUTH"):
+        raise SystemExit(
+            f"Refusing to bind {host!r}: the API has no built-in authentication. "
+            "Bind 127.0.0.1, or set DELIVERYTWIN_TRUSTED_AUTH=1 when an authenticating "
+            "gateway (Entra ID, App Service, Databricks Apps) fronts this server."
+        )
+    configured_demo = _env_flag("DELIVERYTWIN_DEMO_MODE")
+    demo_mode = loopback if configured_demo is None else configured_demo
     with connect(database) as connection:
         initialize_database(connection, register_sources=False)
 
@@ -762,6 +807,15 @@ def serve_dashboard(database: str | Path, host: str, port: int) -> None:
                 from .chat import chat_configuration_status
 
                 self.send_json(200, chat_configuration_status())
+                return
+            if route == "/api/impact":
+                from .analytics import build_impact_report
+
+                try:
+                    with connect(database) as connection:
+                        self.send_json(200, build_impact_report(connection))
+                except (OSError, sqlite3.Error, RuntimeError) as error:
+                    self.send_json(500, {"error": f"Unable to build impact report: {error}"})
                 return
             if route == "/api/intake/baseline":
                 from .intake import latest_baseline
@@ -853,6 +907,7 @@ def serve_dashboard(database: str | Path, host: str, port: int) -> None:
             return payload
 
         def handle_intake(self, route: str, payload: dict[str, Any]) -> None:
+            from .analytics import record_intake_activity
             from .intake import (
                 analyze_intake, approve_baseline, evaluate_intake, forecast_from_history, simulate_rom,
             )
@@ -903,6 +958,16 @@ def serve_dashboard(database: str | Path, host: str, port: int) -> None:
                             documents=payload.get("documents"),
                             adjustments=payload.get("adjustments"),
                         )
+                    event = {
+                        "/api/intake/analyze": "started",
+                        "/api/intake/evaluate": "rom_ready",
+                        "/api/intake/forecast": "rom_ready",
+                        "/api/intake/approve": "approved",
+                    }.get(route)
+                    if event:
+                        record_intake_activity(
+                            connection, payload.get("intake_session_id"), event
+                        )
             except ValueError as error:
                 self.send_json(400, {"error": str(error)})
                 return
@@ -911,6 +976,16 @@ def serve_dashboard(database: str | Path, host: str, port: int) -> None:
                 return
             self.send_json(200, result)
 
+        def reject(self, status: int, message: str) -> None:
+            # Consume the small request body first so the client sees the response, not a reset.
+            try:
+                remaining = min(int(self.headers.get("Content-Length") or 0), MAX_CHAT_REQUEST_BYTES)
+            except ValueError:
+                remaining = 0
+            if remaining:
+                self.rfile.read(remaining)
+            self.send_json(status, {"error": message})
+
         def do_POST(self) -> None:
             route = urlsplit(self.path).path
             if route not in (
@@ -918,6 +993,13 @@ def serve_dashboard(database: str | Path, host: str, port: int) -> None:
                 *INTAKE_POST_ROUTES, *ACT_POST_ROUTES,
             ):
                 self.send_error(404, "Not found")
+                return
+            origin = self.headers.get("Origin")
+            if origin and urlsplit(origin).netloc != self.headers.get("Host"):
+                self.reject(403, "Cross-origin requests are not allowed.")
+                return
+            if route in DESTRUCTIVE_ROUTES and not demo_mode:
+                self.reject(403, "Demo data operations are disabled (DELIVERYTWIN_DEMO_MODE).")
                 return
             payload = self.read_json_object(
                 MAX_INTAKE_REQUEST_BYTES if route in INTAKE_POST_ROUTES else MAX_CHAT_REQUEST_BYTES
@@ -1081,8 +1163,27 @@ def main(argv: list[str] | None = None) -> int:
     serve_parser = subparsers.add_parser("serve", help="Run the local read-only web dashboard")
     serve_parser.add_argument("--host", default="127.0.0.1", help="Dashboard bind address")
     serve_parser.add_argument("--port", type=int, default=8765, help="Dashboard port")
+    data_parser = subparsers.add_parser(
+        "generate-data", help="Regenerate the deterministic delivery_intel-shaped CSV dataset"
+    )
+    data_parser.add_argument("--out", default=None, help="Output directory (default: packaged dataset)")
+    ddl_parser = subparsers.add_parser("ddl", help="Print table DDL for a SQL dialect")
+    ddl_parser.add_argument("--dialect", choices=("databricks", "duckdb", "sqlite"), default="databricks")
+    ddl_parser.add_argument("--catalog", default="dpm_dev")
+    ddl_parser.add_argument("--schema", default="mlops")
     args = parser.parse_args(argv)
 
+    if args.command == "generate-data":
+        from .data import DATASET_DIR, write_dataset
+
+        _write_json(write_dataset(args.out or DATASET_DIR))
+        return 0
+    if args.command == "ddl":
+        from .data import render_ddl
+
+        qualified = args.dialect == "databricks"
+        print(render_ddl(args.dialect, args.catalog if qualified else None, args.schema if qualified else None), end="")
+        return 0
     if args.command == "serve":
         serve_dashboard(args.db, args.host, args.port)
         return 0

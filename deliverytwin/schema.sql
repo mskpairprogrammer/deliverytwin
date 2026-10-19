@@ -261,6 +261,13 @@ CREATE TABLE IF NOT EXISTS baseline_approvals (
     approved_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS intake_sessions (
+    session_id TEXT PRIMARY KEY,
+    started_at TEXT NOT NULL,
+    first_rom_at TEXT,
+    approved_at TEXT
+);
+
 CREATE TABLE IF NOT EXISTS recovery_scenarios (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     initiative_id TEXT NOT NULL REFERENCES delivery_initiatives(id),
@@ -288,3 +295,5 @@ CREATE INDEX IF NOT EXISTS idx_snow_changes_initiative_state
     ON servicenow_change_requests(initiative_id, state);
 CREATE INDEX IF NOT EXISTS idx_ukg_entries_initiative_type_date
     ON ukg_time_entries(initiative_id, work_type, work_date);
+CREATE INDEX IF NOT EXISTS idx_intake_sessions_started_at
+    ON intake_sessions(started_at);

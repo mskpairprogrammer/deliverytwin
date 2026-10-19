@@ -1,0 +1,201 @@
+project_id,category,lesson,suggested_option
+HIST-001,architecture,Customer Profile Unification moved consumers in phases while existing workflows stayed available.,incremental
+HIST-001,data,"Near-real-time events from CRM, commerce, and service systems kept customer profile data in sync for Customer Profile Unification, with replay and reconciliation controls.",event_sync
+HIST-001,security,Customer Profile Unification classified PII and completed consent and retention reviews before each release.,pii_consent
+HIST-001,reuse,Customer Profile Unification reused existing match rules and profile APIs rather than building new identity logic.,reuse_mdm
+HIST-002,architecture,CRM and Service Profile Consolidation moved consumers in phases while existing workflows stayed available.,incremental
+HIST-002,data,"Near-real-time events from CRM, commerce, and service systems kept customer profile data in sync for CRM and Service Profile Consolidation, with replay and reconciliation controls.",event_sync
+HIST-002,security,CRM and Service Profile Consolidation classified PII and completed consent and retention reviews before each release.,pii_consent
+HIST-002,reuse,CRM and Service Profile Consolidation reused existing match rules and profile APIs rather than building new identity logic.,reuse_mdm
+HIST-003,architecture,Customer Identity Resolution Service moved consumers in phases while existing workflows stayed available.,incremental
+HIST-003,data,"Near-real-time events from CRM, commerce, and service systems kept customer profile data in sync for Customer Identity Resolution Service, with replay and reconciliation controls.",event_sync
+HIST-003,security,Customer Identity Resolution Service classified PII and completed consent and retention reviews before each release.,pii_consent
+HIST-003,reuse,Customer Identity Resolution Service reused existing match rules and profile APIs rather than building new identity logic.,reuse_mdm
+HIST-004,architecture,Customer Master Data Hub moved consumers in phases while existing workflows stayed available.,incremental
+HIST-004,data,"Near-real-time events from CRM, commerce, and service systems kept customer profile data in sync for Customer Master Data Hub, with replay and reconciliation controls.",event_sync
+HIST-004,security,Customer Master Data Hub classified PII and completed consent and retention reviews before each release.,pii_consent
+HIST-004,reuse,Customer Master Data Hub reused existing match rules and profile APIs rather than building new identity logic.,reuse_mdm
+HIST-005,architecture,Consent & Preference Hub moved consumers in phases while existing workflows stayed available.,incremental
+HIST-005,data,"Near-real-time events from CRM, commerce, and service systems kept customer profile data in sync for Consent & Preference Hub, with replay and reconciliation controls.",event_sync
+HIST-005,security,Consent & Preference Hub classified PII and completed consent and retention reviews before each release.,pii_consent
+HIST-005,reuse,Consent & Preference Hub reused existing match rules and profile APIs rather than building new identity logic.,reuse_mdm
+HIST-006,architecture,Contact Center Profile API moved consumers in phases while existing workflows stayed available.,incremental
+HIST-006,data,"Near-real-time events from CRM, commerce, and service systems kept customer profile data in sync for Contact Center Profile API, with replay and reconciliation controls.",event_sync
+HIST-006,security,Contact Center Profile API classified PII and completed consent and retention reviews before each release.,pii_consent
+HIST-006,reuse,Contact Center Profile API reused existing match rules and profile APIs rather than building new identity logic.,reuse_mdm
+HIST-007,architecture,Loyalty Data Platform moved consumers in phases while existing workflows stayed available.,incremental
+HIST-007,data,"Loyalty Data Platform relied on an existing master record, so no additional data movement was built.",single_source
+HIST-007,security,Loyalty Data Platform classified PII and completed consent and retention reviews before each release.,pii_consent
+HIST-007,reuse,Loyalty Data Platform reused existing match rules and profile APIs rather than building new identity logic.,reuse_mdm
+HIST-008,architecture,Customer Data Lakehouse moved consumers in phases while existing workflows stayed available.,incremental
+HIST-008,data,"Near-real-time events from CRM, commerce, and service systems kept customer profile data in sync for Customer Data Lakehouse, with replay and reconciliation controls.",event_sync
+HIST-008,security,Customer Data Lakehouse classified PII and completed consent and retention reviews before each release.,pii_consent
+HIST-008,reuse,Customer Data Lakehouse reused existing match rules and profile APIs rather than building new identity logic.,reuse_mdm
+HIST-009,architecture,Household Graph Service moved consumers in phases while existing workflows stayed available.,incremental
+HIST-009,data,Scheduled batch reconciliation of customer records in Household Graph Service exposed mismatches before release.,batch_sync
+HIST-009,security,Household Graph Service classified PII and completed consent and retention reviews before each release.,pii_consent
+HIST-009,reuse,Household Graph Service reused existing match rules and profile APIs rather than building new identity logic.,reuse_mdm
+HIST-010,architecture,Customer Segmentation Feed moved consumers in phases while existing workflows stayed available.,incremental
+HIST-010,data,"Customer Segmentation Feed relied on an existing master record, so no additional data movement was built.",single_source
+HIST-010,security,Customer Segmentation Feed classified PII and completed consent and retention reviews before each release.,pii_consent
+HIST-010,reuse,Customer Segmentation Feed reused existing match rules and profile APIs rather than building new identity logic.,reuse_mdm
+HIST-011,architecture,Preference Center Modernization moved consumers in phases while existing workflows stayed available.,incremental
+HIST-011,data,"Preference Center Modernization relied on an existing master record, so no additional data movement was built.",single_source
+HIST-011,security,Preference Center Modernization classified PII and completed consent and retention reviews before each release.,pii_consent
+HIST-011,reuse,Preference Center Modernization reused existing match rules and profile APIs rather than building new identity logic.,reuse_mdm
+HIST-012,architecture,Support Case Context Service moved consumers in phases while existing workflows stayed available.,incremental
+HIST-012,data,"Near-real-time events from CRM, commerce, and service systems kept customer profile data in sync for Support Case Context Service, with replay and reconciliation controls.",event_sync
+HIST-012,security,Support Case Context Service classified PII and completed consent and retention reviews before each release.,pii_consent
+HIST-012,reuse,Support Case Context Service reused existing match rules and profile APIs rather than building new identity logic.,reuse_mdm
+HIST-013,architecture,Customer Profile Workspace used a new service with independent data contracts and short release cycles.,greenfield
+HIST-013,data,"Customer Profile Workspace relied on an existing master record, so no additional data movement was built.",single_source
+HIST-013,security,Customer Profile Workspace passed standard access reviews because no sensitive attributes were in scope.,standard
+HIST-013,reuse,Customer Profile Workspace reused existing match rules and profile APIs rather than building new identity logic.,reuse_mdm
+HIST-014,architecture,Agent Console Profile Panel used a new service with independent data contracts and short release cycles.,greenfield
+HIST-014,data,"Agent Console Profile Panel relied on an existing master record, so no additional data movement was built.",single_source
+HIST-014,security,Agent Console Profile Panel passed standard access reviews because no sensitive attributes were in scope.,standard
+HIST-014,reuse,Agent Console Profile Panel reused existing match rules and profile APIs rather than building new identity logic.,reuse_mdm
+HIST-015,architecture,Self-Service Account Portal used a new service with independent data contracts and short release cycles.,greenfield
+HIST-015,data,"Self-Service Account Portal relied on an existing master record, so no additional data movement was built.",single_source
+HIST-015,security,Self-Service Account Portal passed standard access reviews because no sensitive attributes were in scope.,standard
+HIST-015,reuse,Self-Service Account Portal reused existing match rules and profile APIs rather than building new identity logic.,reuse_mdm
+HIST-016,architecture,Customer Timeline Service used a new service with independent data contracts and short release cycles.,greenfield
+HIST-016,data,"Customer Timeline Service relied on an existing master record, so no additional data movement was built.",single_source
+HIST-016,security,Customer Timeline Service passed standard access reviews because no sensitive attributes were in scope.,standard
+HIST-016,reuse,Customer Timeline Service reused existing match rules and profile APIs rather than building new identity logic.,reuse_mdm
+HIST-017,architecture,Digital Onboarding Profile used a new service with independent data contracts and short release cycles.,greenfield
+HIST-017,data,"Digital Onboarding Profile relied on an existing master record, so no additional data movement was built.",single_source
+HIST-017,security,Digital Onboarding Profile passed standard access reviews because no sensitive attributes were in scope.,standard
+HIST-017,reuse,Digital Onboarding Profile reused existing match rules and profile APIs rather than building new identity logic.,reuse_mdm
+HIST-018,architecture,CRM Vendor Integration required a coordinated cutover with a rehearsed rollback window.,big_bang
+HIST-018,data,Scheduled batch reconciliation of customer records in CRM Vendor Integration exposed mismatches before release.,batch_sync
+HIST-018,security,CRM Vendor Integration classified PII and completed consent and retention reviews before each release.,pii_consent
+HIST-018,reuse,CRM Vendor Integration built new components because no suitable shared capability existed.,build_new
+HIST-019,architecture,Hosted Service Desk Cutover required a coordinated cutover with a rehearsed rollback window.,big_bang
+HIST-019,data,Scheduled batch reconciliation of customer records in Hosted Service Desk Cutover exposed mismatches before release.,batch_sync
+HIST-019,security,Hosted Service Desk Cutover classified PII and completed consent and retention reviews before each release.,pii_consent
+HIST-019,reuse,Hosted Service Desk Cutover built new components because no suitable shared capability existed.,build_new
+HIST-020,architecture,ERP Customer Master Sync required a coordinated cutover with a rehearsed rollback window.,big_bang
+HIST-020,data,Scheduled batch reconciliation of customer records in ERP Customer Master Sync exposed mismatches before release.,batch_sync
+HIST-020,security,ERP Customer Master Sync classified PII and completed consent and retention reviews before each release.,pii_consent
+HIST-020,reuse,ERP Customer Master Sync built new components because no suitable shared capability existed.,build_new
+HIST-021,architecture,Marketing Cloud Migration required a coordinated cutover with a rehearsed rollback window.,big_bang
+HIST-021,data,Scheduled batch reconciliation of customer records in Marketing Cloud Migration exposed mismatches before release.,batch_sync
+HIST-021,security,Marketing Cloud Migration classified PII and completed consent and retention reviews before each release.,pii_consent
+HIST-021,reuse,Marketing Cloud Migration built new components because no suitable shared capability existed.,build_new
+HIST-022,architecture,Contact Center Platform Replacement required a coordinated cutover with a rehearsed rollback window.,big_bang
+HIST-022,data,Scheduled batch reconciliation of customer records in Contact Center Platform Replacement exposed mismatches before release.,batch_sync
+HIST-022,security,Contact Center Platform Replacement passed standard access reviews because no sensitive attributes were in scope.,standard
+HIST-022,reuse,Contact Center Platform Replacement built new components because no suitable shared capability existed.,build_new
+HIST-023,architecture,Order History Sync moved consumers in phases while existing workflows stayed available.,incremental
+HIST-023,data,"Near-real-time events from CRM, commerce, and service systems kept customer profile data in sync for Order History Sync, with replay and reconciliation controls.",event_sync
+HIST-023,security,Order History Sync classified PII and completed consent and retention reviews before each release.,pii_consent
+HIST-023,reuse,Order History Sync reused existing match rules and profile APIs rather than building new identity logic.,reuse_mdm
+HIST-024,architecture,Cart and Checkout Event Stream moved consumers in phases while existing workflows stayed available.,incremental
+HIST-024,data,"Near-real-time events from CRM, commerce, and service systems kept customer profile data in sync for Cart and Checkout Event Stream, with replay and reconciliation controls.",event_sync
+HIST-024,security,Cart and Checkout Event Stream classified PII and completed consent and retention reviews before each release.,pii_consent
+HIST-024,reuse,Cart and Checkout Event Stream reused existing match rules and profile APIs rather than building new identity logic.,reuse_mdm
+HIST-025,architecture,Returns Portal Integration moved consumers in phases while existing workflows stayed available.,incremental
+HIST-025,data,"Near-real-time events from CRM, commerce, and service systems kept customer profile data in sync for Returns Portal Integration, with replay and reconciliation controls.",event_sync
+HIST-025,security,Returns Portal Integration passed standard access reviews because no sensitive attributes were in scope.,standard
+HIST-025,reuse,Returns Portal Integration built new components because no suitable shared capability existed.,build_new
+HIST-026,architecture,Subscription Billing Profile Sync moved consumers in phases while existing workflows stayed available.,incremental
+HIST-026,data,"Near-real-time events from CRM, commerce, and service systems kept customer profile data in sync for Subscription Billing Profile Sync, with replay and reconciliation controls.",event_sync
+HIST-026,security,Subscription Billing Profile Sync classified PII and completed consent and retention reviews before each release.,pii_consent
+HIST-026,reuse,Subscription Billing Profile Sync reused existing match rules and profile APIs rather than building new identity logic.,reuse_mdm
+HIST-027,architecture,Product Catalog Feed moved consumers in phases while existing workflows stayed available.,incremental
+HIST-027,data,"Near-real-time events from CRM, commerce, and service systems kept customer profile data in sync for Product Catalog Feed, with replay and reconciliation controls.",event_sync
+HIST-027,security,Product Catalog Feed classified PII and completed consent and retention reviews before each release.,pii_consent
+HIST-027,reuse,Product Catalog Feed reused existing match rules and profile APIs rather than building new identity logic.,reuse_mdm
+HIST-028,architecture,Fulfillment Status Gateway moved consumers in phases while existing workflows stayed available.,incremental
+HIST-028,data,"Near-real-time events from CRM, commerce, and service systems kept customer profile data in sync for Fulfillment Status Gateway, with replay and reconciliation controls.",event_sync
+HIST-028,security,Fulfillment Status Gateway passed standard access reviews because no sensitive attributes were in scope.,standard
+HIST-028,reuse,Fulfillment Status Gateway built new components because no suitable shared capability existed.,build_new
+HIST-029,architecture,Enterprise Lakehouse Foundation moved consumers in phases while existing workflows stayed available.,incremental
+HIST-029,data,"Near-real-time events from CRM, commerce, and service systems kept customer profile data in sync for Enterprise Lakehouse Foundation, with replay and reconciliation controls.",event_sync
+HIST-029,security,Enterprise Lakehouse Foundation passed standard access reviews because no sensitive attributes were in scope.,standard
+HIST-029,reuse,Enterprise Lakehouse Foundation reused existing match rules and profile APIs rather than building new identity logic.,reuse_mdm
+HIST-030,architecture,Streaming Ingestion Platform moved consumers in phases while existing workflows stayed available.,incremental
+HIST-030,data,"Near-real-time events from CRM, commerce, and service systems kept customer profile data in sync for Streaming Ingestion Platform, with replay and reconciliation controls.",event_sync
+HIST-030,security,Streaming Ingestion Platform passed standard access reviews because no sensitive attributes were in scope.,standard
+HIST-030,reuse,Streaming Ingestion Platform reused existing match rules and profile APIs rather than building new identity logic.,reuse_mdm
+HIST-031,architecture,Feature Store Enablement moved consumers in phases while existing workflows stayed available.,incremental
+HIST-031,data,"Feature Store Enablement relied on an existing master record, so no additional data movement was built.",single_source
+HIST-031,security,Feature Store Enablement classified PII and completed consent and retention reviews before each release.,pii_consent
+HIST-031,reuse,Feature Store Enablement reused existing match rules and profile APIs rather than building new identity logic.,reuse_mdm
+HIST-032,architecture,Data Quality Observability moved consumers in phases while existing workflows stayed available.,incremental
+HIST-032,data,"Near-real-time events from CRM, commerce, and service systems kept customer profile data in sync for Data Quality Observability, with replay and reconciliation controls.",event_sync
+HIST-032,security,Data Quality Observability classified PII and completed consent and retention reviews before each release.,pii_consent
+HIST-032,reuse,Data Quality Observability reused existing match rules and profile APIs rather than building new identity logic.,reuse_mdm
+HIST-033,architecture,Regional Data Residency Program moved consumers in phases while existing workflows stayed available.,incremental
+HIST-033,data,"Near-real-time events from CRM, commerce, and service systems kept customer profile data in sync for Regional Data Residency Program, with replay and reconciliation controls.",event_sync
+HIST-033,security,Regional Data Residency Program classified PII and completed consent and retention reviews before each release.,pii_consent
+HIST-033,reuse,Regional Data Residency Program reused existing match rules and profile APIs rather than building new identity logic.,reuse_mdm
+HIST-034,architecture,Unity Catalog Governance Rollout moved consumers in phases while existing workflows stayed available.,incremental
+HIST-034,data,"Near-real-time events from CRM, commerce, and service systems kept customer profile data in sync for Unity Catalog Governance Rollout, with replay and reconciliation controls.",event_sync
+HIST-034,security,Unity Catalog Governance Rollout classified PII and completed consent and retention reviews before each release.,pii_consent
+HIST-034,reuse,Unity Catalog Governance Rollout reused existing match rules and profile APIs rather than building new identity logic.,reuse_mdm
+HIST-035,architecture,Partner API Gateway moved consumers in phases while existing workflows stayed available.,incremental
+HIST-035,data,"Near-real-time events from CRM, commerce, and service systems kept customer profile data in sync for Partner API Gateway, with replay and reconciliation controls.",event_sync
+HIST-035,security,Partner API Gateway passed standard access reviews because no sensitive attributes were in scope.,standard
+HIST-035,reuse,Partner API Gateway built new components because no suitable shared capability existed.,build_new
+HIST-036,architecture,Payments Event Integration moved consumers in phases while existing workflows stayed available.,incremental
+HIST-036,data,"Near-real-time events from CRM, commerce, and service systems kept customer profile data in sync for Payments Event Integration, with replay and reconciliation controls.",event_sync
+HIST-036,security,Payments Event Integration passed standard access reviews because no sensitive attributes were in scope.,standard
+HIST-036,reuse,Payments Event Integration built new components because no suitable shared capability existed.,build_new
+HIST-037,architecture,Order Management Integration moved consumers in phases while existing workflows stayed available.,incremental
+HIST-037,data,"Near-real-time events from CRM, commerce, and service systems kept customer profile data in sync for Order Management Integration, with replay and reconciliation controls.",event_sync
+HIST-037,security,Order Management Integration passed standard access reviews because no sensitive attributes were in scope.,standard
+HIST-037,reuse,Order Management Integration built new components because no suitable shared capability existed.,build_new
+HIST-038,architecture,Supplier Connectivity API moved consumers in phases while existing workflows stayed available.,incremental
+HIST-038,data,"Near-real-time events from CRM, commerce, and service systems kept customer profile data in sync for Supplier Connectivity API, with replay and reconciliation controls.",event_sync
+HIST-038,security,Supplier Connectivity API passed standard access reviews because no sensitive attributes were in scope.,standard
+HIST-038,reuse,Supplier Connectivity API built new components because no suitable shared capability existed.,build_new
+HIST-039,architecture,Partner Portal Single Sign-On moved consumers in phases while existing workflows stayed available.,incremental
+HIST-039,data,"Near-real-time events from CRM, commerce, and service systems kept customer profile data in sync for Partner Portal Single Sign-On, with replay and reconciliation controls.",event_sync
+HIST-039,security,Partner Portal Single Sign-On passed standard access reviews because no sensitive attributes were in scope.,standard
+HIST-039,reuse,Partner Portal Single Sign-On built new components because no suitable shared capability existed.,build_new
+HIST-040,architecture,Mobile Backend Modernization moved consumers in phases while existing workflows stayed available.,incremental
+HIST-040,data,"Near-real-time events from CRM, commerce, and service systems kept customer profile data in sync for Mobile Backend Modernization, with replay and reconciliation controls.",event_sync
+HIST-040,security,Mobile Backend Modernization passed standard access reviews because no sensitive attributes were in scope.,standard
+HIST-040,reuse,Mobile Backend Modernization built new components because no suitable shared capability existed.,build_new
+HIST-041,architecture,Privacy Request Automation moved consumers in phases while existing workflows stayed available.,incremental
+HIST-041,data,"Privacy Request Automation relied on an existing master record, so no additional data movement was built.",single_source
+HIST-041,security,Privacy Request Automation classified PII and completed consent and retention reviews before each release.,pii_consent
+HIST-041,reuse,Privacy Request Automation reused existing match rules and profile APIs rather than building new identity logic.,reuse_mdm
+HIST-042,architecture,Consent Ledger Modernization moved consumers in phases while existing workflows stayed available.,incremental
+HIST-042,data,"Consent Ledger Modernization relied on an existing master record, so no additional data movement was built.",single_source
+HIST-042,security,Consent Ledger Modernization classified PII and completed consent and retention reviews before each release.,pii_consent
+HIST-042,reuse,Consent Ledger Modernization reused existing match rules and profile APIs rather than building new identity logic.,reuse_mdm
+HIST-043,architecture,PII Discovery and Masking moved consumers in phases while existing workflows stayed available.,incremental
+HIST-043,data,"PII Discovery and Masking relied on an existing master record, so no additional data movement was built.",single_source
+HIST-043,security,PII Discovery and Masking classified PII and completed consent and retention reviews before each release.,pii_consent
+HIST-043,reuse,PII Discovery and Masking reused existing match rules and profile APIs rather than building new identity logic.,reuse_mdm
+HIST-044,architecture,Access Governance Refresh moved consumers in phases while existing workflows stayed available.,incremental
+HIST-044,data,"Access Governance Refresh relied on an existing master record, so no additional data movement was built.",single_source
+HIST-044,security,Access Governance Refresh classified PII and completed consent and retention reviews before each release.,pii_consent
+HIST-044,reuse,Access Governance Refresh reused existing match rules and profile APIs rather than building new identity logic.,reuse_mdm
+HIST-045,architecture,Data Retention Enforcement moved consumers in phases while existing workflows stayed available.,incremental
+HIST-045,data,"Data Retention Enforcement relied on an existing master record, so no additional data movement was built.",single_source
+HIST-045,security,Data Retention Enforcement classified PII and completed consent and retention reviews before each release.,pii_consent
+HIST-045,reuse,Data Retention Enforcement reused existing match rules and profile APIs rather than building new identity logic.,reuse_mdm
+HIST-046,architecture,Billing Profile Master required a coordinated cutover with a rehearsed rollback window.,big_bang
+HIST-046,data,Scheduled batch reconciliation of customer records in Billing Profile Master exposed mismatches before release.,batch_sync
+HIST-046,security,Billing Profile Master passed standard access reviews because no sensitive attributes were in scope.,standard
+HIST-046,reuse,Billing Profile Master built new components because no suitable shared capability existed.,build_new
+HIST-047,architecture,Finance Close Automation required a coordinated cutover with a rehearsed rollback window.,big_bang
+HIST-047,data,Scheduled batch reconciliation of customer records in Finance Close Automation exposed mismatches before release.,batch_sync
+HIST-047,security,Finance Close Automation passed standard access reviews because no sensitive attributes were in scope.,standard
+HIST-047,reuse,Finance Close Automation built new components because no suitable shared capability existed.,build_new
+HIST-048,architecture,Procurement Platform Upgrade required a coordinated cutover with a rehearsed rollback window.,big_bang
+HIST-048,data,Scheduled batch reconciliation of customer records in Procurement Platform Upgrade exposed mismatches before release.,batch_sync
+HIST-048,security,Procurement Platform Upgrade passed standard access reviews because no sensitive attributes were in scope.,standard
+HIST-048,reuse,Procurement Platform Upgrade built new components because no suitable shared capability existed.,build_new
+HIST-049,architecture,Order-to-Cash Consolidation required a coordinated cutover with a rehearsed rollback window.,big_bang
+HIST-049,data,Scheduled batch reconciliation of customer records in Order-to-Cash Consolidation exposed mismatches before release.,batch_sync
+HIST-049,security,Order-to-Cash Consolidation passed standard access reviews because no sensitive attributes were in scope.,standard
+HIST-049,reuse,Order-to-Cash Consolidation built new components because no suitable shared capability existed.,build_new
+HIST-050,architecture,Revenue Recognition Integration required a coordinated cutover with a rehearsed rollback window.,big_bang
+HIST-050,data,Scheduled batch reconciliation of customer records in Revenue Recognition Integration exposed mismatches before release.,batch_sync
+HIST-050,security,Revenue Recognition Integration passed standard access reviews because no sensitive attributes were in scope.,standard
+HIST-050,reuse,Revenue Recognition Integration built new components because no suitable shared capability existed.,build_new

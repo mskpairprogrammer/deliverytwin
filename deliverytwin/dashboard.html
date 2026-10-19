@@ -34,7 +34,7 @@
     .top-meta { display: flex; align-items: center; gap: 18px; color: #c6d1dc; font-size: 12px; }
     .live { color: #8ee0c7; display: inline-flex; align-items: center; gap: 7px; }
     .live::before { content: ""; width: 7px; height: 7px; background: #55d1a7; border-radius: 50%; box-shadow: 0 0 0 4px rgb(85 209 167 / 14%); }
-    main { max-width: 1380px; margin: 0 auto; padding: 30px 28px 44px; }
+    main { max-width: 1380px; margin: 0 auto; padding: 30px 28px 96px; }
     .heading { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 22px; gap: 20px; }
     .eyebrow { font-size: 10px; letter-spacing: .16em; color: var(--muted); font-weight: 750; text-transform: uppercase; }
     h1 { margin: 7px 0 4px; font-size: clamp(24px, 3vw, 31px); letter-spacing: -.035em; }
@@ -107,6 +107,17 @@
     .full { grid-column: span 12; }
     .wide { grid-column: span 8; }
     .narrow { grid-column: span 4; }
+    .stage-label, .stage-caption { display: block; }
+    .stage-state { display: block; margin-top: 4px; font-size: 9px; font-weight: 700; letter-spacing: .03em; color: #8793a1; }
+    .stage[data-state="done"] .stage-icon { background: var(--teal); border-color: var(--teal); color: white; }
+    .stage[data-state="done"] .stage-state { color: var(--teal); }
+    .stage[data-state="ready"] .stage-state { color: #8a5a00; }
+    .grid[hidden], .empty-state[hidden], .next-step[hidden] { display: none; }
+    .empty-state { margin: 14px 19px 0; padding: 26px 20px; border: 1px dashed var(--line); border-radius: 12px; background: #fbfcfd; color: var(--muted); font-size: 12px; line-height: 1.6; display: grid; gap: 12px; justify-items: center; text-align: center; }
+    .empty-state strong { color: var(--ink, #1c2733); font-size: 13px; }
+    .next-step { display: flex; justify-content: space-between; align-items: center; gap: 14px; flex-wrap: wrap; margin-top: 16px; padding: 14px 18px; border: 1px solid #d9eee7; background: #f0f7f5; border-radius: 12px; font-size: 12px; color: var(--ink, #1c2733); }
+    .demo-controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 18px 2px 0; font-size: 10px; color: #8793a1; }
+    .demo-controls .intake-btn { padding: 6px 10px; font-size: 10px; }
     .half { grid-column: span 6; }
     .detail-list { padding: 8px 19px 17px; }
     .detail-row { display: flex; justify-content: space-between; gap: 15px; padding: 11px 0; border-bottom: 1px solid #f0f2f4; font-size: 10px; }
@@ -155,7 +166,7 @@
     .chat-send { min-height: 40px; border: 0; border-radius: 8px; background: var(--teal); color: white; padding: 0 13px; font: inherit; font-size: 11px; font-weight: 700; cursor: pointer; }
     .chat-send:disabled, .chat-input:disabled { opacity: .55; cursor: not-allowed; }
     @media (max-width: 900px) {
-      .overview, .risk { grid-column: span 12; }
+      .overview, .risk, .wide, .narrow, .half { grid-column: span 12; }
       .sources, .action { grid-column: span 6; }
     }
     @media (max-width: 620px) {
@@ -224,6 +235,34 @@
     .evidence { margin: 8px 0 0; padding: 8px 10px; background: #f4f7f9; border-radius: 7px; font-size: 9px; color: var(--muted); line-height: 1.5; }
     .evidence strong { color: var(--ink); }
     .clarity { font-size: 10px; font-weight: 700; color: var(--amber); }
+    .profile-card, .chart-card { border: 1px solid var(--line); border-radius: 9px; padding: 12px; background: white; }
+    .profile-columns, .commit-chart-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .profile-list { margin: 7px 0 0; padding-left: 18px; font-size: 10px; line-height: 1.6; }
+    .profile-list li.empty { color: var(--muted); list-style: none; margin-left: -18px; }
+    .chart-card { margin-top: 12px; }
+    .chart-title { margin: 0 0 5px; font-size: 12px; font-weight: 750; }
+    .chart-note { margin: 7px 0 0; color: var(--muted); font-size: 9px; line-height: 1.5; }
+    .chart-svg { display: block; width: 100%; height: auto; min-height: 170px; overflow: visible; }
+    .chart-svg text { fill: var(--ink); font: 10px "Segoe UI", Arial, sans-serif; }
+    .chart-svg .axis-label { fill: var(--muted); font-size: 9px; }
+    .chart-svg .grid-line { stroke: #e6ebf1; stroke-width: 1; }
+    .chart-legend { display: flex; flex-wrap: wrap; gap: 10px 16px; font-size: 9px; color: var(--muted); }
+    .chart-legend span { display: inline-flex; align-items: center; gap: 5px; }
+    .chart-swatch { width: 10px; height: 10px; display: inline-block; border-radius: 2px; }
+    .confidence-bridge { display: grid; gap: 9px; margin-top: 12px; }
+    .confidence-row { display: grid; grid-template-columns: minmax(110px, 1fr) 3fr auto; gap: 8px; align-items: center; font-size: 10px; }
+    .confidence-track { height: 12px; border-radius: 999px; overflow: hidden; background: #edf0f3; }
+    .confidence-fill { height: 100%; background: var(--teal); }
+    .confidence-fill.warn { background: var(--amber); }
+    .scenario-compare { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 12px; }
+    .scenario-column { border: 1px solid var(--line); border-radius: 9px; padding: 10px; background: white; }
+    .scenario-column strong { display: block; font-size: 10px; margin-bottom: 7px; }
+    .impact-panel { margin-top: 14px; padding: 15px 18px; }
+    .impact-panel summary { cursor: pointer; font-size: 13px; font-weight: 750; }
+    .impact-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin: 14px 0; }
+    .impact-grid .mini-metric { border: 1px solid var(--line); border-radius: 8px; padding: 10px; }
+    .impact-status { min-height: 1.4em; color: var(--muted); font-size: 10px; }
+    .backtest-chart { margin-top: 10px; }
     .fp-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
     .fp-dim { border: 1px solid var(--line); border-radius: 9px; background: white; padding: 10px 11px; }
     .fp-dim .dim-name { font-size: 9px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
@@ -235,6 +274,11 @@
     .dim-chip.full { background: var(--teal-soft); color: var(--teal); }
     .dim-chip.part { background: var(--amber-soft); color: var(--amber); }
     .dim-chip.none { background: #f0f2f4; color: var(--muted); }
+    #intake-step-5 .intake-actions { margin: 14px 0; }
+    .commit-tune { margin-top: 18px; }
+    .scenario-table td:first-child { color: var(--muted); }
+    .scenario-table td.changed { font-weight: 800; color: var(--teal); }
+    .scenario-table td.changed.worse { color: #a4572b; }
     .rom-hero { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
     .rom-hero .mini-metric { background: white; border: 1px solid var(--line); border-left-width: 3px; border-radius: 9px; padding: 10px 12px; }
     .rom-explain { margin: 12px 0 0; padding: 10px 12px; background: #f4f7f9; border-radius: 8px; font-size: 10px; color: var(--muted); line-height: 1.6; }
@@ -246,16 +290,18 @@
     body[data-sim="false"] .awaiting { display: block; }
     .sim-bar { display: flex; align-items: center; gap: 10px; margin: 0 0 14px; flex-wrap: wrap; }
     .sim-status { font-size: 11px; color: var(--muted); }
-    body[data-sim="false"] #panel-sense .grid,
-    body[data-sim="false"] #panel-forecast .grid,
-    body[data-sim="false"] #panel-act .grid { display: none; }
+    body[data-sim="false"] #panel-track .grid,
+    body[data-sim="false"] #panel-intervene .grid { display: none; }
     body[data-sim="false"] #panel-shape > .grid { display: none; }
     .shape-actions { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
     .intake-btn.danger { border-color: #e6b8b8; color: #8a2f2e; }
     .intake-btn.danger:hover { background: #fff5f4; }
     @media (max-width: 900px) {
       .q-grid, .fp-grid, .rom-hero { grid-template-columns: 1fr; }
+      #intake-commitment { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .history-results .rom-hero { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .profile-columns, .commit-chart-grid, .scenario-compare { grid-template-columns: 1fr; }
+      .impact-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
   </style>
 </head>
@@ -276,22 +322,22 @@
     <div id="error" class="error" role="alert"></div>
     <div class="journey" role="tablist" aria-label="Delivery lifecycle stages">
       <button class="stage" id="tab-shape" type="button" role="tab" aria-selected="true" aria-controls="panel-shape" tabindex="0" data-stage="shape">
-        <span class="stage-icon">01</span><span><span class="stage-label">SHAPE</span><span class="stage-caption">Commitment baseline</span></span>
+        <span class="stage-icon">01</span><span><span class="stage-label">SHAPE</span><span class="stage-caption">Intake and evidence</span><span class="stage-state" id="state-shape"></span></span>
       </button>
-      <button class="stage" id="tab-sense" type="button" role="tab" aria-selected="false" aria-controls="panel-sense" tabindex="-1" data-stage="sense">
-        <span class="stage-icon">02</span><span><span class="stage-label">SENSE</span><span class="stage-caption">Delivery signals</span></span>
+      <button class="stage" id="tab-commit" type="button" role="tab" aria-selected="false" aria-controls="panel-commit" tabindex="-1" data-stage="commit">
+        <span class="stage-icon">02</span><span><span class="stage-label">COMMIT</span><span class="stage-caption">Approve a baseline</span><span class="stage-state" id="state-commit"></span></span>
       </button>
-      <button class="stage" id="tab-forecast" type="button" role="tab" aria-selected="false" aria-controls="panel-forecast" tabindex="-1" data-stage="forecast">
-        <span class="stage-icon">03</span><span><span class="stage-label">FORECAST</span><span class="stage-caption">Probability outlook</span></span>
+      <button class="stage" id="tab-track" type="button" role="tab" aria-selected="false" aria-controls="panel-track" tabindex="-1" data-stage="track">
+        <span class="stage-icon">03</span><span><span class="stage-label">TRACK</span><span class="stage-caption">Signals and outlook</span><span class="stage-state" id="state-track"></span></span>
       </button>
-      <button class="stage" id="tab-act" type="button" role="tab" aria-selected="false" aria-controls="panel-act" tabindex="-1" data-stage="act">
-        <span class="stage-icon">04</span><span><span class="stage-label">ACT</span><span class="stage-caption">Recovery decision</span></span>
+      <button class="stage" id="tab-intervene" type="button" role="tab" aria-selected="false" aria-controls="panel-intervene" tabindex="-1" data-stage="intervene">
+        <span class="stage-icon">04</span><span><span class="stage-label">INTERVENE</span><span class="stage-caption">Review recovery options</span><span class="stage-state" id="state-intervene"></span></span>
       </button>
     </div>
     <section id="panel-shape" class="stage-panel" role="tabpanel" aria-labelledby="tab-shape" tabindex="0">
-      <div class="stage-intro"><div><h2>Shape the commitment</h2><p>Approved baseline, effort range, assumptions, and delivery capacity.</p></div><div class="shape-actions"><button id="clear-all-data" class="intake-btn danger" type="button">Clear all demo data</button><span id="clear-data-status" class="sim-status" role="status"></span><span class="badge" id="shape-stage-status">INTAKE IN PROGRESS</span></div></div>
+      <div class="stage-intro"><div><h2>Shape a delivery proposal</h2><p>Clarify the request, review historical evidence, and produce an explainable estimate.</p></div><div class="shape-actions"><span class="badge" id="shape-stage-status">INTAKE IN PROGRESS</span></div></div>
       <section class="card intake" id="intake" aria-labelledby="intake-title">
-        <div class="card-head"><div><h3 class="card-title" id="intake-title">Intake request</h3><div class="card-kicker">Intake request → clarified fingerprint → explainable ROM → approved baseline</div></div><span class="badge" id="intake-step-badge">STEP 1 OF 5</span></div>
+        <div class="card-head"><div><h3 class="card-title" id="intake-title">Intake request</h3><div class="card-kicker">Intake request → clarified fingerprint → historical evidence → explainable ROM</div></div><span class="badge" id="intake-step-badge">STEP 1 OF 5</span></div>
         <div class="intake-body">
           <div class="intake-step" id="intake-step-1">
             <h4 class="step-title"><span class="step-num">1</span>Intake request</h4>
@@ -313,6 +359,15 @@
           <div class="intake-step" id="intake-step-2" hidden>
             <h4 class="step-title"><span class="step-num">2</span>Clarification questions <span id="intake-clarity" class="clarity"></span></h4>
             <p class="step-help" id="intake-retrieval"></p>
+            <section id="intake-profile" class="profile-card" aria-label="Request profile" hidden>
+              <h4 class="chart-title">Request profile · review before estimating</h4>
+              <p class="chart-note" id="intake-profile-summary"></p>
+              <div class="profile-columns">
+                <div><strong>Areas indicated in the request</strong><ul id="intake-profile-facts" class="profile-list"></ul></div>
+                <div><strong>Needs clarification</strong><ul id="intake-profile-gaps" class="profile-list"></ul></div>
+              </div>
+              <p class="chart-note">Area detection is keyword-based; treat it as a prompt for review, not a verified fact extraction.</p>
+            </section>
             <div id="intake-questions" class="q-grid"></div>
             <div class="intake-actions"><button id="intake-fingerprint-btn" class="intake-btn primary" type="button">Confirm answers &amp; match fingerprint</button></div>
           </div>
@@ -332,36 +387,17 @@
               <p class="step-help">The completed-project list supports both estimates: the three projects marked ROM input drive the deterministic baseline, and up to ten inform the probabilistic forecast. When configured, an LLM reranks these retrieved projects and explains the matches; otherwise SQLite similarity ranking is used. The forecast is advisory and does not change the approval baseline.</p>
               <div class="intake-actions"><button id="intake-history-forecast" class="intake-btn" type="button">Forecast from historical projects</button></div>
               <div id="history-results" class="history-results" aria-live="polite"></div>
+              <section class="chart-card" aria-labelledby="rom-visual-title">
+                <h4 id="rom-visual-title" class="chart-title">Closest ROM analogs</h4>
+                <div id="rom-analogs" class="history-results"></div>
+              </section>
             </section>
-            <div class="intake-actions"><button id="intake-commit-btn" class="intake-btn primary" type="button">Check feasible commitment</button></div>
-          </div>
-          <div class="intake-step" id="intake-step-5" hidden>
-            <h4 class="step-title"><span class="step-num">5</span>Feasible commitment · decision gate</h4>
-            <section class="what-if commit-tune" aria-labelledby="tune-title">
-              <h4 class="step-title" id="tune-title">Adjust the commitment</h4>
-              <p class="step-help">Tweak capacity, target date, and scope to see how confidence and feasibility change. The approved baseline uses these values.</p>
-              <div class="tune-grid">
-                <label for="tune-fte"><span>Allocated FTE</span><input id="tune-fte" type="number" min="0.5" step="0.5"></label>
-                <label for="tune-date"><span>Target date</span><input id="tune-date" type="date"></label>
-                <label for="tune-scope"><span>Scope change <output id="tune-scope-value" for="tune-scope">0%</output></span><input id="tune-scope" type="range" min="0" max="50" step="5" value="0"></label>
-              </div>
-              <div class="intake-actions">
-                <button id="tune-apply" class="intake-btn" type="button">Recalculate confidence</button>
-                <button id="tune-reset" class="intake-btn" type="button">Reset to defaults</button>
-              </div>
-            </section>
-            <div id="intake-commitment" class="rom-hero"></div>
-            <p id="intake-commit-explain" class="rom-explain"></p>
-            <div class="intake-actions">
-              <button id="intake-approve" class="intake-btn primary" type="button">Approve baseline</button>
-              <button id="intake-continue" class="intake-btn" type="button" hidden>Continue to SENSE →</button>
-            </div>
-            <div id="intake-approved" class="approved-banner" role="status" hidden></div>
+            <div class="intake-actions"><button id="intake-commit-btn" class="intake-btn primary" type="button">Continue to COMMIT →</button></div>
           </div>
         </div>
         <div id="intake-error" class="intake-error" role="alert" hidden></div>
       </section>
-      <div class="grid">
+      <div class="grid" id="shape-summary" hidden>
         <section class="card overview">
           <div class="card-head"><div><h3 class="card-title">ROM estimate &amp; confidence</h3><div class="card-kicker">Explainable range with an explicit integration buffer</div></div><span class="badge">P50 / P80 RANGE</span></div>
           <div class="overview-content">
@@ -393,48 +429,76 @@
         </section>
       </div>
     </section>
-    <section id="panel-sense" class="stage-panel" role="tabpanel" aria-labelledby="tab-sense" tabindex="0" hidden>
-      <div class="stage-intro"><div><h2>Sense delivery conditions</h2><p>Signals arriving from workforce, sprint execution, and operations.</p></div><span class="badge">CROSS-SYSTEM SIGNALS</span></div>
+    <section id="panel-commit" class="stage-panel" role="tabpanel" aria-labelledby="tab-commit" tabindex="0" hidden>
+      <div class="stage-intro"><div><h2>Commit the delivery baseline</h2><p>Review feasibility, capacity, target date, and scope before recording human approval.</p></div><span class="badge">HUMAN APPROVAL REQUIRED</span></div>
+      <section class="card intake" aria-label="Commitment approval">
+        <div class="card-head"><div><h3 class="card-title">Commitment decision gate</h3><div class="card-kicker">The baseline is recalculated server-side when approved.</div></div><span class="badge" id="commit-step-badge">COMMIT DECISION</span></div>
+        <div class="intake-body">
+          <div id="commit-empty" class="empty-state">
+            <strong>No estimate to commit yet</strong>
+            <span>Start in SHAPE: describe the request, confirm the clarifications, and generate the ROM. It will appear here for review and approval.</span>
+            <button id="commit-empty-go" class="intake-btn primary" type="button">Go to SHAPE</button>
+          </div>
+          <div class="intake-step" id="intake-step-5" hidden>
+            <h4 class="step-title"><span class="step-num">5</span>Review and approve the commitment</h4>
+            <div id="intake-commitment" class="rom-hero"></div>
+            <p id="intake-commit-explain" class="rom-explain"></p>
+            <div class="intake-actions">
+              <button id="intake-approve" class="intake-btn primary" type="button">Approve baseline</button>
+              <button id="intake-continue" class="intake-btn" type="button" hidden>Continue to TRACK →</button>
+            </div>
+            <div id="intake-approved" class="approved-banner" role="status" hidden></div>
+            <section class="what-if commit-tune" aria-labelledby="tune-title">
+              <h4 class="step-title" id="tune-title">Explore what-if adjustments</h4>
+              <p class="step-help">Change capacity, target date, or scope and recalculate. The summary above updates, and approval uses the values it shows.</p>
+              <div class="tune-grid">
+                <label for="tune-fte"><span>Allocated FTE</span><input id="tune-fte" type="number" min="0.5" step="0.5"></label>
+                <label for="tune-date"><span>Target date</span><input id="tune-date" type="date"></label>
+                <label for="tune-scope"><span>Scope change <output id="tune-scope-value" for="tune-scope">0%</output></span><input id="tune-scope" type="range" min="0" max="50" step="5" value="0"></label>
+              </div>
+              <div class="intake-actions">
+                <button id="tune-apply" class="intake-btn" type="button">Recalculate confidence</button>
+                <button id="tune-reset" class="intake-btn" type="button">Reset to defaults</button>
+              </div>
+              <div id="commit-scenario-chart" class="scenario-compare" aria-live="polite"></div>
+            </section>
+          </div>
+          <div id="commit-error" class="intake-error" role="alert" hidden></div>
+        </div>
+      </section>
+      <section id="commit-readiness" class="card impact-panel" aria-labelledby="commit-readiness-title" hidden>
+        <h3 id="commit-readiness-title" class="card-title">Risk &amp; confidence readiness</h3>
+        <p class="chart-note">The confidence bridge uses the commitment model’s historical confidence and capacity-fit probability. Role figures show assigned FTE, not utilization; demand-by-role is not available in this prototype.</p>
+        <div class="commit-chart-grid">
+          <div class="chart-card">
+            <h4 class="chart-title">Confidence bridge</h4>
+            <div id="commit-confidence-chart" class="confidence-bridge"></div>
+          </div>
+          <div class="chart-card">
+            <h4 class="chart-title">Assigned capacity by role</h4>
+            <div id="commit-role-chart"></div>
+          </div>
+        </div>
+      </section>
+      <details class="card impact-panel" id="impact-panel">
+        <summary>Estimate quality &amp; portfolio impact · historical backtest</summary>
+        <p class="chart-note">Portfolio-level context only. These metrics do not change this initiative’s estimate, confidence, or approval gate.</p>
+        <div id="impact-status" class="impact-status" role="status" aria-live="polite">Loading historical impact metrics…</div>
+        <div id="impact-metrics" class="impact-grid"></div>
+        <section class="chart-card backtest-chart">
+          <h4 class="chart-title">Estimate vs actual · leave-one-out backtest</h4>
+          <div id="impact-backtest-chart"></div>
+          <p class="chart-note" id="impact-method"></p>
+        </section>
+      </details>
+    </section>
+    <section id="panel-track" class="stage-panel" role="tabpanel" aria-labelledby="tab-track" tabindex="0" hidden>
+      <div class="stage-intro"><div><h2>Track delivery conditions</h2><p>Compare cross-system signals and the current forecast with the commitment.</p></div><span class="badge">SIGNALS + OUTLOOK</span></div>
       <div class="awaiting" role="status">No delivery signals yet. Click <strong>Simulate next sprint</strong> below to load test data and move the date forward one sprint.</div>
       <div class="sim-bar">
         <button id="sim-run" class="intake-btn primary" type="button">Simulate next sprint</button>
         <span id="sim-status" class="sim-status" role="status"></span>
       </div>
-      <div class="grid">
-        <section class="card risk wide">
-          <div class="card-head"><div><h3 class="card-title">Cross-system collision</h3><div class="card-kicker">The approved plan no longer reflects current delivery reality</div></div><span class="badge">AT RISK</span></div>
-          <div class="risk-banner"><div class="risk-label">DELIVERY CONDITIONS HAVE DIVERGED</div><p id="finding">Checking source signals…</p></div>
-          <div class="risk-list">
-            <div class="risk-row"><span class="risk-dot"></span><div><strong>Capacity drain · UKG / ServiceNow</strong><span><b id="support-hours">16h</b> / week pulled into P1 production support</span></div></div>
-            <div class="risk-row"><span class="risk-dot"></span><div><strong>Scope growth · Azure DevOps</strong><span><b id="story-count">14 stories</b> and <b id="scope-points">64 pts</b> added outside the baseline</span></div></div>
-            <div class="risk-row"><span class="risk-dot"></span><div><strong>Environment blocker · ServiceNow</strong><span>Customer identity-matching change in CAB for <b id="change-age">9 days</b></span></div></div>
-            <div class="risk-row"><span class="risk-dot"></span><div><strong>Approved time away · UKG</strong><span><b id="pto-hours">40h</b> PTO recorded for lead engineer</span></div></div>
-          </div>
-        </section>
-        <section class="card narrow">
-          <div class="card-head"><div><h3 class="card-title">Workforce availability</h3><div class="card-kicker">Oracle HR / HCM + UKG Pro WFM</div></div></div>
-          <div class="detail-list">
-            <div class="detail-row"><span>Available allocation</span><strong id="sense-capacity">7.5 / 8.0 FTE</strong></div>
-            <div class="detail-row"><span>Lead support load</span><strong id="sense-support">16 h / week</strong></div>
-            <div class="detail-row"><span>Approved PTO</span><strong id="sense-pto">40 h</strong></div>
-            <div class="detail-row"><span>Specialist dependency</span><strong>Data engineering</strong></div>
-          </div>
-        </section>
-        <section class="card full">
-          <div class="card-head"><div><h3 class="card-title">Source systems</h3><div class="card-kicker">Production connectors are simulated for this prototype</div></div><span class="badge">5 SOURCES</span></div>
-          <div class="sources-list">
-            <div class="source-row"><span class="source-logo">PV</span><div class="source-copy"><strong>Planview</strong><span>Baseline · milestones · capacity</span></div><span class="simulated">SIMULATED</span></div>
-            <div class="source-row"><span class="source-logo">ADO</span><div class="source-copy"><strong>Azure DevOps</strong><span>Sprints · velocity · scope</span></div><span class="simulated">SIMULATED</span></div>
-            <div class="source-row"><span class="source-logo">SN</span><div class="source-copy"><strong>ServiceNow</strong><span>Incidents · changes · blockers</span></div><span class="simulated">SIMULATED</span></div>
-            <div class="source-row"><span class="source-logo">OR</span><div class="source-copy"><strong>Oracle HR / HCM</strong><span>Headcount · roles · skills</span></div><span class="simulated">SIMULATED</span></div>
-            <div class="source-row"><span class="source-logo">UKG</span><div class="source-copy"><strong>UKG Pro WFM</strong><span>Time · shifts · PTO</span></div><span class="simulated">SIMULATED</span></div>
-          </div>
-        </section>
-      </div>
-    </section>
-    <section id="panel-forecast" class="stage-panel" role="tabpanel" aria-labelledby="tab-forecast" tabindex="0" hidden>
-      <div class="stage-intro"><div><h2>Forecast likely outcomes</h2><p>Forecast updates from the sample signals generated for each sprint.</p></div><span class="badge">RULE-BASED OUTLOOK</span></div>
-      <div class="awaiting" role="status">No forecast yet. Use <strong>Simulate next sprint</strong> on the SENSE tab.</div>
       <div class="grid">
         <section class="card overview">
           <div class="card-head"><div><h3 class="card-title" id="forecast-title">Sprint delivery outlook</h3><div class="card-kicker" id="forecast-kicker">Estimate from current simulated signals</div></div><span class="badge">CURRENT OUTLOOK</span></div>
@@ -457,6 +521,40 @@
             <div class="risk-row"><span class="risk-dot"></span><div><strong>Change approval delay</strong><span>Customer identity-matching rules are awaiting CAB review.</span></div></div>
           </div>
         </section>
+      </div>
+      <div class="grid">
+        <section class="card risk wide">
+          <div class="card-head"><div><h3 class="card-title">Cross-system collision</h3><div class="card-kicker">The approved plan no longer reflects current delivery reality</div></div><span class="badge">AT RISK</span></div>
+          <div class="risk-banner"><div class="risk-label">DELIVERY CONDITIONS HAVE DIVERGED</div><p id="finding">Checking source signals…</p></div>
+          <div class="risk-list">
+            <div class="risk-row"><span class="risk-dot"></span><div><strong>Capacity drain · UKG / ServiceNow</strong><span><b id="support-hours">16h</b> / week pulled into P1 production support</span></div></div>
+            <div class="risk-row"><span class="risk-dot"></span><div><strong>Scope growth · Azure DevOps</strong><span><b id="story-count">14 stories</b> and <b id="scope-points">64 pts</b> added outside the baseline</span></div></div>
+            <div class="risk-row"><span class="risk-dot"></span><div><strong>Environment blocker · ServiceNow</strong><span>Customer identity-matching change in CAB for <b id="change-age">9 days</b></span></div></div>
+            <div class="risk-row"><span class="risk-dot"></span><div><strong>Approved time away · UKG</strong><span><b id="pto-hours">40h</b> PTO recorded for lead engineer</span></div></div>
+          </div>
+        </section>
+        <section class="card narrow">
+          <div class="card-head"><div><h3 class="card-title">Workforce availability</h3><div class="card-kicker">Oracle HR / HCM + UKG Pro WFM</div></div></div>
+          <div class="detail-list">
+            <div class="detail-row"><span>Available allocation</span><strong id="sense-capacity">7.5 / 8.0 FTE</strong></div>
+            <div class="detail-row"><span>Lead support load</span><strong id="sense-support">16 h / week</strong></div>
+            <div class="detail-row"><span>Approved PTO</span><strong id="sense-pto">40 h</strong></div>
+            <div class="detail-row"><span>Specialist dependency</span><strong>Data engineering</strong></div>
+          </div>
+        </section>
+      </div>
+      <div class="next-step" id="track-next" hidden><span><strong>Delivery conditions have changed.</strong> Compare recovery options and preview their impact.</span><button id="track-next-go" class="intake-btn primary" type="button">Review recovery options →</button></div>
+      <div class="grid">
+        <section class="card full">
+          <div class="card-head"><div><h3 class="card-title">Source systems</h3><div class="card-kicker">Production connectors are simulated for this prototype</div></div><span class="badge">5 SOURCES</span></div>
+          <div class="sources-list">
+            <div class="source-row"><span class="source-logo">PV</span><div class="source-copy"><strong>Planview</strong><span>Baseline · milestones · capacity</span></div><span class="simulated">SIMULATED</span></div>
+            <div class="source-row"><span class="source-logo">ADO</span><div class="source-copy"><strong>Azure DevOps</strong><span>Sprints · velocity · scope</span></div><span class="simulated">SIMULATED</span></div>
+            <div class="source-row"><span class="source-logo">SN</span><div class="source-copy"><strong>ServiceNow</strong><span>Incidents · changes · blockers</span></div><span class="simulated">SIMULATED</span></div>
+            <div class="source-row"><span class="source-logo">OR</span><div class="source-copy"><strong>Oracle HR / HCM</strong><span>Headcount · roles · skills</span></div><span class="simulated">SIMULATED</span></div>
+            <div class="source-row"><span class="source-logo">UKG</span><div class="source-copy"><strong>UKG Pro WFM</strong><span>Time · shifts · PTO</span></div><span class="simulated">SIMULATED</span></div>
+          </div>
+        </section>
         <section class="card full">
           <div class="card-head"><div><h3 class="card-title">Forecast method</h3><div class="card-kicker">Deterministic heuristic applied to seeded sprint signals</div></div></div>
           <div class="detail-list">
@@ -467,12 +565,12 @@
         </section>
       </div>
     </section>
-    <section id="panel-act" class="stage-panel" role="tabpanel" aria-labelledby="tab-act" tabindex="0" hidden>
-      <div class="stage-intro"><div><h2>Choose a recovery path</h2><p>Compare the trade-offs. Any real plan change requires human approval.</p></div><span class="badge">DECISION REQUIRED</span></div>
-      <div class="awaiting" role="status">No recovery options yet. Use <strong>Simulate next sprint</strong> on the SENSE tab.</div>
+    <section id="panel-intervene" class="stage-panel" role="tabpanel" aria-labelledby="tab-intervene" tabindex="0" hidden>
+      <div class="stage-intro"><div><h2>Review an intervention</h2><p>Compare evidence-backed recovery options. Approval and source-system execution remain separate steps.</p></div><span class="badge">DECISION REQUIRED</span></div>
+      <div class="awaiting" role="status">No intervention options yet. Use <strong>Simulate next sprint</strong> on the TRACK tab.</div>
       <div class="grid">
         <section class="card full">
-          <div class="card-head"><div><h3 class="card-title">Recovery scenario comparison</h3><div class="card-kicker" id="act-kicker">Options recalculated from the latest simulated sprint signals.</div></div><span class="badge" id="act-recommendation">DECISION REQUIRED</span></div>
+          <div class="card-head"><div><h3 class="card-title">Intervention scenario comparison</h3><div class="card-kicker" id="act-kicker">Options recalculated from the latest simulated sprint signals.</div></div><span class="badge" id="act-recommendation">DECISION REQUIRED</span></div>
           <div class="option-list">
             <div class="option" id="act-option-a">
               <div class="option-name"><strong id="act-title-a">OPTION A · Contractors</strong><span id="act-description-a">Adds temporary capacity after onboarding.</span></div>
@@ -496,7 +594,7 @@
           <p class="approval-note" id="act-note">The recommendation is advisory. No option is approved and no source-system write-back occurs.</p>
         </section>
         <section class="card full act-what-if">
-          <div class="card-head"><div><h3 class="card-title">Recovery what-if</h3><div class="card-kicker">Adjust the recommended path, preview impacts, then persist simulated target updates.</div></div><span class="badge">LOCAL SIMULATION</span></div>
+          <div class="card-head"><div><h3 class="card-title">Intervention what-if</h3><div class="card-kicker">Adjust the recommended path, preview impacts, then persist simulated target updates.</div></div><span class="badge">LOCAL SIMULATION</span></div>
           <div class="tune-grid">
             <label for="act-fte"><span>Team allocation (FTE)</span><input id="act-fte" type="number" min="0.5" step="0.5"></label>
             <label for="act-target-date"><span>Target date</span><input id="act-target-date" type="date"></label>
@@ -521,6 +619,7 @@
         </section>
       </div>
     </section>
+    <div class="demo-controls"><span>Demo data</span><button id="clear-all-data" class="intake-btn danger" type="button">Clear all demo data</button><span id="clear-data-status" class="sim-status" role="status"></span></div>
     <footer class="footer"><span>DELIVERY TWIN · Illustrative prototype using synthetic data</span><span>Deterministic signals · Human approval required</span></footer>
   </main>
   <aside id="chat-panel" class="chat-panel" role="dialog" aria-label="Ask Delivery Twin" aria-modal="false" hidden>
@@ -552,6 +651,11 @@
         history.replaceState(null, "", `#${tab.dataset.stage}`);
       }
       if (moveFocus) tab.focus();
+    }
+    function goToStage(stage) {
+      const tab = byId(`tab-${stage}`);
+      selectStage(tab, true);
+      tab.scrollIntoView({ behavior: "smooth", block: "start" });
     }
     stageTabs.forEach((tab, index) => {
       tab.addEventListener("click", () => selectStage(tab));
@@ -636,15 +740,19 @@
       }
     }
 
+    let currentReport = null;
+    let serverBaseline = null;
     async function refreshReport() {
       try {
         const response = await fetch("/api/report", { cache: "no-store" });
         if (!response.ok) throw new Error(`Report request failed (${response.status})`);
         const report = await response.json();
+        currentReport = report;
+        updateJourney();
         document.body.dataset.sim = report.simulated ? "true" : "false";
         if (!report.simulated) {
-          byId("workflow-status").textContent = "AWAITING SIMULATION";
-          byId("as-of").textContent = "NOT SIMULATED";
+          byId("workflow-status").textContent = "NO SPRINT DATA YET";
+          byId("as-of").textContent = "BEFORE KICKOFF";
           byId("shape-stage-status").textContent = "NO DEMO DATA";
           byId("updated").textContent = `Updated ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
           byId("error").style.display = "none";
@@ -654,8 +762,8 @@
           throw new Error("Agent Framework workflow metadata is unavailable");
         }
         const { initiative, signals } = report;
-        const forecast = report.workflow.stages.forecast;
-        const act = report.workflow.stages.act;
+        const forecast = report.workflow.stages.track;
+        const act = report.workflow.stages.intervene;
         const sprintNumber = report.simulation.sprints_advanced;
         byId("initiative-name").textContent = initiative.name;
         byId("portfolio-label").textContent = `Portfolio / ${initiative.portfolio}`;
@@ -729,6 +837,17 @@
       }
     }
     refreshReport();
+    loadImpactReport();
+    async function loadBaseline() {
+      try {
+        const response = await fetch("/api/intake/baseline", { cache: "no-store" });
+        if (response.ok) serverBaseline = (await response.json()).baseline || null;
+      } catch (error) {
+        serverBaseline = null;
+      }
+      updateJourney();
+    }
+    loadBaseline();
 
     byId("act-scope-defer").addEventListener("input", (event) => {
       byId("act-scope-defer-value").textContent = `${event.currentTarget.value}%`;
@@ -787,7 +906,9 @@
         });
         const data = await response.json().catch(() => ({}));
         if (!response.ok) throw new Error(data.error || `Request failed (${response.status})`);
+        resetIntakeWorkspace();
         await refreshReport();
+        await loadImpactReport();
         status.textContent = `Cleared ${data.rows_deleted} database rows.`;
       } catch (error) {
         status.textContent = `Clear failed: ${error.message}`;
@@ -796,7 +917,17 @@
       }
     });
     const SAMPLE_REQUEST = "We need one view of every customer across the business. Teams get different answers, and leadership wants this fixed soon.";
-    const intake = { text: "", analysis: null, result: null, documents: [] };
+    const intake = { text: "", analysis: null, result: null, baselineCommitment: null, documents: [], approved: false };
+    function newIntakeSessionId() {
+      if (typeof crypto.randomUUID === "function") return crypto.randomUUID();
+      const bytes = crypto.getRandomValues(new Uint8Array(16));
+      bytes[6] = (bytes[6] & 0x0f) | 0x40;
+      bytes[8] = (bytes[8] & 0x3f) | 0x80;
+      return [...bytes].map((value, index) =>
+        `${[4, 6, 8, 10].includes(index) ? "-" : ""}${value.toString(16).padStart(2, "0")}`
+      ).join("");
+    }
+    let intakeSessionId = newIntakeSessionId();
     const MAX_DOC_FILES = 5, MAX_DOC_CHARS = 100000;
     const MAX_DOC_FILE_BYTES = 2000000, MAX_DOC_TOTAL_BYTES = 5000000;
     function renderDocList() {
@@ -816,6 +947,43 @@
     }
     function resetIntakeResult() {
       intake.result = null;
+      intake.approved = false;
+      intake.baselineCommitment = null;
+      byId("intake-profile").hidden = true;
+      byId("commit-readiness").hidden = true;
+      byId("commit-scenario-chart").replaceChildren();
+      clearCommitmentSummary();
+      intakeShowUpTo(1);
+      intakeError("");
+    }
+    function resetIntakeWorkspace() {
+      intake.text = "";
+      intake.analysis = null;
+      intake.result = null;
+      intake.approved = false;
+      serverBaseline = null;
+      intake.baselineCommitment = null;
+      intake.documents.length = 0;
+      intakeSessionId = newIntakeSessionId();
+      ["intake-text", "intake-rom-file", "intake-notes-file"].forEach((id) => {
+        byId(id).value = "";
+      });
+      renderDocList();
+      [
+        "intake-questions", "intake-fingerprint", "intake-analogs", "intake-rom",
+        "history-results", "rom-analogs", "intake-commitment",
+        "commit-confidence-chart", "commit-role-chart", "commit-scenario-chart",
+      ].forEach((id) => byId(id).replaceChildren());
+      ["intake-profile-summary", "intake-retrieval", "intake-rom-explain",
+        "intake-commit-explain", "intake-approved"].forEach((id) => {
+        byId(id).textContent = "";
+      });
+      byId("intake-profile").hidden = true;
+      byId("commit-readiness").hidden = true;
+      byId("intake-approved").hidden = true;
+      byId("intake-approve").hidden = false;
+      byId("intake-approve").disabled = true;
+      byId("intake-continue").hidden = true;
       clearCommitmentSummary();
       intakeShowUpTo(1);
       intakeError("");
@@ -859,7 +1027,7 @@
         name, kind, ...(text !== undefined ? { text } : { content_base64 }),
       }));
     }
-    const intakeSteps = [1, 2, 3, 4, 5].map((n) => byId(`intake-step-${n}`));
+    const intakeSteps = [1, 2, 3, 4].map((n) => byId(`intake-step-${n}`));
 
     function el(tag, className, text) {
       const node = document.createElement(tag);
@@ -869,7 +1037,42 @@
     }
     function intakeShowUpTo(step) {
       intakeSteps.forEach((node, index) => { node.hidden = index + 1 > step; });
-      byId("intake-step-badge").textContent = `STEP ${step} OF 5`;
+      byId("intake-step-5").hidden = step !== 5;
+      byId("commit-empty").hidden = step === 5;
+      byId("shape-summary").hidden = step < 3;
+      byId("intake-step-badge").textContent = `STEP ${Math.min(step, 4)} OF 4`;
+      updateJourney();
+      if (step > 1 && step < 5) {
+        requestAnimationFrame(() => intakeSteps[step - 1].scrollIntoView({ behavior: "smooth", block: "nearest" }));
+      }
+    }
+    const JOURNEY_STAGES = ["shape", "commit", "track", "intervene"];
+    function updateJourney() {
+      const sim = currentReport && currentReport.simulated ? currentReport : null;
+      const act = sim && sim.workflow && sim.workflow.stages ? sim.workflow.stages : null;
+      const approved = intake.approved || (!intake.result && Boolean(serverBaseline));
+      const states = {
+        shape: intake.result || approved
+          ? ["done", "Estimate ready"]
+          : intake.analysis ? ["ready", "Clarifying request"] : ["ready", "Start here"],
+        commit: approved
+          ? ["done", "Baseline approved"]
+          : intake.result ? ["ready", "Awaiting approval"] : ["pending", "Needs an estimate"],
+        track: sim
+          ? ["ready", `Sprint ${sim.simulation.sprints_advanced}${act ? ` · ${act.track.on_time_pct}% on time` : ""}`]
+          : ["pending", "Not started"],
+        intervene: sim && act
+          ? ["ready", `Option ${act.intervene.recommended_option} recommended`]
+          : ["pending", "Waiting for signals"],
+      };
+      JOURNEY_STAGES.forEach((stage, index) => {
+        const [state, text] = states[stage];
+        const tab = byId(`tab-${stage}`);
+        tab.dataset.state = state;
+        tab.querySelector(".stage-icon").textContent = state === "done" ? "✓" : String(index + 1).padStart(2, "0");
+        byId(`state-${stage}`).textContent = text;
+      });
+      byId("track-next").hidden = !sim;
     }
     function clearCommitmentSummary() {
       ["baseline-p50", "baseline-p80", "buffer", "target-date", "allocated-capacity", "capacity-headroom",
@@ -879,15 +1082,19 @@
       byId("shape-stage-status").textContent = "INTAKE IN PROGRESS";
     }
     function intakeError(message) {
-      const box = byId("intake-error");
-      box.textContent = message || "";
-      box.hidden = !message;
+      ["intake-error", "commit-error"].forEach((id) => {
+        const box = byId(id);
+        box.textContent = message || "";
+        box.hidden = !message;
+      });
     }
     async function intakePost(path, body) {
       const response = await fetch(path, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+        body: JSON.stringify(path.startsWith("/api/intake/")
+          ? { ...body, intake_session_id: intakeSessionId }
+          : body),
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || `Request failed (${response.status})`);
@@ -901,6 +1108,232 @@
     const hours = (value) => `${Number(value).toLocaleString()} h`;
     const percent = (value) => Number.isInteger(Number(value)) ? String(value) : Number(value).toFixed(1);
     const list = (value) => (Array.isArray(value) ? (value.length ? value.join(", ") : "none") : String(value));
+    const SVG_NS = "http://www.w3.org/2000/svg";
+    function svgElement(name, attributes = {}) {
+      const node = document.createElementNS(SVG_NS, name);
+      Object.entries(attributes).forEach(([key, value]) => node.setAttribute(key, String(value)));
+      return node;
+    }
+    function renderProfile(analysis) {
+      const request = analysis.request.toLocaleLowerCase();
+      const categories = [
+        { label: "Customer or master data", terms: ["customer", "master data", "mdm", "profile"] },
+        { label: "Integration or system connectivity", terms: ["integrat", "api", "system", "connect", "sync"] },
+        { label: "Cloud or platform change", terms: ["cloud", "azure", "platform", "migration"] },
+        { label: "Security, privacy, or compliance", terms: ["security", "privacy", "pii", "consent", "compliance"] },
+        { label: "Analytics or reporting", terms: ["analytics", "report", "dashboard", "insight"] },
+      ];
+      const indicated = categories.filter((item) => item.terms.some((term) => request.includes(term)));
+      const gaps = categories.filter((item) => !indicated.includes(item));
+      const fillList = (id, items, emptyText) => {
+        const target = byId(id);
+        target.replaceChildren(...(items.length
+          ? items.map((item) => el("li", "", item.label))
+          : [el("li", "empty", emptyText)]));
+      };
+      byId("intake-profile-summary").textContent =
+        `Request: “${analysis.request.slice(0, 280)}${analysis.request.length > 280 ? "…" : ""}”`;
+      fillList("intake-profile-facts", indicated, "No areas detected from the request text.");
+      fillList("intake-profile-gaps", gaps, "No obvious gaps from these prompt categories.");
+      byId("intake-profile").hidden = false;
+    }
+    function renderRomAnalogs(result) {
+      const root = byId("rom-analogs");
+      const analogs = result.rom.analogs;
+      const table = el("table", "analog-table");
+      const head = el("tr");
+      ["Closest analog", "Similarity", "Planned hours", "Actual hours"].forEach((label) => head.append(el("th", "", label)));
+      table.append(head);
+      result.matches.filter((item) => analogs.includes(item.project_name)).forEach((item) => {
+        const row = el("tr");
+        [
+          item.project_name,
+          `${item.similarity_pct}%`,
+          Number(item.planned_effort_hours).toLocaleString(),
+          Number(item.actual_effort_hours).toLocaleString(),
+        ].forEach((value) => row.append(el("td", "", String(value))));
+        table.append(row);
+      });
+      root.replaceChildren(table);
+    }
+    function renderConfidenceBridge(commitment) {
+      const entries = [
+        { label: "Historical confidence", value: commitment.historical_confidence_pct },
+        { label: "Capacity-fit probability", value: commitment.fit_probability_pct },
+        { label: "Commitment confidence", value: commitment.confidence_pct, final: true },
+      ];
+      const root = byId("commit-confidence-chart");
+      root.replaceChildren(...entries.map((entry) => {
+        const row = el("div", "confidence-row");
+        const label = el("span", "", entry.label);
+        const track = el("div", "confidence-track");
+        const fill = el("div", `confidence-fill${entry.value < 60 ? " warn" : ""}`);
+        fill.style.width = `${Math.max(0, Math.min(100, entry.value))}%`;
+        track.append(fill);
+        row.append(label, track, el("strong", "", `${percent(entry.value)}%`));
+        if (entry.final) row.classList.add("final");
+        return row;
+      }));
+    }
+    function renderAssignedRoles(report) {
+      const root = byId("commit-role-chart");
+      const allocations = report?.resource_allocations || [];
+      if (!allocations.length) {
+        root.textContent = "No role-level assignments are available in the current report.";
+        return;
+      }
+      const width = 520, left = 160, plotWidth = 270, rowHeight = 31, top = 8;
+      const maxFte = Math.max(...allocations.map((item) => Number(item.allocated_fte)), 1);
+      const svg = svgElement("svg", {
+        viewBox: `0 0 ${width} ${top + allocations.length * rowHeight + 10}`,
+        class: "chart-svg",
+        role: "img",
+        "aria-label": "Assigned full-time equivalent capacity by role",
+      });
+      allocations.forEach((item, index) => {
+        const y = top + index * rowHeight;
+        const label = svgElement("text", { x: 3, y: y + 13 });
+        label.textContent = item.role_name;
+        svg.append(label);
+        svg.append(svgElement("rect", {
+          x: left, y, width: plotWidth * Number(item.allocated_fte) / maxFte,
+          height: 18, rx: 3, fill: "#138779",
+        }));
+        const value = svgElement("text", { x: left + plotWidth + 8, y: y + 13, class: "axis-label" });
+        value.textContent = `${Number(item.allocated_fte).toFixed(1)} FTE`;
+        svg.append(value);
+      });
+      root.replaceChildren(svg);
+    }
+    function renderScenarioComparison(commitment) {
+      const baseline = intake.baselineCommitment || commitment;
+      const rows = [
+        ["Allocated team", (v) => `${Number(v.allocated_fte).toFixed(1)} / ${Number(v.capacity_fte).toFixed(1)} FTE`, null],
+        ["Target date", (v) => v.target_date, null],
+        ["Scope change", (v) => `${v.scope_change_pct}%`, null],
+        ["Confidence", (v) => `${percent(v.confidence_pct)}%`, (a, b) => b.confidence_pct < a.confidence_pct],
+        ["Feasibility", (v) => (v.feasible ? "Feasible" : "Not feasible"), (a, b) => a.feasible && !b.feasible],
+      ];
+      const table = el("table", "analog-table scenario-table");
+      const head = el("tr");
+      ["", "Starting", "Current what-if"].forEach((label) => head.append(el("th", "", label)));
+      table.append(head);
+      rows.forEach(([label, format, isWorse]) => {
+        const before = format(baseline), after = format(commitment);
+        const row = el("tr");
+        const current = el("td", before === after ? "" : `changed${isWorse && isWorse(baseline, commitment) ? " worse" : ""}`, after);
+        row.append(el("td", "", label), el("td", "", before), current);
+        table.append(row);
+      });
+      byId("commit-scenario-chart").replaceChildren(table);
+    }
+    function formatDuration(seconds) {
+      if (seconds === null || seconds === undefined) return "Not enough data";
+      if (seconds < 60) return `${Math.round(seconds)} sec`;
+      if (seconds < 3600) return `${(seconds / 60).toFixed(1)} min`;
+      return `${(seconds / 3600).toFixed(1)} hr`;
+    }
+    function renderImpactReport(data) {
+      const metrics = data.backtest.estimators;
+      const intakeMetrics = data.intake_metrics;
+      byId("impact-status").textContent =
+        `Synthetic demo · ${data.backtest.sample_count} completed projects · ${intakeMetrics.intake_starts_last_7_days} intake starts / ${intakeMetrics.rom_sample_count} ROM timings (7 days)`;
+      byId("impact-metrics").replaceChildren(
+        metric(metrics.original_plan_mape_pct === null ? "—" : `${percent(metrics.original_plan_mape_pct)}%`, "Original-plan MAPE"),
+        metric(metrics.analog_mape_pct === null ? "—" : `${percent(metrics.analog_mape_pct)}%`, "Similarity-analog MAPE"),
+        metric(formatDuration(intakeMetrics.median_seconds_to_first_rom), `Median time to ROM · n=${intakeMetrics.rom_sample_count}`),
+        metric(String(intakeMetrics.intake_starts_last_7_days), "Intake starts · last 7 days"),
+      );
+      byId("impact-method").textContent =
+        `${data.backtest.method} MAPE is the mean absolute percentage error across the held-out projects. Lower is better. Intake metrics are instrumented from successful requests in this prototype; they are not historical estimates.`;
+      renderBacktestChart(data.backtest);
+    }
+    function renderBacktestChart(backtest) {
+      const root = byId("impact-backtest-chart");
+      const points = backtest.points.filter((point) =>
+        Number(point.actual_hours) > 0 && Number(point.planned_hours) >= 0 && Number(point.analog_hours) >= 0
+      );
+      if (!points.length) {
+        root.textContent = "No completed projects have usable planned and actual effort for comparison.";
+        return;
+      }
+      const width = 760, height = 330, left = 58, right = 18, top = 16, bottom = 48;
+      const plotWidth = width - left - right, plotHeight = height - top - bottom;
+      const maxHours = Math.max(...points.flatMap((point) =>
+        [Number(point.actual_hours), Number(point.planned_hours), Number(point.analog_hours)]
+      )) * 1.08;
+      const x = (value) => left + Number(value) / maxHours * plotWidth;
+      const y = (value) => top + plotHeight - Number(value) / maxHours * plotHeight;
+      const svg = svgElement("svg", {
+        viewBox: `0 0 ${width} ${height}`,
+        class: "chart-svg",
+        role: "img",
+        "aria-label": "Leave-one-out held-out estimates compared with actual effort, in hours",
+      });
+      for (let tick = 0; tick <= 4; tick += 1) {
+        const value = maxHours * tick / 4;
+        const tickY = y(value);
+        svg.append(svgElement("line", {
+          x1: left, y1: tickY, x2: width - right, y2: tickY, class: "grid-line",
+        }));
+        const label = svgElement("text", { x: left - 8, y: tickY + 3, "text-anchor": "end", class: "axis-label" });
+        label.textContent = Math.round(value).toLocaleString();
+        svg.append(label);
+      }
+      svg.append(svgElement("line", {
+        x1: x(0), y1: y(0), x2: x(maxHours), y2: y(maxHours),
+        stroke: "#8a98a8", "stroke-width": 1.5, "stroke-dasharray": "5 4",
+      }));
+      points.forEach((point) => {
+        [
+          { key: "planned_hours", color: "#8191a3", label: "Original plan" },
+          { key: "analog_hours", color: "#138779", label: "Similarity analog ROM" },
+        ].forEach((series) => {
+          const circle = svgElement("circle", {
+            cx: x(point.actual_hours), cy: y(point[series.key]), r: 5,
+            fill: series.color, "fill-opacity": 0.82,
+          });
+          const title = svgElement("title");
+          title.textContent = `${point.project_name} · ${series.label}: ${Number(point[series.key]).toLocaleString()} h estimated, ${Number(point.actual_hours).toLocaleString()} h actual`;
+          circle.append(title);
+          svg.append(circle);
+        });
+      });
+      const xLabel = svgElement("text", {
+        x: left + plotWidth / 2, y: height - 7, "text-anchor": "middle", class: "axis-label",
+      });
+      xLabel.textContent = "Actual effort (hours)";
+      const yLabel = svgElement("text", {
+        x: 13, y: top + plotHeight / 2, transform: `rotate(-90 13 ${top + plotHeight / 2})`,
+        "text-anchor": "middle", class: "axis-label",
+      });
+      yLabel.textContent = "Estimated effort (hours)";
+      svg.append(xLabel, yLabel);
+      const legend = el("div", "chart-legend");
+      [
+        ["#8191a3", "Original plan"],
+        ["#138779", "Similarity analog ROM"],
+        ["#8a98a8", "Perfect estimate"],
+      ].forEach(([color, label]) => {
+        const entry = el("span");
+        const swatch = el("i", "chart-swatch");
+        swatch.style.backgroundColor = color;
+        entry.append(swatch, document.createTextNode(label));
+        legend.append(entry);
+      });
+      root.replaceChildren(svg, legend);
+    }
+    async function loadImpactReport() {
+      const status = byId("impact-status");
+      try {
+        const response = await fetch("/api/impact", { cache: "no-store" });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.error || `Request failed (${response.status})`);
+        renderImpactReport(data);
+      } catch (error) {
+        status.textContent = `Impact metrics could not be loaded: ${error.message}`;
+      }
+    }
 
     function selectedAnswers() {
       const answers = {};
@@ -953,6 +1386,7 @@
     }
     function renderFingerprint(result) {
       const { rom, commitment } = result;
+      intake.baselineCommitment = { ...commitment };
       byId("baseline-p50").textContent = hours(rom.p50_hours);
       byId("baseline-p80").textContent = hours(rom.p80_hours);
       byId("buffer").textContent = `${rom.integration_buffer_pct}%`;
@@ -993,6 +1427,7 @@
         `P50: median analog base ${hours(rom.base_p50_hours)} + ${hours(rom.buffer_hours_p50)} integration buffer (${rom.integration_buffer_pct}%), rounded to ${hours(rom.p50_hours)}. ` +
         `P80: ${hours(rom.base_p80_hours)} + ${hours(rom.buffer_hours_p80)} buffer, rounded to ${hours(rom.p80_hours)}. ` +
         `Analogs: ${rom.analogs.join("; ")}. This baseline remains deterministic; the historical forecast below is advisory.`;
+      renderRomAnalogs(result);
     }
     function renderHistoryForecast(data) {
       const f = data.forecast;
@@ -1058,7 +1493,7 @@
       byId("tune-scope").value = c.scope_change_pct;
       byId("tune-scope-value").textContent = `${c.scope_change_pct}%`;
       byId("intake-commitment").replaceChildren(
-        metric(`${c.allocated_fte.toFixed(1)} of ${c.capacity_fte.toFixed(1)} FTE`, "Capacity available"),
+        metric(`${c.allocated_fte.toFixed(1)} of ${c.capacity_fte.toFixed(1)} FTE`, "Allocated of available FTE"),
         metric(c.target_date, "Target date"),
         metric(`${percent(c.confidence_pct)}%`, c.adjusted ? "Adjusted confidence" : "Initial confidence"),
         metric(`${c.required_fte_p80} FTE`, "Needed to hit P80"),
@@ -1070,6 +1505,11 @@
         el("span", c.feasible ? "gate-ok" : "gate-bad", c.feasible ? "Feasible — ready for approval." : "Not feasible with current capacity."),
       );
       byId("intake-approve").disabled = !c.feasible;
+      byId("intake-approve").title = c.feasible ? "" : "Not feasible: add capacity, move the target date out, or reduce scope to approve.";
+      byId("commit-readiness").hidden = false;
+      renderConfidenceBridge(c);
+      renderAssignedRoles({ resource_allocations: c.resource_allocations });
+      renderScenarioComparison(c);
     }
     function commitmentAdjustments() {
       return {
@@ -1083,11 +1523,16 @@
         text: intake.text, answers: intake.result.answers, documents: docsPayload(), adjustments,
       });
       renderCommitment(intake.result);
+      intake.approved = false;
+      updateJourney();
       byId("intake-approved").hidden = true;
       byId("intake-approve").hidden = false;
       byId("intake-continue").hidden = true;
     }
     function renderApproved(baseline) {
+      intake.approved = true;
+      serverBaseline = baseline;
+      updateJourney();
       byId("shape-baseline-status").textContent = "Approved";
       byId("shape-stage-status").textContent = "BASELINE APPROVED";
       byId("intake-approved").textContent =
@@ -1100,28 +1545,27 @@
 
     byId("intake-sample").addEventListener("click", () => {
       byId("intake-text").value = SAMPLE_REQUEST;
-      intake.result = null;
-      clearCommitmentSummary();
-      intakeShowUpTo(1);
+      resetIntakeResult();
     });
     byId("intake-text").addEventListener("input", () => {
-      intake.result = null;
-      clearCommitmentSummary();
-      intakeShowUpTo(1);
-      intakeError("");
+      resetIntakeResult();
     });
     byId("intake-rom-file").addEventListener("change", (event) => attachDocuments(event.currentTarget, "rom"));
     byId("intake-notes-file").addEventListener("change", (event) => attachDocuments(event.currentTarget, "meeting_notes"));
     byId("intake-analyze").addEventListener("click", (event) => intakeRun(event.currentTarget, async () => {
       intake.text = byId("intake-text").value;
+      intakeSessionId = newIntakeSessionId();
       intake.analysis = await intakePost("/api/intake/analyze", { text: intake.text, documents: docsPayload() });
+      renderProfile(intake.analysis);
       renderQuestions(intake.analysis);
       intakeShowUpTo(2);
+      await loadImpactReport();
     }));
     byId("intake-fingerprint-btn").addEventListener("click", (event) => intakeRun(event.currentTarget, async () => {
       intake.result = await intakePost("/api/intake/evaluate", { text: intake.text, answers: selectedAnswers(), documents: docsPayload() });
       renderFingerprint(intake.result);
       intakeShowUpTo(3);
+      await loadImpactReport();
     }));
     byId("intake-rom-btn").addEventListener("click", () => { byId("history-results").replaceChildren(); renderRom(intake.result); intakeShowUpTo(4); });
     byId("intake-history-forecast").addEventListener("click", (event) => intakeRun(event.currentTarget, async () => {
@@ -1135,8 +1579,10 @@
     byId("intake-commit-btn").addEventListener("click", () => {
       intakeRun(byId("intake-commit-btn"), async () => {
         const defaults = intake.result.commitment.defaults;
+        intake.baselineCommitment = { ...intake.result.commitment };
         await recalculateCommitment(defaults);
         intakeShowUpTo(5);
+        goToStage("commit");
       });
     });
     byId("tune-scope").addEventListener("input", (event) => {
@@ -1154,8 +1600,12 @@
         },
       });
       renderApproved(approved.baseline);
+      await loadImpactReport();
     }));
-    byId("intake-continue").addEventListener("click", () => selectStage(byId("tab-sense"), true));
+    byId("intake-continue").addEventListener("click", () => goToStage("track"));
+    byId("track-next-go").addEventListener("click", () => goToStage("intervene"));
+    byId("commit-empty-go").addEventListener("click", () => goToStage("shape"));
+    updateJourney();
 
     const chatToggle = byId("chat-toggle");
     const chatPanel = byId("chat-panel");

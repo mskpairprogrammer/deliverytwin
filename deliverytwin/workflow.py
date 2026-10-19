@@ -13,7 +13,7 @@ from agent_framework import (
 )
 
 
-STAGES = ("shape", "sense", "forecast", "act")
+STAGES = ("shape", "commit", "track", "intervene")
 WORKFLOW_NAME = "deliverytwin"
 
 
@@ -38,27 +38,24 @@ def _stage_result(stage: str, report: dict[str, Any]) -> dict[str, Any]:
 
     if stage == "shape":
         return {
-            "status": "baseline_loaded",
+            "status": "proposal_context_loaded",
             "target_end": initiative["target_end"],
             "baseline_p50_hours": initiative["baseline_p50_hours"],
             "baseline_p80_hours": initiative["baseline_p80_hours"],
             "initial_confidence_pct": initiative["initial_confidence_pct"],
         }
-    if stage == "sense":
+    if stage == "commit":
+        return {
+            "status": "commitment_context_loaded",
+            "target_end": initiative["target_end"],
+            "baseline_p50_hours": initiative["baseline_p50_hours"],
+            "baseline_p80_hours": initiative["baseline_p80_hours"],
+            "initial_confidence_pct": initiative["initial_confidence_pct"],
+        }
+    if stage == "track":
         return {
             "status": "signals_evaluated",
             "collision_detected": report["collision_detected"],
-            "unplanned_story_points": signals["unplanned_story_points"],
-            "production_support_hours_per_week": signals[
-                "lead_production_support_hours_per_week"
-            ],
-            "oldest_blocking_change_age_days": signals[
-                "oldest_blocking_change_age_days"
-            ],
-        }
-    if stage == "forecast":
-        return {
-            "status": "rules_based_estimate",
             "calculated": True,
             "source": "simulated_source_records",
             "sprint_number": sprint_number,
@@ -69,6 +66,13 @@ def _stage_result(stage: str, report: dict[str, Any]) -> dict[str, Any]:
                 else "elevated" if on_time_pct <= 70
                 else "managed"
             ),
+            "unplanned_story_points": signals["unplanned_story_points"],
+            "production_support_hours_per_week": signals[
+                "lead_production_support_hours_per_week"
+            ],
+            "oldest_blocking_change_age_days": signals[
+                "oldest_blocking_change_age_days"
+            ],
         }
     has_blocker = bool(signals["blocking_change_requests"])
     options = [

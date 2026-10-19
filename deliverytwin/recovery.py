@@ -25,7 +25,7 @@ def preview_recovery_scenario(report: dict[str, Any], payload: object) -> dict[s
         raise ValueError("Recovery scenario must be an object.")
     signals = report["signals"]
     initiative = report["initiative"]
-    act = report["workflow"]["stages"]["act"]
+    intervention = report["workflow"]["stages"]["intervene"]
 
     fte = payload.get("allocated_fte", signals["allocated_fte"])
     if isinstance(fte, bool) or not isinstance(fte, (int, float)) or not math.isfinite(fte):
@@ -66,7 +66,7 @@ def preview_recovery_scenario(report: dict[str, Any], payload: object) -> dict[s
     deferred_points = round(unplanned_points * scope_defer_pct / 100, 1)
     retained_points = round(unplanned_points - deferred_points, 1)
     date_delta_days = (target_date - current_target).days
-    base_confidence = float(report["workflow"]["stages"]["forecast"]["on_time_pct"])
+    base_confidence = float(report["workflow"]["stages"]["track"]["on_time_pct"])
     base_days = max(1, (current_target - as_of).days)
     base_fte = max(0.5, float(signals["allocated_fte"]))
     workload = max(0.2, 1 - deferred_points * SCOPE_LOAD_PER_POINT)
@@ -87,7 +87,7 @@ def preview_recovery_scenario(report: dict[str, Any], payload: object) -> dict[s
             "remaining_unplanned_scope_points": retained_points,
         },
         "servicenow": {
-            "change_request_action": act["actions"]["servicenow"],
+            "change_request_action": intervention["actions"]["servicenow"],
         },
         "oracle_hcm": {
             "recovery_team_allocation_fte": fte,
@@ -100,7 +100,7 @@ def preview_recovery_scenario(report: dict[str, Any], payload: object) -> dict[s
     return {
         "status": "preview",
         "initiative_id": initiative["id"],
-        "recommended_option": act["recommended_option"],
+        "recommended_option": intervention["recommended_option"],
         "allocated_fte": fte,
         "scope_defer_pct": scope_defer_pct,
         "deferred_scope_points": deferred_points,

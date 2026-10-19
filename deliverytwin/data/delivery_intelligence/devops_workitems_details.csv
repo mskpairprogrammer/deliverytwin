@@ -1,0 +1,755 @@
+workitem_id,prjnumber,title,workitemtype,state,scheduling_effort,tags
+WI-1001,HIST-001,Customer Profile Unification,Epic,Closed,0,customer-data
+WI-1002,HIST-001,Customer Profile Unification - capability 1,Feature,Closed,0,customer-data
+WI-1003,HIST-001,Customer Profile Unification - story 1.1,User Story,Closed,5,customer-data;event-streaming
+WI-1004,HIST-001,Customer Profile Unification - story 1.2,User Story,Closed,8,customer-data;crm
+WI-1005,HIST-001,Customer Profile Unification - capability 2,Feature,Closed,0,customer-data
+WI-1006,HIST-001,Customer Profile Unification - story 2.1,User Story,Closed,3,customer-data;crm
+WI-1007,HIST-001,Customer Profile Unification - story 2.2,User Story,Closed,5,customer-data;customer-data-platform
+WI-1008,HIST-001,Customer Profile Unification - story 2.3,User Story,Closed,2,customer-data;customer-data-platform
+WI-1009,HIST-001,Customer Profile Unification - capability 3,Feature,Closed,0,customer-data
+WI-1010,HIST-001,Customer Profile Unification - story 3.1,User Story,Closed,8,customer-data;crm
+WI-1011,HIST-001,Customer Profile Unification - story 3.2,User Story,Closed,2,customer-data;identity-resolution
+WI-1012,HIST-001,Customer Profile Unification - story 3.3,User Story,Closed,8,customer-data;crm
+WI-1013,HIST-001,Customer Profile Unification - capability 4,Feature,Closed,0,customer-data
+WI-1014,HIST-001,Customer Profile Unification - story 4.1,User Story,Closed,3,customer-data;crm
+WI-1015,HIST-001,Customer Profile Unification - story 4.2,User Story,Closed,5,customer-data;customer-data-platform
+WI-1016,HIST-002,CRM and Service Profile Consolidation,Epic,Closed,0,customer-data
+WI-1017,HIST-002,CRM and Service Profile Consolidation - capability 1,Feature,Closed,0,customer-data
+WI-1018,HIST-002,CRM and Service Profile Consolidation - story 1.1,User Story,Closed,5,customer-data;commerce
+WI-1019,HIST-002,CRM and Service Profile Consolidation - story 1.2,User Story,Closed,3,customer-data;commerce
+WI-1020,HIST-002,CRM and Service Profile Consolidation - capability 2,Feature,Closed,0,customer-data
+WI-1021,HIST-002,CRM and Service Profile Consolidation - story 2.1,User Story,Closed,3,customer-data;batch-integration
+WI-1022,HIST-002,CRM and Service Profile Consolidation - story 2.2,User Story,Closed,5,customer-data;batch-integration
+WI-1023,HIST-002,CRM and Service Profile Consolidation - story 2.3,User Story,Closed,8,customer-data;event-streaming
+WI-1024,HIST-002,CRM and Service Profile Consolidation - capability 3,Feature,Closed,0,customer-data
+WI-1025,HIST-002,CRM and Service Profile Consolidation - story 3.1,User Story,Closed,3,customer-data;customer-data-platform
+WI-1026,HIST-002,CRM and Service Profile Consolidation - story 3.2,User Story,Closed,8,customer-data;batch-integration
+WI-1027,HIST-002,CRM and Service Profile Consolidation - capability 4,Feature,Closed,0,customer-data
+WI-1028,HIST-002,CRM and Service Profile Consolidation - story 4.1,User Story,Closed,3,customer-data;profile-api
+WI-1029,HIST-002,CRM and Service Profile Consolidation - story 4.2,User Story,Closed,8,customer-data;commerce
+WI-1030,HIST-002,CRM and Service Profile Consolidation - story 4.3,User Story,Closed,3,customer-data;batch-integration
+WI-1031,HIST-003,Customer Identity Resolution Service,Epic,Closed,0,customer-data
+WI-1032,HIST-003,Customer Identity Resolution Service - capability 1,Feature,Closed,0,customer-data
+WI-1033,HIST-003,Customer Identity Resolution Service - story 1.1,User Story,Closed,3,customer-data;event-streaming
+WI-1034,HIST-003,Customer Identity Resolution Service - story 1.2,User Story,Closed,3,customer-data;mdm
+WI-1035,HIST-003,Customer Identity Resolution Service - capability 2,Feature,Closed,0,customer-data
+WI-1036,HIST-003,Customer Identity Resolution Service - story 2.1,User Story,Closed,3,customer-data;event-streaming
+WI-1037,HIST-003,Customer Identity Resolution Service - story 2.2,User Story,Closed,2,customer-data;crm
+WI-1038,HIST-003,Customer Identity Resolution Service - story 2.3,User Story,Closed,2,customer-data;event-streaming
+WI-1039,HIST-003,Customer Identity Resolution Service - capability 3,Feature,Closed,0,customer-data
+WI-1040,HIST-003,Customer Identity Resolution Service - story 3.1,User Story,Closed,8,customer-data;mdm
+WI-1041,HIST-003,Customer Identity Resolution Service - story 3.2,User Story,Closed,8,customer-data;mdm
+WI-1042,HIST-003,Customer Identity Resolution Service - capability 4,Feature,Closed,0,customer-data
+WI-1043,HIST-003,Customer Identity Resolution Service - story 4.1,User Story,Closed,5,customer-data;commerce
+WI-1044,HIST-003,Customer Identity Resolution Service - story 4.2,User Story,Closed,2,customer-data;mdm
+WI-1045,HIST-003,Customer Identity Resolution Service - story 4.3,User Story,Closed,5,customer-data;crm
+WI-1046,HIST-003,Customer Identity Resolution Service - capability 5,Feature,Closed,0,customer-data
+WI-1047,HIST-003,Customer Identity Resolution Service - story 5.1,User Story,Closed,8,customer-data;crm
+WI-1048,HIST-003,Customer Identity Resolution Service - story 5.2,User Story,Closed,5,customer-data;identity-resolution
+WI-1049,HIST-004,Customer Master Data Hub,Epic,Closed,0,customer-data
+WI-1050,HIST-004,Customer Master Data Hub - capability 1,Feature,Closed,0,customer-data
+WI-1051,HIST-004,Customer Master Data Hub - story 1.1,User Story,Closed,2,customer-data;identity-resolution
+WI-1052,HIST-004,Customer Master Data Hub - story 1.2,User Story,Closed,5,customer-data;crm
+WI-1053,HIST-004,Customer Master Data Hub - capability 2,Feature,Closed,0,customer-data
+WI-1054,HIST-004,Customer Master Data Hub - story 2.1,User Story,Closed,5,customer-data;batch-integration
+WI-1055,HIST-004,Customer Master Data Hub - story 2.2,User Story,Closed,8,customer-data;identity-resolution
+WI-1056,HIST-004,Customer Master Data Hub - story 2.3,User Story,Closed,5,customer-data;crm
+WI-1057,HIST-004,Customer Master Data Hub - capability 3,Feature,Closed,0,customer-data
+WI-1058,HIST-004,Customer Master Data Hub - story 3.1,User Story,Closed,2,customer-data;event-streaming
+WI-1059,HIST-004,Customer Master Data Hub - story 3.2,User Story,Closed,2,customer-data;batch-integration
+WI-1060,HIST-004,Customer Master Data Hub - story 3.3,User Story,Closed,3,customer-data;service-management
+WI-1061,HIST-005,Consent & Preference Hub,Epic,Closed,0,customer-data
+WI-1062,HIST-005,Consent & Preference Hub - capability 1,Feature,Closed,0,customer-data
+WI-1063,HIST-005,Consent & Preference Hub - story 1.1,User Story,Closed,5,customer-data;mdm
+WI-1064,HIST-005,Consent & Preference Hub - story 1.2,User Story,Closed,3,customer-data;identity-resolution
+WI-1065,HIST-005,Consent & Preference Hub - capability 2,Feature,Closed,0,customer-data
+WI-1066,HIST-005,Consent & Preference Hub - story 2.1,User Story,Closed,2,customer-data;customer-data-platform
+WI-1067,HIST-005,Consent & Preference Hub - story 2.2,User Story,Closed,8,customer-data;crm
+WI-1068,HIST-005,Consent & Preference Hub - capability 3,Feature,Closed,0,customer-data
+WI-1069,HIST-005,Consent & Preference Hub - story 3.1,User Story,Closed,8,customer-data;customer-data-platform
+WI-1070,HIST-005,Consent & Preference Hub - story 3.2,User Story,Closed,5,customer-data;service-management
+WI-1071,HIST-005,Consent & Preference Hub - story 3.3,User Story,Closed,8,customer-data;event-streaming
+WI-1072,HIST-006,Contact Center Profile API,Epic,Closed,0,customer-data
+WI-1073,HIST-006,Contact Center Profile API - capability 1,Feature,Closed,0,customer-data
+WI-1074,HIST-006,Contact Center Profile API - story 1.1,User Story,Closed,5,customer-data;profile-api
+WI-1075,HIST-006,Contact Center Profile API - story 1.2,User Story,Closed,3,customer-data;event-streaming
+WI-1076,HIST-006,Contact Center Profile API - story 1.3,User Story,Closed,5,customer-data;mdm
+WI-1077,HIST-006,Contact Center Profile API - capability 2,Feature,Closed,0,customer-data
+WI-1078,HIST-006,Contact Center Profile API - story 2.1,User Story,Closed,3,customer-data;batch-integration
+WI-1079,HIST-006,Contact Center Profile API - story 2.2,User Story,Closed,8,customer-data;profile-api
+WI-1080,HIST-006,Contact Center Profile API - story 2.3,User Story,Closed,8,customer-data;mdm
+WI-1081,HIST-006,Contact Center Profile API - capability 3,Feature,Closed,0,customer-data
+WI-1082,HIST-006,Contact Center Profile API - story 3.1,User Story,Closed,8,customer-data;mdm
+WI-1083,HIST-006,Contact Center Profile API - story 3.2,User Story,Closed,2,customer-data;commerce
+WI-1084,HIST-006,Contact Center Profile API - capability 4,Feature,Closed,0,customer-data
+WI-1085,HIST-006,Contact Center Profile API - story 4.1,User Story,Closed,3,customer-data;crm
+WI-1086,HIST-006,Contact Center Profile API - story 4.2,User Story,Closed,8,customer-data;profile-api
+WI-1087,HIST-006,Contact Center Profile API - capability 5,Feature,Closed,0,customer-data
+WI-1088,HIST-006,Contact Center Profile API - story 5.1,User Story,Closed,3,customer-data;profile-api
+WI-1089,HIST-006,Contact Center Profile API - story 5.2,User Story,Closed,3,customer-data;mdm
+WI-1090,HIST-006,Contact Center Profile API - story 5.3,User Story,Closed,2,customer-data;commerce
+WI-1091,HIST-007,Loyalty Data Platform,Epic,Closed,0,customer-data
+WI-1092,HIST-007,Loyalty Data Platform - capability 1,Feature,Closed,0,customer-data
+WI-1093,HIST-007,Loyalty Data Platform - story 1.1,User Story,Closed,2,customer-data;crm
+WI-1094,HIST-007,Loyalty Data Platform - story 1.2,User Story,Closed,8,customer-data;customer-data-platform
+WI-1095,HIST-007,Loyalty Data Platform - capability 2,Feature,Closed,0,customer-data
+WI-1096,HIST-007,Loyalty Data Platform - story 2.1,User Story,Closed,2,customer-data;commerce
+WI-1097,HIST-007,Loyalty Data Platform - story 2.2,User Story,Closed,5,customer-data;crm
+WI-1098,HIST-007,Loyalty Data Platform - capability 3,Feature,Closed,0,customer-data
+WI-1099,HIST-007,Loyalty Data Platform - story 3.1,User Story,Closed,8,customer-data;profile-api
+WI-1100,HIST-007,Loyalty Data Platform - story 3.2,User Story,Closed,2,customer-data;profile-api
+WI-1101,HIST-007,Loyalty Data Platform - capability 4,Feature,Closed,0,customer-data
+WI-1102,HIST-007,Loyalty Data Platform - story 4.1,User Story,Closed,2,customer-data;commerce
+WI-1103,HIST-007,Loyalty Data Platform - story 4.2,User Story,Closed,8,customer-data;profile-api
+WI-1104,HIST-008,Customer Data Lakehouse,Epic,Closed,0,customer-data
+WI-1105,HIST-008,Customer Data Lakehouse - capability 1,Feature,Closed,0,customer-data
+WI-1106,HIST-008,Customer Data Lakehouse - story 1.1,User Story,Closed,2,customer-data;customer-data-platform
+WI-1107,HIST-008,Customer Data Lakehouse - story 1.2,User Story,Closed,5,customer-data;commerce
+WI-1108,HIST-008,Customer Data Lakehouse - story 1.3,User Story,Closed,8,customer-data;commerce
+WI-1109,HIST-008,Customer Data Lakehouse - capability 2,Feature,Closed,0,customer-data
+WI-1110,HIST-008,Customer Data Lakehouse - story 2.1,User Story,Closed,5,customer-data;mdm
+WI-1111,HIST-008,Customer Data Lakehouse - story 2.2,User Story,Closed,5,customer-data;customer-data-platform
+WI-1112,HIST-008,Customer Data Lakehouse - story 2.3,User Story,Closed,3,customer-data;service-management
+WI-1113,HIST-008,Customer Data Lakehouse - capability 3,Feature,Closed,0,customer-data
+WI-1114,HIST-008,Customer Data Lakehouse - story 3.1,User Story,Closed,5,customer-data;batch-integration
+WI-1115,HIST-008,Customer Data Lakehouse - story 3.2,User Story,Closed,5,customer-data;service-management
+WI-1116,HIST-008,Customer Data Lakehouse - story 3.3,User Story,Closed,8,customer-data;event-streaming
+WI-1117,HIST-008,Customer Data Lakehouse - capability 4,Feature,Closed,0,customer-data
+WI-1118,HIST-008,Customer Data Lakehouse - story 4.1,User Story,Closed,5,customer-data;customer-data-platform
+WI-1119,HIST-008,Customer Data Lakehouse - story 4.2,User Story,Closed,8,customer-data;crm
+WI-1120,HIST-008,Customer Data Lakehouse - story 4.3,User Story,Closed,5,customer-data;service-management
+WI-1121,HIST-009,Household Graph Service,Epic,Closed,0,customer-data
+WI-1122,HIST-009,Household Graph Service - capability 1,Feature,Closed,0,customer-data
+WI-1123,HIST-009,Household Graph Service - story 1.1,User Story,Closed,8,customer-data;service-management
+WI-1124,HIST-009,Household Graph Service - story 1.2,User Story,Closed,5,customer-data;profile-api
+WI-1125,HIST-009,Household Graph Service - story 1.3,User Story,Closed,5,customer-data;batch-integration
+WI-1126,HIST-009,Household Graph Service - capability 2,Feature,Closed,0,customer-data
+WI-1127,HIST-009,Household Graph Service - story 2.1,User Story,Closed,8,customer-data;mdm
+WI-1128,HIST-009,Household Graph Service - story 2.2,User Story,Closed,5,customer-data;service-management
+WI-1129,HIST-009,Household Graph Service - story 2.3,User Story,Closed,2,customer-data;mdm
+WI-1130,HIST-009,Household Graph Service - capability 3,Feature,Closed,0,customer-data
+WI-1131,HIST-009,Household Graph Service - story 3.1,User Story,Closed,8,customer-data;batch-integration
+WI-1132,HIST-009,Household Graph Service - story 3.2,User Story,Closed,2,customer-data;identity-resolution
+WI-1133,HIST-009,Household Graph Service - story 3.3,User Story,Closed,2,customer-data;commerce
+WI-1134,HIST-010,Customer Segmentation Feed,Epic,Closed,0,customer-data
+WI-1135,HIST-010,Customer Segmentation Feed - capability 1,Feature,Closed,0,customer-data
+WI-1136,HIST-010,Customer Segmentation Feed - story 1.1,User Story,Closed,8,customer-data;crm
+WI-1137,HIST-010,Customer Segmentation Feed - story 1.2,User Story,Closed,2,customer-data;commerce
+WI-1138,HIST-010,Customer Segmentation Feed - capability 2,Feature,Closed,0,customer-data
+WI-1139,HIST-010,Customer Segmentation Feed - story 2.1,User Story,Closed,2,customer-data;profile-api
+WI-1140,HIST-010,Customer Segmentation Feed - story 2.2,User Story,Closed,8,customer-data;commerce
+WI-1141,HIST-010,Customer Segmentation Feed - capability 3,Feature,Closed,0,customer-data
+WI-1142,HIST-010,Customer Segmentation Feed - story 3.1,User Story,Closed,8,customer-data;profile-api
+WI-1143,HIST-010,Customer Segmentation Feed - story 3.2,User Story,Closed,2,customer-data;customer-data-platform
+WI-1144,HIST-011,Preference Center Modernization,Epic,Closed,0,customer-data
+WI-1145,HIST-011,Preference Center Modernization - capability 1,Feature,Closed,0,customer-data
+WI-1146,HIST-011,Preference Center Modernization - story 1.1,User Story,Closed,2,customer-data;mdm
+WI-1147,HIST-011,Preference Center Modernization - story 1.2,User Story,Closed,2,customer-data;customer-data-platform
+WI-1148,HIST-011,Preference Center Modernization - capability 2,Feature,Closed,0,customer-data
+WI-1149,HIST-011,Preference Center Modernization - story 2.1,User Story,Closed,3,customer-data;mdm
+WI-1150,HIST-011,Preference Center Modernization - story 2.2,User Story,Closed,8,customer-data;service-management
+WI-1151,HIST-011,Preference Center Modernization - story 2.3,User Story,Closed,3,customer-data;customer-data-platform
+WI-1152,HIST-011,Preference Center Modernization - capability 3,Feature,Closed,0,customer-data
+WI-1153,HIST-011,Preference Center Modernization - story 3.1,User Story,Closed,3,customer-data;mdm
+WI-1154,HIST-011,Preference Center Modernization - story 3.2,User Story,Closed,2,customer-data;crm
+WI-1155,HIST-011,Preference Center Modernization - story 3.3,User Story,Closed,3,customer-data;profile-api
+WI-1156,HIST-011,Preference Center Modernization - capability 4,Feature,Closed,0,customer-data
+WI-1157,HIST-011,Preference Center Modernization - story 4.1,User Story,Closed,2,customer-data;mdm
+WI-1158,HIST-011,Preference Center Modernization - story 4.2,User Story,Closed,8,customer-data;crm
+WI-1159,HIST-011,Preference Center Modernization - story 4.3,User Story,Closed,2,customer-data;mdm
+WI-1160,HIST-012,Support Case Context Service,Epic,Closed,0,customer-data
+WI-1161,HIST-012,Support Case Context Service - capability 1,Feature,Closed,0,customer-data
+WI-1162,HIST-012,Support Case Context Service - story 1.1,User Story,Closed,2,customer-data;event-streaming
+WI-1163,HIST-012,Support Case Context Service - story 1.2,User Story,Closed,5,customer-data;mdm
+WI-1164,HIST-012,Support Case Context Service - story 1.3,User Story,Closed,8,customer-data;customer-data-platform
+WI-1165,HIST-012,Support Case Context Service - capability 2,Feature,Closed,0,customer-data
+WI-1166,HIST-012,Support Case Context Service - story 2.1,User Story,Closed,3,customer-data;service-management
+WI-1167,HIST-012,Support Case Context Service - story 2.2,User Story,Closed,3,customer-data;customer-data-platform
+WI-1168,HIST-012,Support Case Context Service - capability 3,Feature,Closed,0,customer-data
+WI-1169,HIST-012,Support Case Context Service - story 3.1,User Story,Closed,2,customer-data;profile-api
+WI-1170,HIST-012,Support Case Context Service - story 3.2,User Story,Closed,3,customer-data;mdm
+WI-1171,HIST-012,Support Case Context Service - story 3.3,User Story,Closed,5,customer-data;service-management
+WI-1172,HIST-013,Customer Profile Workspace,Epic,Closed,0,customer-greenfield
+WI-1173,HIST-013,Customer Profile Workspace - capability 1,Feature,Closed,0,customer-greenfield
+WI-1174,HIST-013,Customer Profile Workspace - story 1.1,User Story,Closed,3,customer-greenfield;customer-profile-service
+WI-1175,HIST-013,Customer Profile Workspace - story 1.2,User Story,Closed,2,customer-greenfield;customer-profile-service
+WI-1176,HIST-013,Customer Profile Workspace - capability 2,Feature,Closed,0,customer-greenfield
+WI-1177,HIST-013,Customer Profile Workspace - story 2.1,User Story,Closed,2,customer-greenfield;customer-profile-service
+WI-1178,HIST-013,Customer Profile Workspace - story 2.2,User Story,Closed,5,customer-greenfield;customer-profile-service
+WI-1179,HIST-013,Customer Profile Workspace - story 2.3,User Story,Closed,5,customer-greenfield;customer-portal
+WI-1180,HIST-013,Customer Profile Workspace - capability 3,Feature,Closed,0,customer-greenfield
+WI-1181,HIST-013,Customer Profile Workspace - story 3.1,User Story,Closed,2,customer-greenfield;customer-profile-service
+WI-1182,HIST-013,Customer Profile Workspace - story 3.2,User Story,Closed,8,customer-greenfield;customer-portal
+WI-1183,HIST-013,Customer Profile Workspace - capability 4,Feature,Closed,0,customer-greenfield
+WI-1184,HIST-013,Customer Profile Workspace - story 4.1,User Story,Closed,3,customer-greenfield;profile-api
+WI-1185,HIST-013,Customer Profile Workspace - story 4.2,User Story,Closed,2,customer-greenfield;customer-portal
+WI-1186,HIST-014,Agent Console Profile Panel,Epic,Closed,0,customer-greenfield
+WI-1187,HIST-014,Agent Console Profile Panel - capability 1,Feature,Closed,0,customer-greenfield
+WI-1188,HIST-014,Agent Console Profile Panel - story 1.1,User Story,Closed,8,customer-greenfield;profile-api
+WI-1189,HIST-014,Agent Console Profile Panel - story 1.2,User Story,Closed,2,customer-greenfield;identity-provider
+WI-1190,HIST-014,Agent Console Profile Panel - story 1.3,User Story,Closed,5,customer-greenfield;customer-profile-service
+WI-1191,HIST-014,Agent Console Profile Panel - capability 2,Feature,Closed,0,customer-greenfield
+WI-1192,HIST-014,Agent Console Profile Panel - story 2.1,User Story,Closed,5,customer-greenfield;profile-api
+WI-1193,HIST-014,Agent Console Profile Panel - story 2.2,User Story,Closed,2,customer-greenfield;customer-portal
+WI-1194,HIST-014,Agent Console Profile Panel - story 2.3,User Story,Closed,8,customer-greenfield;profile-api
+WI-1195,HIST-014,Agent Console Profile Panel - capability 3,Feature,Closed,0,customer-greenfield
+WI-1196,HIST-014,Agent Console Profile Panel - story 3.1,User Story,Closed,2,customer-greenfield;profile-api
+WI-1197,HIST-014,Agent Console Profile Panel - story 3.2,User Story,Closed,3,customer-greenfield;profile-api
+WI-1198,HIST-014,Agent Console Profile Panel - capability 4,Feature,Closed,0,customer-greenfield
+WI-1199,HIST-014,Agent Console Profile Panel - story 4.1,User Story,Closed,2,customer-greenfield;identity-provider
+WI-1200,HIST-014,Agent Console Profile Panel - story 4.2,User Story,Closed,2,customer-greenfield;identity-provider
+WI-1201,HIST-014,Agent Console Profile Panel - story 4.3,User Story,Closed,2,customer-greenfield;customer-profile-service
+WI-1202,HIST-015,Self-Service Account Portal,Epic,Closed,0,customer-greenfield
+WI-1203,HIST-015,Self-Service Account Portal - capability 1,Feature,Closed,0,customer-greenfield
+WI-1204,HIST-015,Self-Service Account Portal - story 1.1,User Story,Closed,3,customer-greenfield;customer-profile-service
+WI-1205,HIST-015,Self-Service Account Portal - story 1.2,User Story,Closed,5,customer-greenfield;customer-profile-service
+WI-1206,HIST-015,Self-Service Account Portal - story 1.3,User Story,Closed,5,customer-greenfield;profile-api
+WI-1207,HIST-015,Self-Service Account Portal - capability 2,Feature,Closed,0,customer-greenfield
+WI-1208,HIST-015,Self-Service Account Portal - story 2.1,User Story,Closed,8,customer-greenfield;profile-api
+WI-1209,HIST-015,Self-Service Account Portal - story 2.2,User Story,Closed,8,customer-greenfield;customer-profile-service
+WI-1210,HIST-015,Self-Service Account Portal - story 2.3,User Story,Closed,2,customer-greenfield;profile-api
+WI-1211,HIST-015,Self-Service Account Portal - capability 3,Feature,Closed,0,customer-greenfield
+WI-1212,HIST-015,Self-Service Account Portal - story 3.1,User Story,Closed,5,customer-greenfield;customer-profile-service
+WI-1213,HIST-015,Self-Service Account Portal - story 3.2,User Story,Closed,8,customer-greenfield;identity-provider
+WI-1214,HIST-015,Self-Service Account Portal - story 3.3,User Story,Closed,5,customer-greenfield;customer-profile-service
+WI-1215,HIST-016,Customer Timeline Service,Epic,Closed,0,customer-greenfield
+WI-1216,HIST-016,Customer Timeline Service - capability 1,Feature,Closed,0,customer-greenfield
+WI-1217,HIST-016,Customer Timeline Service - story 1.1,User Story,Closed,2,customer-greenfield;customer-profile-service
+WI-1218,HIST-016,Customer Timeline Service - story 1.2,User Story,Closed,5,customer-greenfield;profile-api
+WI-1219,HIST-016,Customer Timeline Service - story 1.3,User Story,Closed,2,customer-greenfield;profile-api
+WI-1220,HIST-016,Customer Timeline Service - capability 2,Feature,Closed,0,customer-greenfield
+WI-1221,HIST-016,Customer Timeline Service - story 2.1,User Story,Closed,5,customer-greenfield;customer-profile-service
+WI-1222,HIST-016,Customer Timeline Service - story 2.2,User Story,Closed,5,customer-greenfield;profile-api
+WI-1223,HIST-016,Customer Timeline Service - capability 3,Feature,Closed,0,customer-greenfield
+WI-1224,HIST-016,Customer Timeline Service - story 3.1,User Story,Closed,8,customer-greenfield;profile-api
+WI-1225,HIST-016,Customer Timeline Service - story 3.2,User Story,Closed,8,customer-greenfield;profile-api
+WI-1226,HIST-016,Customer Timeline Service - capability 4,Feature,Closed,0,customer-greenfield
+WI-1227,HIST-016,Customer Timeline Service - story 4.1,User Story,Closed,8,customer-greenfield;customer-portal
+WI-1228,HIST-016,Customer Timeline Service - story 4.2,User Story,Closed,2,customer-greenfield;profile-api
+WI-1229,HIST-016,Customer Timeline Service - story 4.3,User Story,Closed,5,customer-greenfield;customer-portal
+WI-1230,HIST-017,Digital Onboarding Profile,Epic,Closed,0,customer-greenfield
+WI-1231,HIST-017,Digital Onboarding Profile - capability 1,Feature,Closed,0,customer-greenfield
+WI-1232,HIST-017,Digital Onboarding Profile - story 1.1,User Story,Closed,3,customer-greenfield;identity-provider
+WI-1233,HIST-017,Digital Onboarding Profile - story 1.2,User Story,Closed,8,customer-greenfield;identity-provider
+WI-1234,HIST-017,Digital Onboarding Profile - story 1.3,User Story,Closed,8,customer-greenfield;customer-portal
+WI-1235,HIST-017,Digital Onboarding Profile - capability 2,Feature,Closed,0,customer-greenfield
+WI-1236,HIST-017,Digital Onboarding Profile - story 2.1,User Story,Closed,5,customer-greenfield;identity-provider
+WI-1237,HIST-017,Digital Onboarding Profile - story 2.2,User Story,Closed,8,customer-greenfield;customer-portal
+WI-1238,HIST-017,Digital Onboarding Profile - capability 3,Feature,Closed,0,customer-greenfield
+WI-1239,HIST-017,Digital Onboarding Profile - story 3.1,User Story,Closed,8,customer-greenfield;customer-portal
+WI-1240,HIST-017,Digital Onboarding Profile - story 3.2,User Story,Closed,5,customer-greenfield;profile-api
+WI-1241,HIST-018,CRM Vendor Integration,Epic,Closed,0,vendor-integration
+WI-1242,HIST-018,CRM Vendor Integration - capability 1,Feature,Closed,0,vendor-integration
+WI-1243,HIST-018,CRM Vendor Integration - story 1.1,User Story,Closed,8,vendor-integration;crm
+WI-1244,HIST-018,CRM Vendor Integration - story 1.2,User Story,Closed,3,vendor-integration;batch-integration
+WI-1245,HIST-018,CRM Vendor Integration - capability 2,Feature,Closed,0,vendor-integration
+WI-1246,HIST-018,CRM Vendor Integration - story 2.1,User Story,Closed,8,vendor-integration;batch-integration
+WI-1247,HIST-018,CRM Vendor Integration - story 2.2,User Story,Closed,3,vendor-integration;batch-integration
+WI-1248,HIST-018,CRM Vendor Integration - story 2.3,User Story,Closed,5,vendor-integration;service-management
+WI-1249,HIST-018,CRM Vendor Integration - capability 3,Feature,Closed,0,vendor-integration
+WI-1250,HIST-018,CRM Vendor Integration - story 3.1,User Story,Closed,2,vendor-integration;service-management
+WI-1251,HIST-018,CRM Vendor Integration - story 3.2,User Story,Closed,8,vendor-integration;batch-integration
+WI-1252,HIST-018,CRM Vendor Integration - story 3.3,User Story,Closed,2,vendor-integration;erp
+WI-1253,HIST-018,CRM Vendor Integration - capability 4,Feature,Closed,0,vendor-integration
+WI-1254,HIST-018,CRM Vendor Integration - story 4.1,User Story,Closed,3,vendor-integration;erp
+WI-1255,HIST-018,CRM Vendor Integration - story 4.2,User Story,Closed,2,vendor-integration;batch-integration
+WI-1256,HIST-018,CRM Vendor Integration - story 4.3,User Story,Closed,2,vendor-integration;crm
+WI-1257,HIST-018,CRM Vendor Integration - capability 5,Feature,Closed,0,vendor-integration
+WI-1258,HIST-018,CRM Vendor Integration - story 5.1,User Story,Closed,3,vendor-integration;crm
+WI-1259,HIST-018,CRM Vendor Integration - story 5.2,User Story,Closed,2,vendor-integration;batch-integration
+WI-1260,HIST-019,Hosted Service Desk Cutover,Epic,Closed,0,vendor-integration
+WI-1261,HIST-019,Hosted Service Desk Cutover - capability 1,Feature,Closed,0,vendor-integration
+WI-1262,HIST-019,Hosted Service Desk Cutover - story 1.1,User Story,Closed,3,vendor-integration;service-management
+WI-1263,HIST-019,Hosted Service Desk Cutover - story 1.2,User Story,Closed,8,vendor-integration;batch-integration
+WI-1264,HIST-019,Hosted Service Desk Cutover - capability 2,Feature,Closed,0,vendor-integration
+WI-1265,HIST-019,Hosted Service Desk Cutover - story 2.1,User Story,Closed,8,vendor-integration;crm
+WI-1266,HIST-019,Hosted Service Desk Cutover - story 2.2,User Story,Closed,3,vendor-integration;crm
+WI-1267,HIST-019,Hosted Service Desk Cutover - story 2.3,User Story,Closed,2,vendor-integration;crm
+WI-1268,HIST-019,Hosted Service Desk Cutover - capability 3,Feature,Closed,0,vendor-integration
+WI-1269,HIST-019,Hosted Service Desk Cutover - story 3.1,User Story,Closed,8,vendor-integration;batch-integration
+WI-1270,HIST-019,Hosted Service Desk Cutover - story 3.2,User Story,Closed,3,vendor-integration;service-management
+WI-1271,HIST-020,ERP Customer Master Sync,Epic,Closed,0,vendor-integration
+WI-1272,HIST-020,ERP Customer Master Sync - capability 1,Feature,Closed,0,vendor-integration
+WI-1273,HIST-020,ERP Customer Master Sync - story 1.1,User Story,Closed,8,vendor-integration;service-management
+WI-1274,HIST-020,ERP Customer Master Sync - story 1.2,User Story,Closed,3,vendor-integration;erp
+WI-1275,HIST-020,ERP Customer Master Sync - capability 2,Feature,Closed,0,vendor-integration
+WI-1276,HIST-020,ERP Customer Master Sync - story 2.1,User Story,Closed,8,vendor-integration;service-management
+WI-1277,HIST-020,ERP Customer Master Sync - story 2.2,User Story,Closed,8,vendor-integration;crm
+WI-1278,HIST-020,ERP Customer Master Sync - capability 3,Feature,Closed,0,vendor-integration
+WI-1279,HIST-020,ERP Customer Master Sync - story 3.1,User Story,Closed,8,vendor-integration;crm
+WI-1280,HIST-020,ERP Customer Master Sync - story 3.2,User Story,Closed,5,vendor-integration;batch-integration
+WI-1281,HIST-020,ERP Customer Master Sync - story 3.3,User Story,Closed,3,vendor-integration;erp
+WI-1282,HIST-020,ERP Customer Master Sync - capability 4,Feature,Closed,0,vendor-integration
+WI-1283,HIST-020,ERP Customer Master Sync - story 4.1,User Story,Closed,8,vendor-integration;crm
+WI-1284,HIST-020,ERP Customer Master Sync - story 4.2,User Story,Closed,8,vendor-integration;erp
+WI-1285,HIST-021,Marketing Cloud Migration,Epic,Closed,0,vendor-integration
+WI-1286,HIST-021,Marketing Cloud Migration - capability 1,Feature,Closed,0,vendor-integration
+WI-1287,HIST-021,Marketing Cloud Migration - story 1.1,User Story,Closed,3,vendor-integration;service-management
+WI-1288,HIST-021,Marketing Cloud Migration - story 1.2,User Story,Closed,3,vendor-integration;crm
+WI-1289,HIST-021,Marketing Cloud Migration - story 1.3,User Story,Closed,8,vendor-integration;batch-integration
+WI-1290,HIST-021,Marketing Cloud Migration - capability 2,Feature,Closed,0,vendor-integration
+WI-1291,HIST-021,Marketing Cloud Migration - story 2.1,User Story,Closed,2,vendor-integration;service-management
+WI-1292,HIST-021,Marketing Cloud Migration - story 2.2,User Story,Closed,2,vendor-integration;batch-integration
+WI-1293,HIST-021,Marketing Cloud Migration - story 2.3,User Story,Closed,8,vendor-integration;batch-integration
+WI-1294,HIST-021,Marketing Cloud Migration - capability 3,Feature,Closed,0,vendor-integration
+WI-1295,HIST-021,Marketing Cloud Migration - story 3.1,User Story,Closed,2,vendor-integration;erp
+WI-1296,HIST-021,Marketing Cloud Migration - story 3.2,User Story,Closed,2,vendor-integration;service-management
+WI-1297,HIST-021,Marketing Cloud Migration - story 3.3,User Story,Closed,2,vendor-integration;batch-integration
+WI-1298,HIST-022,Contact Center Platform Replacement,Epic,Closed,0,vendor-integration
+WI-1299,HIST-022,Contact Center Platform Replacement - capability 1,Feature,Closed,0,vendor-integration
+WI-1300,HIST-022,Contact Center Platform Replacement - story 1.1,User Story,Closed,2,vendor-integration;crm
+WI-1301,HIST-022,Contact Center Platform Replacement - story 1.2,User Story,Closed,2,vendor-integration;crm
+WI-1302,HIST-022,Contact Center Platform Replacement - story 1.3,User Story,Closed,5,vendor-integration;service-management
+WI-1303,HIST-022,Contact Center Platform Replacement - capability 2,Feature,Closed,0,vendor-integration
+WI-1304,HIST-022,Contact Center Platform Replacement - story 2.1,User Story,Closed,8,vendor-integration;batch-integration
+WI-1305,HIST-022,Contact Center Platform Replacement - story 2.2,User Story,Closed,2,vendor-integration;crm
+WI-1306,HIST-022,Contact Center Platform Replacement - capability 3,Feature,Closed,0,vendor-integration
+WI-1307,HIST-022,Contact Center Platform Replacement - story 3.1,User Story,Closed,3,vendor-integration;service-management
+WI-1308,HIST-022,Contact Center Platform Replacement - story 3.2,User Story,Closed,8,vendor-integration;erp
+WI-1309,HIST-023,Order History Sync,Epic,Closed,0,commerce
+WI-1310,HIST-023,Order History Sync - capability 1,Feature,Closed,0,commerce
+WI-1311,HIST-023,Order History Sync - story 1.1,User Story,Closed,2,commerce;event-streaming
+WI-1312,HIST-023,Order History Sync - story 1.2,User Story,Closed,2,commerce;batch-integration
+WI-1313,HIST-023,Order History Sync - story 1.3,User Story,Closed,3,commerce;crm
+WI-1314,HIST-023,Order History Sync - capability 2,Feature,Closed,0,commerce
+WI-1315,HIST-023,Order History Sync - story 2.1,User Story,Closed,3,commerce;crm
+WI-1316,HIST-023,Order History Sync - story 2.2,User Story,Closed,2,commerce;event-streaming
+WI-1317,HIST-023,Order History Sync - capability 3,Feature,Closed,0,commerce
+WI-1318,HIST-023,Order History Sync - story 3.1,User Story,Closed,5,commerce;batch-integration
+WI-1319,HIST-023,Order History Sync - story 3.2,User Story,Closed,8,commerce;profile-api
+WI-1320,HIST-023,Order History Sync - story 3.3,User Story,Closed,2,commerce;batch-integration
+WI-1321,HIST-023,Order History Sync - capability 4,Feature,Closed,0,commerce
+WI-1322,HIST-023,Order History Sync - story 4.1,User Story,Closed,5,commerce;commerce
+WI-1323,HIST-023,Order History Sync - story 4.2,User Story,Closed,2,commerce;event-streaming
+WI-1324,HIST-023,Order History Sync - story 4.3,User Story,Closed,2,commerce;batch-integration
+WI-1325,HIST-023,Order History Sync - capability 5,Feature,Closed,0,commerce
+WI-1326,HIST-023,Order History Sync - story 5.1,User Story,Closed,2,commerce;commerce
+WI-1327,HIST-023,Order History Sync - story 5.2,User Story,Closed,3,commerce;crm
+WI-1328,HIST-024,Cart and Checkout Event Stream,Epic,Closed,0,commerce
+WI-1329,HIST-024,Cart and Checkout Event Stream - capability 1,Feature,Closed,0,commerce
+WI-1330,HIST-024,Cart and Checkout Event Stream - story 1.1,User Story,Closed,2,commerce;commerce
+WI-1331,HIST-024,Cart and Checkout Event Stream - story 1.2,User Story,Closed,5,commerce;commerce
+WI-1332,HIST-024,Cart and Checkout Event Stream - story 1.3,User Story,Closed,2,commerce;service-management
+WI-1333,HIST-024,Cart and Checkout Event Stream - capability 2,Feature,Closed,0,commerce
+WI-1334,HIST-024,Cart and Checkout Event Stream - story 2.1,User Story,Closed,3,commerce;commerce
+WI-1335,HIST-024,Cart and Checkout Event Stream - story 2.2,User Story,Closed,3,commerce;service-management
+WI-1336,HIST-024,Cart and Checkout Event Stream - capability 3,Feature,Closed,0,commerce
+WI-1337,HIST-024,Cart and Checkout Event Stream - story 3.1,User Story,Closed,3,commerce;event-streaming
+WI-1338,HIST-024,Cart and Checkout Event Stream - story 3.2,User Story,Closed,8,commerce;event-streaming
+WI-1339,HIST-024,Cart and Checkout Event Stream - story 3.3,User Story,Closed,8,commerce;batch-integration
+WI-1340,HIST-025,Returns Portal Integration,Epic,Closed,0,commerce
+WI-1341,HIST-025,Returns Portal Integration - capability 1,Feature,Closed,0,commerce
+WI-1342,HIST-025,Returns Portal Integration - story 1.1,User Story,Closed,8,commerce;crm
+WI-1343,HIST-025,Returns Portal Integration - story 1.2,User Story,Closed,5,commerce;event-streaming
+WI-1344,HIST-025,Returns Portal Integration - capability 2,Feature,Closed,0,commerce
+WI-1345,HIST-025,Returns Portal Integration - story 2.1,User Story,Closed,8,commerce;batch-integration
+WI-1346,HIST-025,Returns Portal Integration - story 2.2,User Story,Closed,5,commerce;event-streaming
+WI-1347,HIST-025,Returns Portal Integration - story 2.3,User Story,Closed,2,commerce;commerce
+WI-1348,HIST-025,Returns Portal Integration - capability 3,Feature,Closed,0,commerce
+WI-1349,HIST-025,Returns Portal Integration - story 3.1,User Story,Closed,8,commerce;batch-integration
+WI-1350,HIST-025,Returns Portal Integration - story 3.2,User Story,Closed,5,commerce;crm
+WI-1351,HIST-026,Subscription Billing Profile Sync,Epic,Closed,0,commerce
+WI-1352,HIST-026,Subscription Billing Profile Sync - capability 1,Feature,Closed,0,commerce
+WI-1353,HIST-026,Subscription Billing Profile Sync - story 1.1,User Story,Closed,8,commerce;service-management
+WI-1354,HIST-026,Subscription Billing Profile Sync - story 1.2,User Story,Closed,8,commerce;commerce
+WI-1355,HIST-026,Subscription Billing Profile Sync - capability 2,Feature,Closed,0,commerce
+WI-1356,HIST-026,Subscription Billing Profile Sync - story 2.1,User Story,Closed,8,commerce;profile-api
+WI-1357,HIST-026,Subscription Billing Profile Sync - story 2.2,User Story,Closed,5,commerce;profile-api
+WI-1358,HIST-026,Subscription Billing Profile Sync - capability 3,Feature,Closed,0,commerce
+WI-1359,HIST-026,Subscription Billing Profile Sync - story 3.1,User Story,Closed,5,commerce;commerce
+WI-1360,HIST-026,Subscription Billing Profile Sync - story 3.2,User Story,Closed,3,commerce;service-management
+WI-1361,HIST-026,Subscription Billing Profile Sync - story 3.3,User Story,Closed,3,commerce;commerce
+WI-1362,HIST-026,Subscription Billing Profile Sync - capability 4,Feature,Closed,0,commerce
+WI-1363,HIST-026,Subscription Billing Profile Sync - story 4.1,User Story,Closed,8,commerce;event-streaming
+WI-1364,HIST-026,Subscription Billing Profile Sync - story 4.2,User Story,Closed,3,commerce;service-management
+WI-1365,HIST-026,Subscription Billing Profile Sync - story 4.3,User Story,Closed,8,commerce;commerce
+WI-1366,HIST-026,Subscription Billing Profile Sync - capability 5,Feature,Closed,0,commerce
+WI-1367,HIST-026,Subscription Billing Profile Sync - story 5.1,User Story,Closed,5,commerce;service-management
+WI-1368,HIST-026,Subscription Billing Profile Sync - story 5.2,User Story,Closed,8,commerce;profile-api
+WI-1369,HIST-026,Subscription Billing Profile Sync - story 5.3,User Story,Closed,2,commerce;service-management
+WI-1370,HIST-027,Product Catalog Feed,Epic,Closed,0,commerce
+WI-1371,HIST-027,Product Catalog Feed - capability 1,Feature,Closed,0,commerce
+WI-1372,HIST-027,Product Catalog Feed - story 1.1,User Story,Closed,8,commerce;event-streaming
+WI-1373,HIST-027,Product Catalog Feed - story 1.2,User Story,Closed,3,commerce;profile-api
+WI-1374,HIST-027,Product Catalog Feed - story 1.3,User Story,Closed,2,commerce;commerce
+WI-1375,HIST-027,Product Catalog Feed - capability 2,Feature,Closed,0,commerce
+WI-1376,HIST-027,Product Catalog Feed - story 2.1,User Story,Closed,2,commerce;profile-api
+WI-1377,HIST-027,Product Catalog Feed - story 2.2,User Story,Closed,8,commerce;commerce
+WI-1378,HIST-027,Product Catalog Feed - capability 3,Feature,Closed,0,commerce
+WI-1379,HIST-027,Product Catalog Feed - story 3.1,User Story,Closed,3,commerce;crm
+WI-1380,HIST-027,Product Catalog Feed - story 3.2,User Story,Closed,3,commerce;commerce
+WI-1381,HIST-027,Product Catalog Feed - capability 4,Feature,Closed,0,commerce
+WI-1382,HIST-027,Product Catalog Feed - story 4.1,User Story,Closed,2,commerce;commerce
+WI-1383,HIST-027,Product Catalog Feed - story 4.2,User Story,Closed,8,commerce;crm
+WI-1384,HIST-027,Product Catalog Feed - story 4.3,User Story,Closed,5,commerce;event-streaming
+WI-1385,HIST-027,Product Catalog Feed - capability 5,Feature,Closed,0,commerce
+WI-1386,HIST-027,Product Catalog Feed - story 5.1,User Story,Closed,8,commerce;crm
+WI-1387,HIST-027,Product Catalog Feed - story 5.2,User Story,Closed,2,commerce;profile-api
+WI-1388,HIST-028,Fulfillment Status Gateway,Epic,Closed,0,commerce
+WI-1389,HIST-028,Fulfillment Status Gateway - capability 1,Feature,Closed,0,commerce
+WI-1390,HIST-028,Fulfillment Status Gateway - story 1.1,User Story,Closed,8,commerce;service-management
+WI-1391,HIST-028,Fulfillment Status Gateway - story 1.2,User Story,Closed,3,commerce;batch-integration
+WI-1392,HIST-028,Fulfillment Status Gateway - story 1.3,User Story,Closed,5,commerce;batch-integration
+WI-1393,HIST-028,Fulfillment Status Gateway - capability 2,Feature,Closed,0,commerce
+WI-1394,HIST-028,Fulfillment Status Gateway - story 2.1,User Story,Closed,3,commerce;event-streaming
+WI-1395,HIST-028,Fulfillment Status Gateway - story 2.2,User Story,Closed,5,commerce;service-management
+WI-1396,HIST-028,Fulfillment Status Gateway - story 2.3,User Story,Closed,8,commerce;service-management
+WI-1397,HIST-028,Fulfillment Status Gateway - capability 3,Feature,Closed,0,commerce
+WI-1398,HIST-028,Fulfillment Status Gateway - story 3.1,User Story,Closed,5,commerce;commerce
+WI-1399,HIST-028,Fulfillment Status Gateway - story 3.2,User Story,Closed,2,commerce;batch-integration
+WI-1400,HIST-028,Fulfillment Status Gateway - capability 4,Feature,Closed,0,commerce
+WI-1401,HIST-028,Fulfillment Status Gateway - story 4.1,User Story,Closed,3,commerce;commerce
+WI-1402,HIST-028,Fulfillment Status Gateway - story 4.2,User Story,Closed,2,commerce;commerce
+WI-1403,HIST-028,Fulfillment Status Gateway - capability 5,Feature,Closed,0,commerce
+WI-1404,HIST-028,Fulfillment Status Gateway - story 5.1,User Story,Closed,8,commerce;service-management
+WI-1405,HIST-028,Fulfillment Status Gateway - story 5.2,User Story,Closed,3,commerce;commerce
+WI-1406,HIST-028,Fulfillment Status Gateway - story 5.3,User Story,Closed,8,commerce;batch-integration
+WI-1407,HIST-029,Enterprise Lakehouse Foundation,Epic,Closed,0,lakehouse
+WI-1408,HIST-029,Enterprise Lakehouse Foundation - capability 1,Feature,Closed,0,lakehouse
+WI-1409,HIST-029,Enterprise Lakehouse Foundation - story 1.1,User Story,Closed,3,lakehouse;delta-lake
+WI-1410,HIST-029,Enterprise Lakehouse Foundation - story 1.2,User Story,Closed,2,lakehouse;delta-lake
+WI-1411,HIST-029,Enterprise Lakehouse Foundation - story 1.3,User Story,Closed,8,lakehouse;customer-data-platform
+WI-1412,HIST-029,Enterprise Lakehouse Foundation - capability 2,Feature,Closed,0,lakehouse
+WI-1413,HIST-029,Enterprise Lakehouse Foundation - story 2.1,User Story,Closed,5,lakehouse;customer-data-platform
+WI-1414,HIST-029,Enterprise Lakehouse Foundation - story 2.2,User Story,Closed,8,lakehouse;mdm
+WI-1415,HIST-029,Enterprise Lakehouse Foundation - story 2.3,User Story,Closed,2,lakehouse;identity-resolution
+WI-1416,HIST-029,Enterprise Lakehouse Foundation - capability 3,Feature,Closed,0,lakehouse
+WI-1417,HIST-029,Enterprise Lakehouse Foundation - story 3.1,User Story,Closed,5,lakehouse;databricks
+WI-1418,HIST-029,Enterprise Lakehouse Foundation - story 3.2,User Story,Closed,2,lakehouse;mdm
+WI-1419,HIST-029,Enterprise Lakehouse Foundation - story 3.3,User Story,Closed,2,lakehouse;azure
+WI-1420,HIST-029,Enterprise Lakehouse Foundation - capability 4,Feature,Closed,0,lakehouse
+WI-1421,HIST-029,Enterprise Lakehouse Foundation - story 4.1,User Story,Closed,5,lakehouse;event-streaming
+WI-1422,HIST-029,Enterprise Lakehouse Foundation - story 4.2,User Story,Closed,5,lakehouse;delta-lake
+WI-1423,HIST-029,Enterprise Lakehouse Foundation - story 4.3,User Story,Closed,2,lakehouse;mdm
+WI-1424,HIST-030,Streaming Ingestion Platform,Epic,Closed,0,lakehouse
+WI-1425,HIST-030,Streaming Ingestion Platform - capability 1,Feature,Closed,0,lakehouse
+WI-1426,HIST-030,Streaming Ingestion Platform - story 1.1,User Story,Closed,3,lakehouse;delta-lake
+WI-1427,HIST-030,Streaming Ingestion Platform - story 1.2,User Story,Closed,2,lakehouse;event-streaming
+WI-1428,HIST-030,Streaming Ingestion Platform - capability 2,Feature,Closed,0,lakehouse
+WI-1429,HIST-030,Streaming Ingestion Platform - story 2.1,User Story,Closed,8,lakehouse;azure
+WI-1430,HIST-030,Streaming Ingestion Platform - story 2.2,User Story,Closed,2,lakehouse;azure
+WI-1431,HIST-030,Streaming Ingestion Platform - story 2.3,User Story,Closed,2,lakehouse;azure
+WI-1432,HIST-030,Streaming Ingestion Platform - capability 3,Feature,Closed,0,lakehouse
+WI-1433,HIST-030,Streaming Ingestion Platform - story 3.1,User Story,Closed,5,lakehouse;databricks
+WI-1434,HIST-030,Streaming Ingestion Platform - story 3.2,User Story,Closed,5,lakehouse;delta-lake
+WI-1435,HIST-030,Streaming Ingestion Platform - story 3.3,User Story,Closed,2,lakehouse;databricks
+WI-1436,HIST-030,Streaming Ingestion Platform - capability 4,Feature,Closed,0,lakehouse
+WI-1437,HIST-030,Streaming Ingestion Platform - story 4.1,User Story,Closed,5,lakehouse;delta-lake
+WI-1438,HIST-030,Streaming Ingestion Platform - story 4.2,User Story,Closed,5,lakehouse;identity-resolution
+WI-1439,HIST-031,Feature Store Enablement,Epic,Closed,0,lakehouse
+WI-1440,HIST-031,Feature Store Enablement - capability 1,Feature,Closed,0,lakehouse
+WI-1441,HIST-031,Feature Store Enablement - story 1.1,User Story,Closed,3,lakehouse;azure
+WI-1442,HIST-031,Feature Store Enablement - story 1.2,User Story,Closed,5,lakehouse;customer-data-platform
+WI-1443,HIST-031,Feature Store Enablement - story 1.3,User Story,Closed,3,lakehouse;delta-lake
+WI-1444,HIST-031,Feature Store Enablement - capability 2,Feature,Closed,0,lakehouse
+WI-1445,HIST-031,Feature Store Enablement - story 2.1,User Story,Closed,3,lakehouse;mdm
+WI-1446,HIST-031,Feature Store Enablement - story 2.2,User Story,Closed,8,lakehouse;mdm
+WI-1447,HIST-031,Feature Store Enablement - capability 3,Feature,Closed,0,lakehouse
+WI-1448,HIST-031,Feature Store Enablement - story 3.1,User Story,Closed,5,lakehouse;azure
+WI-1449,HIST-031,Feature Store Enablement - story 3.2,User Story,Closed,8,lakehouse;identity-resolution
+WI-1450,HIST-031,Feature Store Enablement - story 3.3,User Story,Closed,5,lakehouse;databricks
+WI-1451,HIST-031,Feature Store Enablement - capability 4,Feature,Closed,0,lakehouse
+WI-1452,HIST-031,Feature Store Enablement - story 4.1,User Story,Closed,5,lakehouse;delta-lake
+WI-1453,HIST-031,Feature Store Enablement - story 4.2,User Story,Closed,5,lakehouse;databricks
+WI-1454,HIST-031,Feature Store Enablement - capability 5,Feature,Closed,0,lakehouse
+WI-1455,HIST-031,Feature Store Enablement - story 5.1,User Story,Closed,5,lakehouse;identity-resolution
+WI-1456,HIST-031,Feature Store Enablement - story 5.2,User Story,Closed,5,lakehouse;identity-resolution
+WI-1457,HIST-032,Data Quality Observability,Epic,Closed,0,lakehouse
+WI-1458,HIST-032,Data Quality Observability - capability 1,Feature,Closed,0,lakehouse
+WI-1459,HIST-032,Data Quality Observability - story 1.1,User Story,Closed,8,lakehouse;mdm
+WI-1460,HIST-032,Data Quality Observability - story 1.2,User Story,Closed,5,lakehouse;azure
+WI-1461,HIST-032,Data Quality Observability - story 1.3,User Story,Closed,8,lakehouse;event-streaming
+WI-1462,HIST-032,Data Quality Observability - capability 2,Feature,Closed,0,lakehouse
+WI-1463,HIST-032,Data Quality Observability - story 2.1,User Story,Closed,3,lakehouse;delta-lake
+WI-1464,HIST-032,Data Quality Observability - story 2.2,User Story,Closed,8,lakehouse;identity-resolution
+WI-1465,HIST-032,Data Quality Observability - story 2.3,User Story,Closed,2,lakehouse;identity-resolution
+WI-1466,HIST-032,Data Quality Observability - capability 3,Feature,Closed,0,lakehouse
+WI-1467,HIST-032,Data Quality Observability - story 3.1,User Story,Closed,3,lakehouse;customer-data-platform
+WI-1468,HIST-032,Data Quality Observability - story 3.2,User Story,Closed,2,lakehouse;delta-lake
+WI-1469,HIST-032,Data Quality Observability - story 3.3,User Story,Closed,2,lakehouse;databricks
+WI-1470,HIST-033,Regional Data Residency Program,Epic,Closed,0,lakehouse
+WI-1471,HIST-033,Regional Data Residency Program - capability 1,Feature,Closed,0,lakehouse
+WI-1472,HIST-033,Regional Data Residency Program - story 1.1,User Story,Closed,8,lakehouse;event-streaming
+WI-1473,HIST-033,Regional Data Residency Program - story 1.2,User Story,Closed,5,lakehouse;delta-lake
+WI-1474,HIST-033,Regional Data Residency Program - capability 2,Feature,Closed,0,lakehouse
+WI-1475,HIST-033,Regional Data Residency Program - story 2.1,User Story,Closed,2,lakehouse;databricks
+WI-1476,HIST-033,Regional Data Residency Program - story 2.2,User Story,Closed,3,lakehouse;event-streaming
+WI-1477,HIST-033,Regional Data Residency Program - capability 3,Feature,Closed,0,lakehouse
+WI-1478,HIST-033,Regional Data Residency Program - story 3.1,User Story,Closed,5,lakehouse;identity-resolution
+WI-1479,HIST-033,Regional Data Residency Program - story 3.2,User Story,Closed,8,lakehouse;azure
+WI-1480,HIST-033,Regional Data Residency Program - story 3.3,User Story,Closed,2,lakehouse;identity-resolution
+WI-1481,HIST-033,Regional Data Residency Program - capability 4,Feature,Closed,0,lakehouse
+WI-1482,HIST-033,Regional Data Residency Program - story 4.1,User Story,Closed,5,lakehouse;delta-lake
+WI-1483,HIST-033,Regional Data Residency Program - story 4.2,User Story,Closed,8,lakehouse;event-streaming
+WI-1484,HIST-033,Regional Data Residency Program - story 4.3,User Story,Closed,2,lakehouse;delta-lake
+WI-1485,HIST-034,Unity Catalog Governance Rollout,Epic,Closed,0,lakehouse
+WI-1486,HIST-034,Unity Catalog Governance Rollout - capability 1,Feature,Closed,0,lakehouse
+WI-1487,HIST-034,Unity Catalog Governance Rollout - story 1.1,User Story,Closed,8,lakehouse;mdm
+WI-1488,HIST-034,Unity Catalog Governance Rollout - story 1.2,User Story,Closed,2,lakehouse;delta-lake
+WI-1489,HIST-034,Unity Catalog Governance Rollout - story 1.3,User Story,Closed,8,lakehouse;event-streaming
+WI-1490,HIST-034,Unity Catalog Governance Rollout - capability 2,Feature,Closed,0,lakehouse
+WI-1491,HIST-034,Unity Catalog Governance Rollout - story 2.1,User Story,Closed,5,lakehouse;delta-lake
+WI-1492,HIST-034,Unity Catalog Governance Rollout - story 2.2,User Story,Closed,5,lakehouse;delta-lake
+WI-1493,HIST-034,Unity Catalog Governance Rollout - story 2.3,User Story,Closed,8,lakehouse;azure
+WI-1494,HIST-034,Unity Catalog Governance Rollout - capability 3,Feature,Closed,0,lakehouse
+WI-1495,HIST-034,Unity Catalog Governance Rollout - story 3.1,User Story,Closed,5,lakehouse;mdm
+WI-1496,HIST-034,Unity Catalog Governance Rollout - story 3.2,User Story,Closed,5,lakehouse;identity-resolution
+WI-1497,HIST-034,Unity Catalog Governance Rollout - story 3.3,User Story,Closed,3,lakehouse;mdm
+WI-1498,HIST-034,Unity Catalog Governance Rollout - capability 4,Feature,Closed,0,lakehouse
+WI-1499,HIST-034,Unity Catalog Governance Rollout - story 4.1,User Story,Closed,8,lakehouse;azure
+WI-1500,HIST-034,Unity Catalog Governance Rollout - story 4.2,User Story,Closed,8,lakehouse;event-streaming
+WI-1501,HIST-034,Unity Catalog Governance Rollout - story 4.3,User Story,Closed,5,lakehouse;customer-data-platform
+WI-1502,HIST-035,Partner API Gateway,Epic,Closed,0,api
+WI-1503,HIST-035,Partner API Gateway - capability 1,Feature,Closed,0,api
+WI-1504,HIST-035,Partner API Gateway - story 1.1,User Story,Closed,8,api;event-streaming
+WI-1505,HIST-035,Partner API Gateway - story 1.2,User Story,Closed,3,api;service-management
+WI-1506,HIST-035,Partner API Gateway - capability 2,Feature,Closed,0,api
+WI-1507,HIST-035,Partner API Gateway - story 2.1,User Story,Closed,3,api;identity-provider
+WI-1508,HIST-035,Partner API Gateway - story 2.2,User Story,Closed,8,api;identity-provider
+WI-1509,HIST-035,Partner API Gateway - capability 3,Feature,Closed,0,api
+WI-1510,HIST-035,Partner API Gateway - story 3.1,User Story,Closed,5,api;service-management
+WI-1511,HIST-035,Partner API Gateway - story 3.2,User Story,Closed,2,api;payments-gateway
+WI-1512,HIST-036,Payments Event Integration,Epic,Closed,0,api
+WI-1513,HIST-036,Payments Event Integration - capability 1,Feature,Closed,0,api
+WI-1514,HIST-036,Payments Event Integration - story 1.1,User Story,Closed,3,api;payments-gateway
+WI-1515,HIST-036,Payments Event Integration - story 1.2,User Story,Closed,2,api;payments-gateway
+WI-1516,HIST-036,Payments Event Integration - capability 2,Feature,Closed,0,api
+WI-1517,HIST-036,Payments Event Integration - story 2.1,User Story,Closed,5,api;api-management
+WI-1518,HIST-036,Payments Event Integration - story 2.2,User Story,Closed,5,api;event-streaming
+WI-1519,HIST-036,Payments Event Integration - story 2.3,User Story,Closed,5,api;api-management
+WI-1520,HIST-036,Payments Event Integration - capability 3,Feature,Closed,0,api
+WI-1521,HIST-036,Payments Event Integration - story 3.1,User Story,Closed,5,api;service-management
+WI-1522,HIST-036,Payments Event Integration - story 3.2,User Story,Closed,3,api;payments-gateway
+WI-1523,HIST-036,Payments Event Integration - capability 4,Feature,Closed,0,api
+WI-1524,HIST-036,Payments Event Integration - story 4.1,User Story,Closed,3,api;payments-gateway
+WI-1525,HIST-036,Payments Event Integration - story 4.2,User Story,Closed,8,api;payments-gateway
+WI-1526,HIST-036,Payments Event Integration - story 4.3,User Story,Closed,5,api;payments-gateway
+WI-1527,HIST-036,Payments Event Integration - capability 5,Feature,Closed,0,api
+WI-1528,HIST-036,Payments Event Integration - story 5.1,User Story,Closed,5,api;payments-gateway
+WI-1529,HIST-036,Payments Event Integration - story 5.2,User Story,Closed,3,api;event-streaming
+WI-1530,HIST-037,Order Management Integration,Epic,Closed,0,api
+WI-1531,HIST-037,Order Management Integration - capability 1,Feature,Closed,0,api
+WI-1532,HIST-037,Order Management Integration - story 1.1,User Story,Closed,2,api;identity-provider
+WI-1533,HIST-037,Order Management Integration - story 1.2,User Story,Closed,3,api;api-management
+WI-1534,HIST-037,Order Management Integration - story 1.3,User Story,Closed,8,api;identity-provider
+WI-1535,HIST-037,Order Management Integration - capability 2,Feature,Closed,0,api
+WI-1536,HIST-037,Order Management Integration - story 2.1,User Story,Closed,3,api;identity-provider
+WI-1537,HIST-037,Order Management Integration - story 2.2,User Story,Closed,3,api;api-management
+WI-1538,HIST-037,Order Management Integration - capability 3,Feature,Closed,0,api
+WI-1539,HIST-037,Order Management Integration - story 3.1,User Story,Closed,3,api;event-streaming
+WI-1540,HIST-037,Order Management Integration - story 3.2,User Story,Closed,5,api;service-management
+WI-1541,HIST-037,Order Management Integration - story 3.3,User Story,Closed,2,api;service-management
+WI-1542,HIST-037,Order Management Integration - capability 4,Feature,Closed,0,api
+WI-1543,HIST-037,Order Management Integration - story 4.1,User Story,Closed,2,api;identity-provider
+WI-1544,HIST-037,Order Management Integration - story 4.2,User Story,Closed,5,api;payments-gateway
+WI-1545,HIST-038,Supplier Connectivity API,Epic,Closed,0,api
+WI-1546,HIST-038,Supplier Connectivity API - capability 1,Feature,Closed,0,api
+WI-1547,HIST-038,Supplier Connectivity API - story 1.1,User Story,Closed,5,api;event-streaming
+WI-1548,HIST-038,Supplier Connectivity API - story 1.2,User Story,Closed,8,api;identity-provider
+WI-1549,HIST-038,Supplier Connectivity API - capability 2,Feature,Closed,0,api
+WI-1550,HIST-038,Supplier Connectivity API - story 2.1,User Story,Closed,2,api;payments-gateway
+WI-1551,HIST-038,Supplier Connectivity API - story 2.2,User Story,Closed,3,api;payments-gateway
+WI-1552,HIST-038,Supplier Connectivity API - capability 3,Feature,Closed,0,api
+WI-1553,HIST-038,Supplier Connectivity API - story 3.1,User Story,Closed,3,api;identity-provider
+WI-1554,HIST-038,Supplier Connectivity API - story 3.2,User Story,Closed,2,api;event-streaming
+WI-1555,HIST-038,Supplier Connectivity API - story 3.3,User Story,Closed,8,api;api-management
+WI-1556,HIST-039,Partner Portal Single Sign-On,Epic,Closed,0,api
+WI-1557,HIST-039,Partner Portal Single Sign-On - capability 1,Feature,Closed,0,api
+WI-1558,HIST-039,Partner Portal Single Sign-On - story 1.1,User Story,Closed,2,api;api-management
+WI-1559,HIST-039,Partner Portal Single Sign-On - story 1.2,User Story,Closed,2,api;payments-gateway
+WI-1560,HIST-039,Partner Portal Single Sign-On - capability 2,Feature,Closed,0,api
+WI-1561,HIST-039,Partner Portal Single Sign-On - story 2.1,User Story,Closed,5,api;payments-gateway
+WI-1562,HIST-039,Partner Portal Single Sign-On - story 2.2,User Story,Closed,5,api;identity-provider
+WI-1563,HIST-039,Partner Portal Single Sign-On - capability 3,Feature,Closed,0,api
+WI-1564,HIST-039,Partner Portal Single Sign-On - story 3.1,User Story,Closed,8,api;event-streaming
+WI-1565,HIST-039,Partner Portal Single Sign-On - story 3.2,User Story,Closed,3,api;event-streaming
+WI-1566,HIST-039,Partner Portal Single Sign-On - story 3.3,User Story,Closed,5,api;event-streaming
+WI-1567,HIST-039,Partner Portal Single Sign-On - capability 4,Feature,Closed,0,api
+WI-1568,HIST-039,Partner Portal Single Sign-On - story 4.1,User Story,Closed,3,api;event-streaming
+WI-1569,HIST-039,Partner Portal Single Sign-On - story 4.2,User Story,Closed,8,api;identity-provider
+WI-1570,HIST-039,Partner Portal Single Sign-On - capability 5,Feature,Closed,0,api
+WI-1571,HIST-039,Partner Portal Single Sign-On - story 5.1,User Story,Closed,2,api;event-streaming
+WI-1572,HIST-039,Partner Portal Single Sign-On - story 5.2,User Story,Closed,3,api;event-streaming
+WI-1573,HIST-039,Partner Portal Single Sign-On - story 5.3,User Story,Closed,5,api;event-streaming
+WI-1574,HIST-040,Mobile Backend Modernization,Epic,Closed,0,api
+WI-1575,HIST-040,Mobile Backend Modernization - capability 1,Feature,Closed,0,api
+WI-1576,HIST-040,Mobile Backend Modernization - story 1.1,User Story,Closed,5,api;api-management
+WI-1577,HIST-040,Mobile Backend Modernization - story 1.2,User Story,Closed,5,api;identity-provider
+WI-1578,HIST-040,Mobile Backend Modernization - story 1.3,User Story,Closed,3,api;service-management
+WI-1579,HIST-040,Mobile Backend Modernization - capability 2,Feature,Closed,0,api
+WI-1580,HIST-040,Mobile Backend Modernization - story 2.1,User Story,Closed,2,api;payments-gateway
+WI-1581,HIST-040,Mobile Backend Modernization - story 2.2,User Story,Closed,2,api;event-streaming
+WI-1582,HIST-040,Mobile Backend Modernization - capability 3,Feature,Closed,0,api
+WI-1583,HIST-040,Mobile Backend Modernization - story 3.1,User Story,Closed,2,api;event-streaming
+WI-1584,HIST-040,Mobile Backend Modernization - story 3.2,User Story,Closed,8,api;event-streaming
+WI-1585,HIST-040,Mobile Backend Modernization - story 3.3,User Story,Closed,2,api;event-streaming
+WI-1586,HIST-040,Mobile Backend Modernization - capability 4,Feature,Closed,0,api
+WI-1587,HIST-040,Mobile Backend Modernization - story 4.1,User Story,Closed,5,api;event-streaming
+WI-1588,HIST-040,Mobile Backend Modernization - story 4.2,User Story,Closed,8,api;service-management
+WI-1589,HIST-040,Mobile Backend Modernization - story 4.3,User Story,Closed,2,api;identity-provider
+WI-1590,HIST-041,Privacy Request Automation,Epic,Closed,0,security
+WI-1591,HIST-041,Privacy Request Automation - capability 1,Feature,Closed,0,security
+WI-1592,HIST-041,Privacy Request Automation - story 1.1,User Story,Closed,3,security;profile-api
+WI-1593,HIST-041,Privacy Request Automation - story 1.2,User Story,Closed,3,security;identity-resolution
+WI-1594,HIST-041,Privacy Request Automation - story 1.3,User Story,Closed,8,security;identity-resolution
+WI-1595,HIST-041,Privacy Request Automation - capability 2,Feature,Closed,0,security
+WI-1596,HIST-041,Privacy Request Automation - story 2.1,User Story,Closed,8,security;crm
+WI-1597,HIST-041,Privacy Request Automation - story 2.2,User Story,Closed,8,security;identity-provider
+WI-1598,HIST-041,Privacy Request Automation - capability 3,Feature,Closed,0,security
+WI-1599,HIST-041,Privacy Request Automation - story 3.1,User Story,Closed,2,security;profile-api
+WI-1600,HIST-041,Privacy Request Automation - story 3.2,User Story,Closed,2,security;profile-api
+WI-1601,HIST-042,Consent Ledger Modernization,Epic,Closed,0,security
+WI-1602,HIST-042,Consent Ledger Modernization - capability 1,Feature,Closed,0,security
+WI-1603,HIST-042,Consent Ledger Modernization - story 1.1,User Story,Closed,8,security;identity-resolution
+WI-1604,HIST-042,Consent Ledger Modernization - story 1.2,User Story,Closed,8,security;crm
+WI-1605,HIST-042,Consent Ledger Modernization - capability 2,Feature,Closed,0,security
+WI-1606,HIST-042,Consent Ledger Modernization - story 2.1,User Story,Closed,3,security;identity-resolution
+WI-1607,HIST-042,Consent Ledger Modernization - story 2.2,User Story,Closed,5,security;crm
+WI-1608,HIST-042,Consent Ledger Modernization - story 2.3,User Story,Closed,5,security;identity-resolution
+WI-1609,HIST-042,Consent Ledger Modernization - capability 3,Feature,Closed,0,security
+WI-1610,HIST-042,Consent Ledger Modernization - story 3.1,User Story,Closed,8,security;mdm
+WI-1611,HIST-042,Consent Ledger Modernization - story 3.2,User Story,Closed,8,security;profile-api
+WI-1612,HIST-042,Consent Ledger Modernization - capability 4,Feature,Closed,0,security
+WI-1613,HIST-042,Consent Ledger Modernization - story 4.1,User Story,Closed,5,security;identity-resolution
+WI-1614,HIST-042,Consent Ledger Modernization - story 4.2,User Story,Closed,8,security;crm
+WI-1615,HIST-042,Consent Ledger Modernization - story 4.3,User Story,Closed,5,security;crm
+WI-1616,HIST-042,Consent Ledger Modernization - capability 5,Feature,Closed,0,security
+WI-1617,HIST-042,Consent Ledger Modernization - story 5.1,User Story,Closed,3,security;identity-resolution
+WI-1618,HIST-042,Consent Ledger Modernization - story 5.2,User Story,Closed,3,security;crm
+WI-1619,HIST-042,Consent Ledger Modernization - story 5.3,User Story,Closed,8,security;profile-api
+WI-1620,HIST-043,PII Discovery and Masking,Epic,Closed,0,security
+WI-1621,HIST-043,PII Discovery and Masking - capability 1,Feature,Closed,0,security
+WI-1622,HIST-043,PII Discovery and Masking - story 1.1,User Story,Closed,8,security;mdm
+WI-1623,HIST-043,PII Discovery and Masking - story 1.2,User Story,Closed,2,security;mdm
+WI-1624,HIST-043,PII Discovery and Masking - capability 2,Feature,Closed,0,security
+WI-1625,HIST-043,PII Discovery and Masking - story 2.1,User Story,Closed,8,security;crm
+WI-1626,HIST-043,PII Discovery and Masking - story 2.2,User Story,Closed,3,security;identity-resolution
+WI-1627,HIST-043,PII Discovery and Masking - story 2.3,User Story,Closed,3,security;identity-provider
+WI-1628,HIST-043,PII Discovery and Masking - capability 3,Feature,Closed,0,security
+WI-1629,HIST-043,PII Discovery and Masking - story 3.1,User Story,Closed,5,security;profile-api
+WI-1630,HIST-043,PII Discovery and Masking - story 3.2,User Story,Closed,8,security;mdm
+WI-1631,HIST-043,PII Discovery and Masking - story 3.3,User Story,Closed,2,security;identity-provider
+WI-1632,HIST-043,PII Discovery and Masking - capability 4,Feature,Closed,0,security
+WI-1633,HIST-043,PII Discovery and Masking - story 4.1,User Story,Closed,3,security;mdm
+WI-1634,HIST-043,PII Discovery and Masking - story 4.2,User Story,Closed,5,security;identity-resolution
+WI-1635,HIST-043,PII Discovery and Masking - story 4.3,User Story,Closed,8,security;identity-resolution
+WI-1636,HIST-043,PII Discovery and Masking - capability 5,Feature,Closed,0,security
+WI-1637,HIST-043,PII Discovery and Masking - story 5.1,User Story,Closed,5,security;identity-resolution
+WI-1638,HIST-043,PII Discovery and Masking - story 5.2,User Story,Closed,8,security;mdm
+WI-1639,HIST-044,Access Governance Refresh,Epic,Closed,0,security
+WI-1640,HIST-044,Access Governance Refresh - capability 1,Feature,Closed,0,security
+WI-1641,HIST-044,Access Governance Refresh - story 1.1,User Story,Closed,2,security;profile-api
+WI-1642,HIST-044,Access Governance Refresh - story 1.2,User Story,Closed,3,security;identity-provider
+WI-1643,HIST-044,Access Governance Refresh - capability 2,Feature,Closed,0,security
+WI-1644,HIST-044,Access Governance Refresh - story 2.1,User Story,Closed,8,security;profile-api
+WI-1645,HIST-044,Access Governance Refresh - story 2.2,User Story,Closed,3,security;crm
+WI-1646,HIST-044,Access Governance Refresh - capability 3,Feature,Closed,0,security
+WI-1647,HIST-044,Access Governance Refresh - story 3.1,User Story,Closed,5,security;crm
+WI-1648,HIST-044,Access Governance Refresh - story 3.2,User Story,Closed,5,security;profile-api
+WI-1649,HIST-044,Access Governance Refresh - story 3.3,User Story,Closed,2,security;identity-resolution
+WI-1650,HIST-044,Access Governance Refresh - capability 4,Feature,Closed,0,security
+WI-1651,HIST-044,Access Governance Refresh - story 4.1,User Story,Closed,3,security;crm
+WI-1652,HIST-044,Access Governance Refresh - story 4.2,User Story,Closed,8,security;profile-api
+WI-1653,HIST-044,Access Governance Refresh - capability 5,Feature,Closed,0,security
+WI-1654,HIST-044,Access Governance Refresh - story 5.1,User Story,Closed,2,security;mdm
+WI-1655,HIST-044,Access Governance Refresh - story 5.2,User Story,Closed,5,security;identity-resolution
+WI-1656,HIST-044,Access Governance Refresh - story 5.3,User Story,Closed,3,security;crm
+WI-1657,HIST-045,Data Retention Enforcement,Epic,Closed,0,security
+WI-1658,HIST-045,Data Retention Enforcement - capability 1,Feature,Closed,0,security
+WI-1659,HIST-045,Data Retention Enforcement - story 1.1,User Story,Closed,8,security;crm
+WI-1660,HIST-045,Data Retention Enforcement - story 1.2,User Story,Closed,2,security;crm
+WI-1661,HIST-045,Data Retention Enforcement - capability 2,Feature,Closed,0,security
+WI-1662,HIST-045,Data Retention Enforcement - story 2.1,User Story,Closed,2,security;identity-provider
+WI-1663,HIST-045,Data Retention Enforcement - story 2.2,User Story,Closed,8,security;mdm
+WI-1664,HIST-045,Data Retention Enforcement - capability 3,Feature,Closed,0,security
+WI-1665,HIST-045,Data Retention Enforcement - story 3.1,User Story,Closed,8,security;mdm
+WI-1666,HIST-045,Data Retention Enforcement - story 3.2,User Story,Closed,3,security;mdm
+WI-1667,HIST-045,Data Retention Enforcement - capability 4,Feature,Closed,0,security
+WI-1668,HIST-045,Data Retention Enforcement - story 4.1,User Story,Closed,8,security;mdm
+WI-1669,HIST-045,Data Retention Enforcement - story 4.2,User Story,Closed,8,security;mdm
+WI-1670,HIST-045,Data Retention Enforcement - story 4.3,User Story,Closed,2,security;mdm
+WI-1671,HIST-046,Billing Profile Master,Epic,Closed,0,erp
+WI-1672,HIST-046,Billing Profile Master - capability 1,Feature,Closed,0,erp
+WI-1673,HIST-046,Billing Profile Master - story 1.1,User Story,Closed,8,erp;batch-integration
+WI-1674,HIST-046,Billing Profile Master - story 1.2,User Story,Closed,5,erp;batch-integration
+WI-1675,HIST-046,Billing Profile Master - story 1.3,User Story,Closed,8,erp;customer-master
+WI-1676,HIST-046,Billing Profile Master - capability 2,Feature,Closed,0,erp
+WI-1677,HIST-046,Billing Profile Master - story 2.1,User Story,Closed,5,erp;erp
+WI-1678,HIST-046,Billing Profile Master - story 2.2,User Story,Closed,2,erp;erp
+WI-1679,HIST-046,Billing Profile Master - story 2.3,User Story,Closed,3,erp;service-management
+WI-1680,HIST-046,Billing Profile Master - capability 3,Feature,Closed,0,erp
+WI-1681,HIST-046,Billing Profile Master - story 3.1,User Story,Closed,5,erp;batch-integration
+WI-1682,HIST-046,Billing Profile Master - story 3.2,User Story,Closed,3,erp;erp
+WI-1683,HIST-046,Billing Profile Master - story 3.3,User Story,Closed,3,erp;batch-integration
+WI-1684,HIST-047,Finance Close Automation,Epic,Closed,0,erp
+WI-1685,HIST-047,Finance Close Automation - capability 1,Feature,Closed,0,erp
+WI-1686,HIST-047,Finance Close Automation - story 1.1,User Story,Closed,8,erp;customer-master
+WI-1687,HIST-047,Finance Close Automation - story 1.2,User Story,Closed,3,erp;service-management
+WI-1688,HIST-047,Finance Close Automation - capability 2,Feature,Closed,0,erp
+WI-1689,HIST-047,Finance Close Automation - story 2.1,User Story,Closed,5,erp;customer-master
+WI-1690,HIST-047,Finance Close Automation - story 2.2,User Story,Closed,2,erp;service-management
+WI-1691,HIST-047,Finance Close Automation - capability 3,Feature,Closed,0,erp
+WI-1692,HIST-047,Finance Close Automation - story 3.1,User Story,Closed,8,erp;service-management
+WI-1693,HIST-047,Finance Close Automation - story 3.2,User Story,Closed,5,erp;erp
+WI-1694,HIST-047,Finance Close Automation - capability 4,Feature,Closed,0,erp
+WI-1695,HIST-047,Finance Close Automation - story 4.1,User Story,Closed,3,erp;erp
+WI-1696,HIST-047,Finance Close Automation - story 4.2,User Story,Closed,5,erp;customer-master
+WI-1697,HIST-047,Finance Close Automation - story 4.3,User Story,Closed,3,erp;customer-master
+WI-1698,HIST-047,Finance Close Automation - capability 5,Feature,Closed,0,erp
+WI-1699,HIST-047,Finance Close Automation - story 5.1,User Story,Closed,2,erp;erp
+WI-1700,HIST-047,Finance Close Automation - story 5.2,User Story,Closed,3,erp;erp
+WI-1701,HIST-047,Finance Close Automation - story 5.3,User Story,Closed,2,erp;service-management
+WI-1702,HIST-048,Procurement Platform Upgrade,Epic,Closed,0,erp
+WI-1703,HIST-048,Procurement Platform Upgrade - capability 1,Feature,Closed,0,erp
+WI-1704,HIST-048,Procurement Platform Upgrade - story 1.1,User Story,Closed,5,erp;customer-master
+WI-1705,HIST-048,Procurement Platform Upgrade - story 1.2,User Story,Closed,2,erp;batch-integration
+WI-1706,HIST-048,Procurement Platform Upgrade - story 1.3,User Story,Closed,5,erp;batch-integration
+WI-1707,HIST-048,Procurement Platform Upgrade - capability 2,Feature,Closed,0,erp
+WI-1708,HIST-048,Procurement Platform Upgrade - story 2.1,User Story,Closed,8,erp;service-management
+WI-1709,HIST-048,Procurement Platform Upgrade - story 2.2,User Story,Closed,5,erp;service-management
+WI-1710,HIST-048,Procurement Platform Upgrade - capability 3,Feature,Closed,0,erp
+WI-1711,HIST-048,Procurement Platform Upgrade - story 3.1,User Story,Closed,8,erp;batch-integration
+WI-1712,HIST-048,Procurement Platform Upgrade - story 3.2,User Story,Closed,2,erp;batch-integration
+WI-1713,HIST-048,Procurement Platform Upgrade - story 3.3,User Story,Closed,2,erp;batch-integration
+WI-1714,HIST-048,Procurement Platform Upgrade - capability 4,Feature,Closed,0,erp
+WI-1715,HIST-048,Procurement Platform Upgrade - story 4.1,User Story,Closed,3,erp;customer-master
+WI-1716,HIST-048,Procurement Platform Upgrade - story 4.2,User Story,Closed,3,erp;batch-integration
+WI-1717,HIST-048,Procurement Platform Upgrade - capability 5,Feature,Closed,0,erp
+WI-1718,HIST-048,Procurement Platform Upgrade - story 5.1,User Story,Closed,2,erp;service-management
+WI-1719,HIST-048,Procurement Platform Upgrade - story 5.2,User Story,Closed,5,erp;erp
+WI-1720,HIST-049,Order-to-Cash Consolidation,Epic,Closed,0,erp
+WI-1721,HIST-049,Order-to-Cash Consolidation - capability 1,Feature,Closed,0,erp
+WI-1722,HIST-049,Order-to-Cash Consolidation - story 1.1,User Story,Closed,5,erp;erp
+WI-1723,HIST-049,Order-to-Cash Consolidation - story 1.2,User Story,Closed,3,erp;customer-master
+WI-1724,HIST-049,Order-to-Cash Consolidation - capability 2,Feature,Closed,0,erp
+WI-1725,HIST-049,Order-to-Cash Consolidation - story 2.1,User Story,Closed,8,erp;batch-integration
+WI-1726,HIST-049,Order-to-Cash Consolidation - story 2.2,User Story,Closed,2,erp;batch-integration
+WI-1727,HIST-049,Order-to-Cash Consolidation - story 2.3,User Story,Closed,3,erp;batch-integration
+WI-1728,HIST-049,Order-to-Cash Consolidation - capability 3,Feature,Closed,0,erp
+WI-1729,HIST-049,Order-to-Cash Consolidation - story 3.1,User Story,Closed,2,erp;service-management
+WI-1730,HIST-049,Order-to-Cash Consolidation - story 3.2,User Story,Closed,8,erp;service-management
+WI-1731,HIST-049,Order-to-Cash Consolidation - capability 4,Feature,Closed,0,erp
+WI-1732,HIST-049,Order-to-Cash Consolidation - story 4.1,User Story,Closed,3,erp;batch-integration
+WI-1733,HIST-049,Order-to-Cash Consolidation - story 4.2,User Story,Closed,5,erp;erp
+WI-1734,HIST-049,Order-to-Cash Consolidation - capability 5,Feature,Closed,0,erp
+WI-1735,HIST-049,Order-to-Cash Consolidation - story 5.1,User Story,Closed,3,erp;customer-master
+WI-1736,HIST-049,Order-to-Cash Consolidation - story 5.2,User Story,Closed,5,erp;batch-integration
+WI-1737,HIST-050,Revenue Recognition Integration,Epic,Closed,0,erp
+WI-1738,HIST-050,Revenue Recognition Integration - capability 1,Feature,Closed,0,erp
+WI-1739,HIST-050,Revenue Recognition Integration - story 1.1,User Story,Closed,3,erp;batch-integration
+WI-1740,HIST-050,Revenue Recognition Integration - story 1.2,User Story,Closed,3,erp;customer-master
+WI-1741,HIST-050,Revenue Recognition Integration - story 1.3,User Story,Closed,5,erp;customer-master
+WI-1742,HIST-050,Revenue Recognition Integration - capability 2,Feature,Closed,0,erp
+WI-1743,HIST-050,Revenue Recognition Integration - story 2.1,User Story,Closed,8,erp;batch-integration
+WI-1744,HIST-050,Revenue Recognition Integration - story 2.2,User Story,Closed,8,erp;customer-master
+WI-1745,HIST-050,Revenue Recognition Integration - capability 3,Feature,Closed,0,erp
+WI-1746,HIST-050,Revenue Recognition Integration - story 3.1,User Story,Closed,3,erp;erp
+WI-1747,HIST-050,Revenue Recognition Integration - story 3.2,User Story,Closed,2,erp;batch-integration
+WI-1748,HIST-050,Revenue Recognition Integration - capability 4,Feature,Closed,0,erp
+WI-1749,HIST-050,Revenue Recognition Integration - story 4.1,User Story,Closed,3,erp;erp
+WI-1750,HIST-050,Revenue Recognition Integration - story 4.2,User Story,Closed,3,erp;erp
+WI-1751,HIST-050,Revenue Recognition Integration - capability 5,Feature,Closed,0,erp
+WI-1752,HIST-050,Revenue Recognition Integration - story 5.1,User Story,Closed,3,erp;batch-integration
+WI-1753,HIST-050,Revenue Recognition Integration - story 5.2,User Story,Closed,5,erp;customer-master
+WI-1754,HIST-050,Revenue Recognition Integration - story 5.3,User Story,Closed,2,erp;customer-master

@@ -1,0 +1,91 @@
+project_id,gate,dependency,owner,status,blocking,approved_date
+HIST-001,Consent model sign-off,consent-management,Data Governance,approved,yes,2022-01-20
+HIST-002,Consent model sign-off,consent-management,Data Governance,approved,yes,2022-02-13
+HIST-002,CRM/MDM integration design,crm-mdm-integration,Architecture Board,approved,no,2022-02-19
+HIST-003,Consent model sign-off,consent-management,Data Governance,approved,yes,2022-03-05
+HIST-003,CRM/MDM integration design,crm-mdm-integration,Architecture Board,approved,no,2022-03-11
+HIST-003,Privacy impact assessment,privacy-review,Privacy Office,approved,no,2022-03-17
+HIST-004,Consent model sign-off,consent-management,Data Governance,approved,yes,2022-03-28
+HIST-004,CRM/MDM integration design,crm-mdm-integration,Architecture Board,approved,no,2022-04-03
+HIST-004,Privacy impact assessment,privacy-review,Privacy Office,approved,no,2022-04-09
+HIST-005,Consent model sign-off,consent-management,Data Governance,approved,yes,2022-04-17
+HIST-005,CRM/MDM integration design,crm-mdm-integration,Architecture Board,approved,no,2022-04-23
+HIST-006,CRM/MDM integration design,crm-mdm-integration,Architecture Board,approved,yes,2022-05-05
+HIST-006,Privacy impact assessment,privacy-review,Privacy Office,approved,no,2022-05-11
+HIST-007,Consent model sign-off,consent-management,Data Governance,approved,yes,2022-06-01
+HIST-008,Consent model sign-off,consent-management,Data Governance,approved,yes,2022-06-11
+HIST-008,CRM/MDM integration design,crm-mdm-integration,Architecture Board,approved,no,2022-06-17
+HIST-008,Privacy impact assessment,privacy-review,Privacy Office,approved,no,2022-06-23
+HIST-009,Consent model sign-off,consent-management,Data Governance,approved,yes,2022-07-11
+HIST-009,CRM/MDM integration design,crm-mdm-integration,Architecture Board,approved,no,2022-07-17
+HIST-010,Consent model sign-off,consent-management,Data Governance,approved,yes,2022-07-29
+HIST-010,CRM/MDM integration design,crm-mdm-integration,Architecture Board,approved,no,2022-08-04
+HIST-010,Privacy impact assessment,privacy-review,Privacy Office,approved,no,2022-08-10
+HIST-011,Consent model sign-off,consent-management,Data Governance,approved,yes,2022-08-12
+HIST-011,Privacy impact assessment,privacy-review,Privacy Office,approved,no,2022-08-18
+HIST-012,Consent model sign-off,consent-management,Data Governance,approved,yes,2022-09-07
+HIST-012,CRM/MDM integration design,crm-mdm-integration,Architecture Board,approved,no,2022-09-13
+HIST-012,Privacy impact assessment,privacy-review,Privacy Office,approved,no,2022-09-19
+HIST-013,Identity provider onboarding,identity-provider,Security Engineering,approved,yes,2022-09-26
+HIST-014,Identity provider onboarding,identity-provider,Security Engineering,approved,yes,2022-10-15
+HIST-015,Identity provider onboarding,identity-provider,Security Engineering,approved,yes,2022-10-30
+HIST-016,Identity provider onboarding,identity-provider,Security Engineering,approved,yes,2022-11-22
+HIST-017,Identity provider onboarding,identity-provider,Security Engineering,approved,yes,2022-12-06
+HIST-018,Privacy impact assessment,privacy-review,Privacy Office,approved,yes,2023-01-03
+HIST-018,Vendor contract execution,vendor-contract,Procurement,approved,no,2023-01-09
+HIST-019,Privacy impact assessment,privacy-review,Privacy Office,approved,yes,2023-01-18
+HIST-019,Vendor contract execution,vendor-contract,Procurement,approved,no,2023-01-24
+HIST-020,Privacy impact assessment,privacy-review,Privacy Office,approved,yes,2023-02-10
+HIST-020,Vendor contract execution,vendor-contract,Procurement,approved,no,2023-02-16
+HIST-021,Privacy impact assessment,privacy-review,Privacy Office,approved,yes,2023-03-01
+HIST-022,Vendor contract execution,vendor-contract,Procurement,approved,yes,2023-03-20
+HIST-023,CRM/MDM integration design,crm-mdm-integration,Architecture Board,approved,yes,2023-04-13
+HIST-023,Privacy impact assessment,privacy-review,Privacy Office,approved,no,2023-04-19
+HIST-024,CRM/MDM integration design,crm-mdm-integration,Architecture Board,approved,yes,2023-05-01
+HIST-024,Privacy impact assessment,privacy-review,Privacy Office,approved,no,2023-05-07
+HIST-025,CRM/MDM integration design,crm-mdm-integration,Architecture Board,approved,yes,2023-05-20
+HIST-026,Privacy impact assessment,privacy-review,Privacy Office,approved,yes,2023-06-04
+HIST-027,CRM/MDM integration design,crm-mdm-integration,Architecture Board,approved,yes,2023-06-27
+HIST-027,Privacy impact assessment,privacy-review,Privacy Office,approved,no,2023-07-03
+HIST-028,CRM/MDM integration design,crm-mdm-integration,Architecture Board,approved,yes,2023-07-19
+HIST-029,Private network approval,private-network,Cloud Platform,approved,yes,2023-08-13
+HIST-030,Identity provider onboarding,identity-provider,Security Engineering,approved,yes,2023-09-03
+HIST-030,Private network approval,private-network,Cloud Platform,approved,no,2023-09-09
+HIST-031,Identity provider onboarding,identity-provider,Security Engineering,approved,yes,2023-09-22
+HIST-031,Privacy impact assessment,privacy-review,Privacy Office,approved,no,2023-09-28
+HIST-031,Private network approval,private-network,Cloud Platform,approved,no,2023-10-04
+HIST-032,Identity provider onboarding,identity-provider,Security Engineering,approved,yes,2023-10-08
+HIST-032,Privacy impact assessment,privacy-review,Privacy Office,approved,no,2023-10-14
+HIST-032,Private network approval,private-network,Cloud Platform,approved,no,2023-10-20
+HIST-033,Identity provider onboarding,identity-provider,Security Engineering,approved,yes,2023-10-26
+HIST-033,Privacy impact assessment,privacy-review,Privacy Office,approved,no,2023-11-01
+HIST-033,Private network approval,private-network,Cloud Platform,approved,no,2023-11-07
+HIST-034,Identity provider onboarding,identity-provider,Security Engineering,approved,yes,2023-11-22
+HIST-034,Privacy impact assessment,privacy-review,Privacy Office,approved,no,2023-11-28
+HIST-034,Private network approval,private-network,Cloud Platform,approved,no,2023-12-04
+HIST-035,Identity provider onboarding,identity-provider,Security Engineering,approved,yes,2023-12-06
+HIST-035,Private network approval,private-network,Cloud Platform,approved,no,2023-12-12
+HIST-036,Identity provider onboarding,identity-provider,Security Engineering,approved,yes,2023-12-29
+HIST-036,Private network approval,private-network,Cloud Platform,approved,no,2024-01-04
+HIST-037,Identity provider onboarding,identity-provider,Security Engineering,approved,yes,2024-01-18
+HIST-038,Identity provider onboarding,identity-provider,Security Engineering,approved,yes,2024-02-08
+HIST-038,Private network approval,private-network,Cloud Platform,approved,no,2024-02-14
+HIST-039,Identity provider onboarding,identity-provider,Security Engineering,approved,yes,2024-02-24
+HIST-039,Private network approval,private-network,Cloud Platform,approved,no,2024-03-01
+HIST-040,Identity provider onboarding,identity-provider,Security Engineering,approved,yes,2024-03-22
+HIST-040,Private network approval,private-network,Cloud Platform,approved,no,2024-03-28
+HIST-041,Consent model sign-off,consent-management,Data Governance,approved,yes,2024-04-03
+HIST-041,Identity provider onboarding,identity-provider,Security Engineering,approved,no,2024-04-09
+HIST-042,Consent model sign-off,consent-management,Data Governance,approved,yes,2024-04-30
+HIST-042,Identity provider onboarding,identity-provider,Security Engineering,approved,no,2024-05-06
+HIST-043,Identity provider onboarding,identity-provider,Security Engineering,approved,yes,2024-05-15
+HIST-043,Privacy impact assessment,privacy-review,Privacy Office,approved,no,2024-05-21
+HIST-044,Consent model sign-off,consent-management,Data Governance,approved,yes,2024-06-07
+HIST-044,Identity provider onboarding,identity-provider,Security Engineering,approved,no,2024-06-13
+HIST-045,Consent model sign-off,consent-management,Data Governance,approved,yes,2024-06-24
+HIST-045,Privacy impact assessment,privacy-review,Privacy Office,approved,no,2024-06-30
+HIST-046,Vendor contract execution,vendor-contract,Procurement,approved,yes,2024-07-17
+HIST-047,Vendor contract execution,vendor-contract,Procurement,approved,yes,2024-07-29
+HIST-048,Vendor contract execution,vendor-contract,Procurement,approved,yes,2024-08-18
+HIST-049,Vendor contract execution,vendor-contract,Procurement,approved,yes,2024-09-17
+HIST-050,Vendor contract execution,vendor-contract,Procurement,approved,yes,2024-09-28
