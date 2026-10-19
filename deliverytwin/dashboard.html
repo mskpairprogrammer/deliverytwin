@@ -188,6 +188,16 @@
     }
     .intake { margin-bottom: 16px; padding-bottom: 18px; }
     .intake-body { padding: 14px 19px 0; display: grid; gap: 14px; }
+    .intake-step.collapsed { background: white; padding: 10px 15px; }
+    .intake-step.collapsed > :not(.step-title):not(.step-summary) { display: none; }
+    .step-summary { display: none; font-size: 11px; color: var(--muted); margin-top: 4px; line-height: 1.5; }
+    .intake-step.collapsed > .step-summary { display: block; }
+    .link-btn { display: none; margin-left: auto; border: 0; background: none; color: var(--teal); font: inherit; font-size: 11px; font-weight: 700; cursor: pointer; text-decoration: underline; }
+    .intake-step.collapsed .link-btn { display: inline; }
+    .q-support { margin-top: 8px; font-size: 10px; color: var(--teal); font-weight: 700; }
+    details.evidence > summary, .evidence-details > summary { cursor: pointer; font-size: 11px; font-weight: 700; color: var(--muted); }
+    .evidence-details { margin-top: 14px; border: 1px solid var(--line); border-radius: 9px; background: white; padding: 10px 12px; }
+    .evidence-details[open] > summary { margin-bottom: 10px; }
     .intake-step { border: 1px solid var(--line); border-radius: 10px; padding: 14px 15px; background: #fbfcfd; }
     .intake-step[hidden] { display: none; }
     .step-title { margin: 0 0 4px; font-size: 12px; font-weight: 750; display: flex; gap: 8px; align-items: center; }
@@ -337,10 +347,11 @@
     <section id="panel-shape" class="stage-panel" role="tabpanel" aria-labelledby="tab-shape" tabindex="0">
       <div class="stage-intro"><div><h2>Shape a delivery proposal</h2><p>Clarify the request, review historical evidence, and produce an explainable estimate.</p></div><div class="shape-actions"><span class="badge" id="shape-stage-status">INTAKE IN PROGRESS</span></div></div>
       <section class="card intake" id="intake" aria-labelledby="intake-title">
-        <div class="card-head"><div><h3 class="card-title" id="intake-title">Intake request</h3><div class="card-kicker">Intake request → clarified fingerprint → historical evidence → explainable ROM</div></div><span class="badge" id="intake-step-badge">STEP 1 OF 5</span></div>
+        <div class="card-head"><div><h3 class="card-title" id="intake-title">Intake request</h3><div class="card-kicker">Describe the request, confirm the approach, get an estimate</div></div><span class="badge" id="intake-step-badge">STEP 1 OF 3</span></div>
         <div class="intake-body">
           <div class="intake-step" id="intake-step-1">
-            <h4 class="step-title"><span class="step-num">1</span>Intake request</h4>
+            <h4 class="step-title"><span class="step-num">1</span>Describe the request<button type="button" class="link-btn" data-edit="1">Edit</button></h4>
+            <div class="step-summary" id="summary-1"></div>
             <p class="step-help">Paste a vague request the way it arrives from the business.</p>
             <textarea id="intake-text" class="intake-text" maxlength="2000" aria-label="Project request" placeholder="Describe the project request…"></textarea>
             <div class="intake-docs">
@@ -352,82 +363,41 @@
               <ul id="intake-doc-list" class="intake-doc-list"></ul>
             </div>
             <div class="intake-actions">
-              <button id="intake-sample" class="intake-btn" type="button">Use sample request</button>
+              <button id="intake-sample" class="intake-btn" type="button">Try the sample request</button>
               <button id="intake-analyze" class="intake-btn primary" type="button">Analyze request</button>
             </div>
           </div>
           <div class="intake-step" id="intake-step-2" hidden>
-            <h4 class="step-title"><span class="step-num">2</span>Clarification questions <span id="intake-clarity" class="clarity"></span></h4>
+            <h4 class="step-title"><span class="step-num">2</span>Confirm the approach <span id="intake-clarity" class="clarity"></span><button type="button" class="link-btn" data-edit="2">Edit</button></h4>
+            <div class="step-summary" id="summary-2"></div>
             <p class="step-help" id="intake-retrieval"></p>
-            <section id="intake-profile" class="profile-card" aria-label="Request profile" hidden>
-              <h4 class="chart-title">Request profile · review before estimating</h4>
-              <p class="chart-note" id="intake-profile-summary"></p>
-              <div class="profile-columns">
-                <div><strong>Areas indicated in the request</strong><ul id="intake-profile-facts" class="profile-list"></ul></div>
-                <div><strong>Needs clarification</strong><ul id="intake-profile-gaps" class="profile-list"></ul></div>
-              </div>
-              <p class="chart-note">Area detection is keyword-based; treat it as a prompt for review, not a verified fact extraction.</p>
-            </section>
             <div id="intake-questions" class="q-grid"></div>
-            <div class="intake-actions"><button id="intake-fingerprint-btn" class="intake-btn primary" type="button">Confirm answers &amp; match fingerprint</button></div>
+            <div class="intake-actions"><button id="intake-fingerprint-btn" class="intake-btn primary" type="button">Get estimate</button></div>
           </div>
           <div class="intake-step" id="intake-step-3" hidden>
-            <h4 class="step-title"><span class="step-num">3</span>6D delivery fingerprint</h4>
-            <p class="step-help">The six dimensions describe this initiative and drive matching against the shared completed-project history. Review the matched projects in the evidence section below.</p>
-            <div id="intake-fingerprint" class="fp-grid"></div>
-            <div id="intake-analogs"></div>
-            <div class="intake-actions"><button id="intake-rom-btn" class="intake-btn primary" type="button">Generate explainable ROM</button></div>
-          </div>
-          <div class="intake-step" id="intake-step-4" hidden>
-            <h4 class="step-title"><span class="step-num">4</span>Explainable ROM</h4>
+            <h4 class="step-title"><span class="step-num">3</span>Estimate</h4>
             <div id="intake-rom" class="rom-hero"></div>
-            <p id="intake-rom-explain" class="rom-explain"></p>
-            <section class="history-forecast" aria-labelledby="history-title">
-              <h4 class="step-title" id="history-title">Shared historical project evidence</h4>
-              <p class="step-help">The completed-project list supports both estimates: the three projects marked ROM input drive the deterministic baseline, and up to ten inform the probabilistic forecast. When configured, an LLM reranks these retrieved projects and explains the matches; otherwise SQLite similarity ranking is used. The forecast is advisory and does not change the approval baseline.</p>
-              <div class="intake-actions"><button id="intake-history-forecast" class="intake-btn" type="button">Forecast from historical projects</button></div>
-              <div id="history-results" class="history-results" aria-live="polite"></div>
+            <div class="intake-actions"><button id="intake-commit-btn" class="intake-btn primary" type="button">Continue to COMMIT →</button></div>
+            <details class="evidence-details" id="intake-evidence">
+              <summary>How we got this · matching and evidence</summary>
+              <p id="intake-rom-explain" class="rom-explain"></p>
+              <h4 class="chart-title">What we matched on</h4>
+              <div id="intake-fingerprint" class="fp-grid"></div>
               <section class="chart-card" aria-labelledby="rom-visual-title">
-                <h4 id="rom-visual-title" class="chart-title">Closest ROM analogs</h4>
+                <h4 id="rom-visual-title" class="chart-title">Closest completed projects used for the estimate</h4>
                 <div id="rom-analogs" class="history-results"></div>
               </section>
-            </section>
-            <div class="intake-actions"><button id="intake-commit-btn" class="intake-btn primary" type="button">Continue to COMMIT →</button></div>
+              <section class="history-forecast" aria-labelledby="history-title">
+                <h4 class="step-title" id="history-title">Optional: probabilistic forecast from history</h4>
+                <p class="step-help">Advisory only. Uses up to ten similar completed projects (reranked by an LLM when configured) and does not change the estimate or approval gate.</p>
+                <div class="intake-actions"><button id="intake-history-forecast" class="intake-btn" type="button">Forecast from historical projects</button></div>
+                <div id="history-results" class="history-results" aria-live="polite"></div>
+              </section>
+            </details>
           </div>
         </div>
         <div id="intake-error" class="intake-error" role="alert" hidden></div>
       </section>
-      <div class="grid" id="shape-summary" hidden>
-        <section class="card overview">
-          <div class="card-head"><div><h3 class="card-title">ROM estimate &amp; confidence</h3><div class="card-kicker">Explainable range with an explicit integration buffer</div></div><span class="badge">P50 / P80 RANGE</span></div>
-          <div class="overview-content">
-            <div class="confidence"><div class="ring" style="--value:0%"><div class="ring-value"><span id="initial-confidence-ring">—</span><small>INITIAL</small></div></div><div class="confidence-copy"><strong>Initial commitment confidence</strong><span>Calculated after the intake fields are completed.</span></div></div>
-            <div class="metric-stack">
-              <div class="mini-metric"><strong id="baseline-p50">—</strong><span>P50 effort estimate</span></div>
-              <div class="mini-metric"><strong id="baseline-p80">—</strong><span>P80 effort estimate</span></div>
-              <div class="mini-metric"><strong id="buffer">—</strong><span>Integration buffer</span></div>
-              <div class="mini-metric"><strong id="target-date">—</strong><span>Committed target date</span></div>
-            </div>
-          </div>
-        </section>
-        <section class="card narrow">
-          <div class="card-head"><div><h3 class="card-title">Capacity baseline</h3><div class="card-kicker">Planview resource allocation</div></div></div>
-          <div class="detail-list">
-            <div class="detail-row"><span>Allocated team</span><strong id="allocated-capacity">—</strong></div>
-            <div class="detail-row"><span>Current headroom</span><strong id="capacity-headroom">—</strong></div>
-            <div class="detail-row"><span>Delivery fingerprint</span><strong id="shape-fingerprint-status">—</strong></div>
-            <div class="detail-row"><span>Baseline status</span><strong id="shape-baseline-status">Awaiting intake</strong></div>
-          </div>
-        </section>
-        <section class="card full">
-          <div class="card-head"><div><h3 class="card-title">Commitment assumptions</h3><div class="card-kicker">Visible inputs used to shape the plan</div></div></div>
-          <div class="detail-list">
-            <div class="detail-row"><span>Scope pattern</span><strong>Customer profiles across CRM, commerce, and service</strong></div>
-            <div class="detail-row"><span>Critical capability</span><strong>Identity resolution / privacy controls</strong></div>
-            <div class="detail-row"><span>Delivery guardrail</span><strong>Approve only with visible capacity and confidence</strong></div>
-          </div>
-        </section>
-      </div>
     </section>
     <section id="panel-commit" class="stage-panel" role="tabpanel" aria-labelledby="tab-commit" tabindex="0" hidden>
       <div class="stage-intro"><div><h2>Commit the delivery baseline</h2><p>Review feasibility, capacity, target date, and scope before recording human approval.</p></div><span class="badge">HUMAN APPROVAL REQUIRED</span></div>
@@ -949,9 +919,9 @@
       intake.result = null;
       intake.approved = false;
       intake.baselineCommitment = null;
-      byId("intake-profile").hidden = true;
       byId("commit-readiness").hidden = true;
       byId("commit-scenario-chart").replaceChildren();
+      clearSavedIntake();
       clearCommitmentSummary();
       intakeShowUpTo(1);
       intakeError("");
@@ -970,17 +940,17 @@
       });
       renderDocList();
       [
-        "intake-questions", "intake-fingerprint", "intake-analogs", "intake-rom",
+        "intake-questions", "intake-fingerprint", "intake-rom",
         "history-results", "rom-analogs", "intake-commitment",
         "commit-confidence-chart", "commit-role-chart", "commit-scenario-chart",
       ].forEach((id) => byId(id).replaceChildren());
-      ["intake-profile-summary", "intake-retrieval", "intake-rom-explain",
+      ["intake-retrieval", "intake-rom-explain",
         "intake-commit-explain", "intake-approved"].forEach((id) => {
         byId(id).textContent = "";
       });
-      byId("intake-profile").hidden = true;
       byId("commit-readiness").hidden = true;
       byId("intake-approved").hidden = true;
+      clearSavedIntake();
       byId("intake-approve").hidden = false;
       byId("intake-approve").disabled = true;
       byId("intake-continue").hidden = true;
@@ -1027,7 +997,7 @@
         name, kind, ...(text !== undefined ? { text } : { content_base64 }),
       }));
     }
-    const intakeSteps = [1, 2, 3, 4].map((n) => byId(`intake-step-${n}`));
+    const intakeSteps = [1, 2, 3].map((n) => byId(`intake-step-${n}`));
 
     function el(tag, className, text) {
       const node = document.createElement(tag);
@@ -1035,15 +1005,31 @@
       if (text !== undefined) node.textContent = text;
       return node;
     }
+    function updateStepSummaries() {
+      const text = intake.text || byId("intake-text").value;
+      const docs = intake.documents.length ? ` · ${intake.documents.length} document(s)` : "";
+      byId("summary-1").textContent = `“${text.length > 140 ? `${text.slice(0, 140)}…` : text}”${docs}`;
+      const chosen = selectedAnswers();
+      byId("summary-2").replaceChildren(...(intake.analysis ? intake.analysis.clarifications.map((item) => {
+        const option = item.options.find((candidate) => candidate.value === chosen[item.id]);
+        const line = el("div");
+        line.append(el("strong", "", `${item.category}: `), document.createTextNode(option ? option.label : "—"));
+        return line;
+      }) : []));
+    }
     function intakeShowUpTo(step) {
-      intakeSteps.forEach((node, index) => { node.hidden = index + 1 > step; });
+      const shapeStep = Math.min(step, 3);
+      intakeSteps.forEach((node, index) => {
+        node.hidden = index + 1 > shapeStep;
+        node.classList.toggle("collapsed", index + 1 < shapeStep);
+      });
       byId("intake-step-5").hidden = step !== 5;
       byId("commit-empty").hidden = step === 5;
-      byId("shape-summary").hidden = step < 3;
-      byId("intake-step-badge").textContent = `STEP ${Math.min(step, 4)} OF 4`;
+      byId("intake-step-badge").textContent = `STEP ${shapeStep} OF 3`;
+      updateStepSummaries();
       updateJourney();
       if (step > 1 && step < 5) {
-        requestAnimationFrame(() => intakeSteps[step - 1].scrollIntoView({ behavior: "smooth", block: "nearest" }));
+        requestAnimationFrame(() => intakeSteps[shapeStep - 1].scrollIntoView({ behavior: "smooth", block: "nearest" }));
       }
     }
     const JOURNEY_STAGES = ["shape", "commit", "track", "intervene"];
@@ -1075,10 +1061,6 @@
       byId("track-next").hidden = !sim;
     }
     function clearCommitmentSummary() {
-      ["baseline-p50", "baseline-p80", "buffer", "target-date", "allocated-capacity", "capacity-headroom",
-        "initial-confidence-ring", "shape-fingerprint-status"].forEach((id) => { byId(id).textContent = "—"; });
-      byId("panel-shape").querySelector(".ring").style.setProperty("--value", "0%");
-      byId("shape-baseline-status").textContent = "Awaiting intake";
       byId("shape-stage-status").textContent = "INTAKE IN PROGRESS";
     }
     function intakeError(message) {
@@ -1113,29 +1095,6 @@
       const node = document.createElementNS(SVG_NS, name);
       Object.entries(attributes).forEach(([key, value]) => node.setAttribute(key, String(value)));
       return node;
-    }
-    function renderProfile(analysis) {
-      const request = analysis.request.toLocaleLowerCase();
-      const categories = [
-        { label: "Customer or master data", terms: ["customer", "master data", "mdm", "profile"] },
-        { label: "Integration or system connectivity", terms: ["integrat", "api", "system", "connect", "sync"] },
-        { label: "Cloud or platform change", terms: ["cloud", "azure", "platform", "migration"] },
-        { label: "Security, privacy, or compliance", terms: ["security", "privacy", "pii", "consent", "compliance"] },
-        { label: "Analytics or reporting", terms: ["analytics", "report", "dashboard", "insight"] },
-      ];
-      const indicated = categories.filter((item) => item.terms.some((term) => request.includes(term)));
-      const gaps = categories.filter((item) => !indicated.includes(item));
-      const fillList = (id, items, emptyText) => {
-        const target = byId(id);
-        target.replaceChildren(...(items.length
-          ? items.map((item) => el("li", "", item.label))
-          : [el("li", "empty", emptyText)]));
-      };
-      byId("intake-profile-summary").textContent =
-        `Request: “${analysis.request.slice(0, 280)}${analysis.request.length > 280 ? "…" : ""}”`;
-      fillList("intake-profile-facts", indicated, "No areas detected from the request text.");
-      fillList("intake-profile-gaps", gaps, "No obvious gaps from these prompt categories.");
-      byId("intake-profile").hidden = false;
     }
     function renderRomAnalogs(result) {
       const root = byId("rom-analogs");
@@ -1345,8 +1304,10 @@
     function renderQuestions(analysis) {
       const container = byId("intake-questions");
       container.replaceChildren();
-      byId("intake-clarity").textContent = `· ${analysis.clarity.specified} of ${analysis.clarity.total} areas specified in the request`;
-      byId("intake-retrieval").textContent = `${analysis.retrieval.method} · ${analysis.retrieval.projects_searched} completed projects searched. Suggested answers come from the best-matching lesson; change any of them.`;
+      byId("intake-clarity").textContent = `· ${analysis.clarity.specified} of ${analysis.clarity.total} already covered in your request`;
+      byId("intake-retrieval").textContent =
+        `${analysis.retrieval.projects_searched} completed projects searched. The most common choice among the closest matches is pre-selected; change any answer.`;
+      byId("intake-retrieval").title = analysis.retrieval.method;
       analysis.clarifications.forEach((item) => {
         const card = el("fieldset", "q-card");
         card.append(el("legend", "", item.category), el("div", "q-text", item.question));
@@ -1358,22 +1319,24 @@
           input.value = option.value;
           input.checked = option.value === item.suggested;
           input.addEventListener("change", () => {
-            intakeShowUpTo(2);
             intake.result = null;
+            intake.approved = false;
             clearCommitmentSummary();
+            intakeShowUpTo(2);
+            saveIntake(2);
           });
           const text = el("span", "", option.label);
           if (option.value === item.suggested) text.append(el("span", "tag", "SUGGESTED"));
           label.append(input, text);
           card.append(label);
         });
-        const evidence = el("div", "evidence");
-        evidence.append(el("strong", "", "Historical evidence"));
-        item.evidence.forEach((entry) => {
-          const line = el("div", "", `${entry.project}: ${entry.lesson}`);
-          if (entry.matched_terms.length) line.append(el("em", "", ` [matched: ${entry.matched_terms.join(", ")}]`));
-          evidence.append(line);
-        });
+        if (item.support) {
+          card.append(el("div", "q-support", `Suggested by ${item.support.agree} of the ${item.support.of} closest projects.`));
+        }
+        const evidence = document.createElement("details");
+        evidence.className = "evidence";
+        evidence.append(el("summary", "", "Why this is suggested"));
+        item.evidence.forEach((entry) => evidence.append(el("div", "", `${entry.project}: ${entry.lesson}`)));
         card.append(evidence);
         container.append(card);
       });
@@ -1386,19 +1349,8 @@
       const level = score >= 1 ? "full" : score > 0 ? "part" : "none";
       return el("span", `dim-chip ${level}`, `${Math.round(score * 100)}%`);
     }
-    function renderFingerprint(result) {
-      const { rom, commitment } = result;
-      intake.baselineCommitment = { ...commitment };
-      byId("baseline-p50").textContent = hours(rom.p50_hours);
-      byId("baseline-p80").textContent = hours(rom.p80_hours);
-      byId("buffer").textContent = `${rom.integration_buffer_pct}%`;
-      byId("target-date").textContent = commitment.target_date;
-      byId("allocated-capacity").textContent = `${commitment.allocated_fte.toFixed(1)} / ${commitment.capacity_fte.toFixed(1)} FTE`;
-      byId("capacity-headroom").textContent = `${(commitment.capacity_fte - commitment.allocated_fte).toFixed(1)} FTE`;
-      byId("initial-confidence-ring").textContent = commitment.confidence_pct;
-      byId("panel-shape").querySelector(".ring").style.setProperty("--value", `${commitment.confidence_pct}%`);
-      byId("shape-fingerprint-status").textContent = "6 dimensions matched";
-      byId("shape-baseline-status").textContent = "Ready for approval";
+    function renderEvidence(result) {
+      intake.baselineCommitment = { ...result.commitment };
       byId("shape-stage-status").textContent = "INTAKE READY";
       const grid = byId("intake-fingerprint");
       grid.replaceChildren();
@@ -1407,28 +1359,26 @@
         cell.append(el("div", "dim-name", label), el("div", "dim-value", list(result.fingerprint[key])));
         grid.append(cell);
       });
-      const holder = byId("intake-analogs");
-      holder.replaceChildren(
-        el("p", "rom-explain", "The closest ROM inputs will be marked in the shared historical-project list after the forecast is generated."),
-      );
     }
-    function metric(value, label) {
+    function metric(value, label, hint) {
       const box = el("div", "mini-metric");
       box.append(el("strong", "", value), el("span", "", label));
+      if (hint) box.title = hint;
       return box;
     }
     function renderRom(result) {
-      const { rom } = result;
+      const { rom, commitment } = result;
       byId("intake-rom").replaceChildren(
-        metric(hours(rom.p50_hours), "P50 effort"),
-        metric(hours(rom.p80_hours), "P80 effort"),
-        metric(`${rom.integration_buffer_pct}%`, "Integration buffer"),
-        metric(String(rom.analogs.length), "Analogs used"),
+        metric(hours(rom.p50_hours), "Likely effort (P50)", "Median of comparable projects plus an integration buffer: about half finished within this effort."),
+        metric(hours(rom.p80_hours), "Safe commitment (P80)", "About four in five comparable projects finished within this effort, including the integration buffer."),
+        metric(`${percent(commitment.confidence_pct)}%`, "On-time confidence", "Historical on-time rate multiplied by the chance the allocated capacity covers the P80 effort."),
+        metric(commitment.target_date, "Target date", "Default target date; adjust it in COMMIT."),
       );
+      const round = (value) => hours(Math.round(value));
       byId("intake-rom-explain").textContent =
-        `P50: median analog base ${hours(rom.base_p50_hours)} + ${hours(rom.buffer_hours_p50)} integration buffer (${rom.integration_buffer_pct}%), rounded to ${hours(rom.p50_hours)}. ` +
-        `P80: ${hours(rom.base_p80_hours)} + ${hours(rom.buffer_hours_p80)} buffer, rounded to ${hours(rom.p80_hours)}. ` +
-        `Analogs: ${rom.analogs.join("; ")}. This baseline remains deterministic; the historical forecast below is advisory.`;
+        `The ${rom.analogs.length} closest completed projects (${rom.analogs.join("; ")}) typically took ${round(rom.base_p50_hours)} at P50 and ${round(rom.base_p80_hours)} at P80. ` +
+        `Adding a ${rom.integration_buffer_pct}% integration buffer gives ${hours(rom.p50_hours)} and ${hours(rom.p80_hours)}, rounded to 50 h. ` +
+        "This estimate is deterministic; the history forecast below is advisory.";
       renderRomAnalogs(result);
     }
     function renderHistoryForecast(data) {
@@ -1535,7 +1485,6 @@
       intake.approved = true;
       serverBaseline = baseline;
       updateJourney();
-      byId("shape-baseline-status").textContent = "Approved";
       byId("shape-stage-status").textContent = "BASELINE APPROVED";
       byId("intake-approved").textContent =
         `Baseline ${String(baseline.id).slice(0, 8)} approved ${baseline.approved_at}: P50 ${hours(baseline.p50_hours)} · P80 ${hours(baseline.p80_hours)} · ` +
@@ -1545,31 +1494,81 @@
       byId("intake-continue").hidden = false;
     }
 
+    const INTAKE_STORE = "deliverytwin.intake.v1";
+    function saveIntake(step) {
+      if (!intake.text || intake.documents.length) { sessionStorage.removeItem(INTAKE_STORE); return; }
+      sessionStorage.setItem(INTAKE_STORE, JSON.stringify({
+        text: intake.text, answers: selectedAnswers(), step, sessionId: intakeSessionId,
+      }));
+    }
+    function clearSavedIntake() { sessionStorage.removeItem(INTAKE_STORE); }
+    async function runAnalyze(restoring = false) {
+      intake.text = byId("intake-text").value;
+      if (!restoring) intakeSessionId = newIntakeSessionId();
+      intake.analysis = await intakePost("/api/intake/analyze", { text: intake.text, documents: docsPayload() });
+      renderQuestions(intake.analysis);
+      intakeShowUpTo(2);
+      saveIntake(2);
+      await loadImpactReport();
+    }
+    async function runEstimate() {
+      intake.result = await intakePost("/api/intake/evaluate", { text: intake.text, answers: selectedAnswers(), documents: docsPayload() });
+      byId("history-results").replaceChildren();
+      renderEvidence(intake.result);
+      renderRom(intake.result);
+      intakeShowUpTo(3);
+      saveIntake(3);
+      await loadImpactReport();
+    }
+    function showCommitment() {
+      intake.baselineCommitment = { ...intake.result.commitment };
+      renderCommitment(intake.result);
+      intake.approved = false;
+      byId("intake-approved").hidden = true;
+      byId("intake-approve").hidden = false;
+      byId("intake-continue").hidden = true;
+      intakeShowUpTo(5);
+    }
+    async function restoreIntake() {
+      let saved = null;
+      try { saved = JSON.parse(sessionStorage.getItem(INTAKE_STORE) || "null"); } catch (error) { saved = null; }
+      if (!saved || !saved.text) return;
+      try {
+        byId("intake-text").value = saved.text;
+        intakeSessionId = saved.sessionId || intakeSessionId;
+        await runAnalyze(true);
+        Object.entries(saved.answers || {}).forEach(([name, value]) => {
+          const input = document.querySelector(`#intake-questions input[name="${name}"][value="${value}"]`);
+          if (input) input.checked = true;
+        });
+        if (saved.step >= 3) {
+          await runEstimate();
+          if (window.location.hash === "#commit") showCommitment();
+        }
+      } catch (error) {
+        clearSavedIntake();
+      }
+    }
+
     byId("intake-sample").addEventListener("click", () => {
       byId("intake-text").value = SAMPLE_REQUEST;
       resetIntakeResult();
+      byId("intake-analyze").click();
     });
     byId("intake-text").addEventListener("input", () => {
       resetIntakeResult();
     });
     byId("intake-rom-file").addEventListener("change", (event) => attachDocuments(event.currentTarget, "rom"));
     byId("intake-notes-file").addEventListener("change", (event) => attachDocuments(event.currentTarget, "meeting_notes"));
-    byId("intake-analyze").addEventListener("click", (event) => intakeRun(event.currentTarget, async () => {
-      intake.text = byId("intake-text").value;
-      intakeSessionId = newIntakeSessionId();
-      intake.analysis = await intakePost("/api/intake/analyze", { text: intake.text, documents: docsPayload() });
-      renderProfile(intake.analysis);
-      renderQuestions(intake.analysis);
-      intakeShowUpTo(2);
-      await loadImpactReport();
+    byId("intake-analyze").addEventListener("click", (event) => intakeRun(event.currentTarget, () => runAnalyze()));
+    byId("intake-fingerprint-btn").addEventListener("click", (event) => intakeRun(event.currentTarget, runEstimate));
+    document.querySelectorAll("[data-edit]").forEach((button) => button.addEventListener("click", () => {
+      intake.result = null;
+      intake.approved = false;
+      byId("commit-readiness").hidden = true;
+      clearCommitmentSummary();
+      intakeShowUpTo(Number(button.dataset.edit));
     }));
-    byId("intake-fingerprint-btn").addEventListener("click", (event) => intakeRun(event.currentTarget, async () => {
-      intake.result = await intakePost("/api/intake/evaluate", { text: intake.text, answers: selectedAnswers(), documents: docsPayload() });
-      renderFingerprint(intake.result);
-      intakeShowUpTo(3);
-      await loadImpactReport();
-    }));
-    byId("intake-rom-btn").addEventListener("click", () => { byId("history-results").replaceChildren(); renderRom(intake.result); intakeShowUpTo(4); });
     byId("intake-history-forecast").addEventListener("click", (event) => intakeRun(event.currentTarget, async () => {
       const data = await intakePost("/api/intake/forecast", {
         text: intake.text,
@@ -1579,13 +1578,8 @@
       renderHistoryForecast(data);
     }));
     byId("intake-commit-btn").addEventListener("click", () => {
-      intakeRun(byId("intake-commit-btn"), async () => {
-        const defaults = intake.result.commitment.defaults;
-        intake.baselineCommitment = { ...intake.result.commitment };
-        await recalculateCommitment(defaults);
-        intakeShowUpTo(5);
-        goToStage("commit");
-      });
+      showCommitment();
+      goToStage("commit");
     });
     byId("tune-scope").addEventListener("input", (event) => {
       byId("tune-scope-value").textContent = `${event.currentTarget.value}%`;
@@ -1608,6 +1602,7 @@
     byId("track-next-go").addEventListener("click", () => goToStage("intervene"));
     byId("commit-empty-go").addEventListener("click", () => goToStage("shape"));
     updateJourney();
+    restoreIntake();
 
     const chatToggle = byId("chat-toggle");
     const chatPanel = byId("chat-panel");

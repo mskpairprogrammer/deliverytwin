@@ -3,6 +3,8 @@
 Skipped when Playwright or its Chromium build is not installed
 (``pip install playwright`` then ``playwright install chromium``).
 """
+import http.client
+import json
 import os
 import socket
 import tempfile
@@ -55,6 +57,11 @@ class JourneyUiTests(unittest.TestCase):
         cls.playwright.stop()
 
     def setUp(self) -> None:
+        connection = http.client.HTTPConnection("127.0.0.1", self.port, timeout=10)
+        connection.request("POST", "/api/reset-all", json.dumps({"confirm": True}),
+                           {"Content-Type": "application/json"})
+        self.assertEqual(connection.getresponse().status, 200)
+        connection.close()
         self.page = self.browser.new_page(viewport={"width": 1280, "height": 900})
         self.errors: list[str] = []
         self.page.on("pageerror", lambda error: self.errors.append(str(error)))
@@ -74,19 +81,67 @@ class JourneyUiTests(unittest.TestCase):
     def go(self, stage: str) -> None:
         self.page.evaluate(f"document.getElementById('tab-{stage}').click()")
 
+    def run_shape_to_estimate(self) -> None:
+        page = self.page
+        page.get_by_role("button", name="Try the sample request").click()
+        page.get_by_role("button", name="Get estimate").click()
+        page.locator("#intake-rom").get_by_text("Likely effort (P50)").wait_for()
+        self.assertEqual(self.states()["shape"], "Estimate ready")
+
     def run_shape_to_commit(self) -> None:
         page = self.page
-        page.get_by_role("button", name="Use sample request").click()
-        page.get_by_role("button", name="Analyze request").click()
-        page.get_by_role("button", name="Confirm answers & match fingerprint").click()
-        page.get_by_role("button", name="Generate explainable ROM").click()
-        page.locator("#intake-rom").get_by_text("P50 effort").wait_for()
-        self.assertEqual(self.states()["shape"], "Estimate ready")
-        analog_rows = page.locator("#rom-analogs tr").all_inner_texts()
-        self.assertEqual(len(analog_rows), 4, analog_rows)
-        self.assertRegex(analog_rows[1], r"\d+%.*\d+ h.*\d+ h")
+        self.run_shape_to_estimate()
+        analog_rows = page.locator("#rom-analogs tr")
+        self.assertEqual(analog_rows.count(), 4)
+        self.assertRegex(analog_rows.nth(1).text_content(), r"\d+%.*\d+ h.*\d+ h")
         page.get_by_role("button", name="Continue to COMMIT →").click()
         page.locator("#commit-role-chart svg").wait_for()
+
+    def test_shape_is_three_steps_that_collapse_and_survive_a_reload(self) -> None:
+        page = self.page
+        visible = lambda: [n for n in (1, 2, 3) if page.locator(f"#intake-step-{n}").is_visible()]
+        collapsed = lambda: [n for n in (1, 2, 3) if "collapsed" in (page.locator(f"#intake-step-{n}").get_attribute("class") or "")]
+        self.assertEqual(visible(), [1])
+        self.assertEqual(page.locator("#intake-step-badge").inner_text(), "STEP 1 OF 3")
+
+        page.get_by_role("button", name="Try the sample request").click()
+        page.get_by_role("button", name="Get estimate").wait_for()
+        self.assertEqual((visible(), collapsed()), ([1, 2], [1]))
+        self.assertIn("We need one view of every customer", page.locator("#summary-1").inner_text())
+        cards = page.locator("#intake-questions .q-card")
+        self.assertEqual(cards.count(), 4)
+        self.assertEqual(page.locator("#intake-questions .q-support").count(), 4)
+        self.assertRegex(page.locator("#intake-questions .q-support").first.inner_text(), r"Suggested by \d+ of the \d+ closest projects")
+        self.assertEqual(page.locator("#intake-questions input:checked").count(), 4)
+        self.assertEqual(page.locator("#intake-profile").count(), 0)
+
+        page.get_by_role("button", name="Get estimate").click()
+        page.locator("#intake-rom").get_by_text("Likely effort (P50)").wait_for()
+        self.assertEqual((visible(), collapsed()), ([1, 2, 3], [1, 2]))
+        self.assertEqual(page.locator("#intake-step-badge").inner_text(), "STEP 3 OF 3")
+        self.assertIn("Architecture:", page.locator("#summary-2").inner_text())
+        hero = page.locator("#intake-rom").inner_text()
+        for label in ("Likely effort (P50)", "Safe commitment (P80)", "On-time confidence", "Target date"):
+            self.assertIn(label, hero)
+        self.assertFalse(page.locator("#intake-evidence").evaluate("node => node.open"))
+        self.assertTrue(page.get_by_role("button", name="Continue to COMMIT →").is_visible())
+
+        page.reload()
+        page.locator("#intake-rom").get_by_text("Likely effort (P50)").wait_for()
+        self.assertEqual((visible(), collapsed()), ([1, 2, 3], [1, 2]))
+        self.assertEqual(self.states()["shape"], "Estimate ready")
+
+        page.locator('[data-edit="2"]').click()
+        self.assertEqual((visible(), collapsed()), ([1, 2], [1]))
+        self.assertEqual(self.states()["shape"], "Clarifying request")
+        self.assertEqual(self.states()["commit"], "Needs an estimate")
+        page.locator('#intake-questions input[value="batch_sync"]').check()
+        page.get_by_role("button", name="Get estimate").click()
+        page.locator("#intake-rom").get_by_text("Likely effort (P50)").wait_for()
+        self.assertIn("batch", page.locator("#intake-fingerprint").text_content().lower())
+
+        page.locator('[data-edit="1"]').click()
+        self.assertEqual((visible(), collapsed()), ([1], []))
 
     def test_full_journey_through_every_stage(self) -> None:
         page = self.page
@@ -95,7 +150,6 @@ class JourneyUiTests(unittest.TestCase):
         self.assertEqual(self.states()["commit"], "Needs an estimate")
         page.get_by_role("button", name="Go to SHAPE").click()
         self.assertEqual(page.locator("#tab-shape").get_attribute("aria-selected"), "true")
-        self.assertTrue(page.locator("#shape-summary").is_hidden())
 
         self.run_shape_to_commit()
         self.assertEqual(page.locator("#tab-commit").get_attribute("aria-selected"), "true")

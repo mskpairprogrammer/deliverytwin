@@ -420,6 +420,8 @@ def analyze_intake(
         for matched_count, row, _terms in ranked[:SUGGESTION_VOTERS]:
             votes[row["suggested_option"]] = votes.get(row["suggested_option"], 0) + matched_count + 1
         suggested = max(votes, key=lambda option: (votes[option], option == top[0][1]["suggested_option"]))
+        voters = ranked[:SUGGESTION_VOTERS]
+        agree = sum(1 for _, row, _ in voters if row["suggested_option"] == suggested)
         clarifications.append(
             {
                 "id": question["id"],
@@ -431,6 +433,7 @@ def analyze_intake(
                     for value, option in question["options"].items()
                 ],
                 "suggested": suggested,
+                "support": {"agree": agree, "of": len(voters)},
                 "evidence": [
                     {"project": row["name"], "lesson": row["lesson"], "matched_terms": terms}
                     for _, row, terms in top
