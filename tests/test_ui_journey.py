@@ -20,6 +20,11 @@ except ImportError:  # pragma: no cover - optional dependency
 
 from deliverytwin.app import serve_dashboard
 
+try:
+    from tests.llm_stub import ScriptedLLM
+except ImportError:  # discovery with -s tests
+    from llm_stub import ScriptedLLM
+
 
 def _free_port() -> int:
     with socket.socket() as sock:
@@ -32,6 +37,15 @@ class JourneyUiTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.port = _free_port()
+        cls.llm_enabled = False
+        cls.llm = ScriptedLLM()
+        # The server runs in this process, so patching the module covers its request threads.
+        cls.patches = [
+            patch("deliverytwin.intake.openai_configured", side_effect=lambda: cls.llm_enabled),
+            patch("deliverytwin.intake.complete", side_effect=lambda *a, **k: cls.llm(*a, **k)),
+        ]
+        for active in cls.patches:
+            active.start()
         database = os.path.join(tempfile.mkdtemp(), "ui.db")
         with patch.dict(os.environ, {"DELIVERYTWIN_DEMO_MODE": "1"}):
             threading.Thread(
@@ -53,10 +67,14 @@ class JourneyUiTests(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls) -> None:
+        for active in cls.patches:
+            active.stop()
         cls.browser.close()
         cls.playwright.stop()
 
     def setUp(self) -> None:
+        type(self).llm_enabled = False
+        type(self).llm = ScriptedLLM()
         connection = http.client.HTTPConnection("127.0.0.1", self.port, timeout=10)
         connection.request("POST", "/api/reset-all", json.dumps({"confirm": True}),
                            {"Content-Type": "application/json"})
@@ -84,8 +102,8 @@ class JourneyUiTests(unittest.TestCase):
     def run_shape_to_estimate(self) -> None:
         page = self.page
         page.get_by_role("button", name="Try the sample request").click()
-        page.get_by_role("button", name="Get estimate").click()
-        page.locator("#intake-rom").get_by_text("Likely effort (P50)").wait_for()
+        page.get_by_role("button", name="Run prediction").click()
+        page.locator("#intake-rom").get_by_text("Most likely effort (P50)").wait_for()
         self.assertEqual(self.states()["shape"], "Estimate ready")
 
     def run_shape_to_commit(self) -> None:
@@ -105,7 +123,7 @@ class JourneyUiTests(unittest.TestCase):
         self.assertEqual(page.locator("#intake-step-badge").inner_text(), "STEP 1 OF 3")
 
         page.get_by_role("button", name="Try the sample request").click()
-        page.get_by_role("button", name="Get estimate").wait_for()
+        page.get_by_role("button", name="Run prediction").wait_for()
         self.assertEqual((visible(), collapsed()), ([1, 2], [1]))
         self.assertIn("We need one view of every customer", page.locator("#summary-1").inner_text())
         cards = page.locator("#intake-questions .q-card")
@@ -115,19 +133,19 @@ class JourneyUiTests(unittest.TestCase):
         self.assertEqual(page.locator("#intake-questions input:checked").count(), 4)
         self.assertEqual(page.locator("#intake-profile").count(), 0)
 
-        page.get_by_role("button", name="Get estimate").click()
-        page.locator("#intake-rom").get_by_text("Likely effort (P50)").wait_for()
+        page.get_by_role("button", name="Run prediction").click()
+        page.locator("#intake-rom").get_by_text("Most likely effort (P50)").wait_for()
         self.assertEqual((visible(), collapsed()), ([1, 2, 3], [1, 2]))
         self.assertEqual(page.locator("#intake-step-badge").inner_text(), "STEP 3 OF 3")
         self.assertIn("Architecture:", page.locator("#summary-2").inner_text())
         hero = page.locator("#intake-rom").inner_text()
-        for label in ("Likely effort (P50)", "Safe commitment (P80)", "On-time confidence", "Target date"):
+        for label in ("Most likely effort (P50)", "Commit-to effort (P80)", "Worst case (P90)", "On-time probability"):
             self.assertIn(label, hero)
         self.assertFalse(page.locator("#intake-evidence").evaluate("node => node.open"))
         self.assertTrue(page.get_by_role("button", name="Continue to COMMIT →").is_visible())
 
         page.reload()
-        page.locator("#intake-rom").get_by_text("Likely effort (P50)").wait_for()
+        page.locator("#intake-rom").get_by_text("Most likely effort (P50)").wait_for()
         self.assertEqual((visible(), collapsed()), ([1, 2, 3], [1, 2]))
         self.assertEqual(self.states()["shape"], "Estimate ready")
 
@@ -136,8 +154,8 @@ class JourneyUiTests(unittest.TestCase):
         self.assertEqual(self.states()["shape"], "Clarifying request")
         self.assertEqual(self.states()["commit"], "Needs an estimate")
         page.locator('#intake-questions input[value="batch_sync"]').check()
-        page.get_by_role("button", name="Get estimate").click()
-        page.locator("#intake-rom").get_by_text("Likely effort (P50)").wait_for()
+        page.get_by_role("button", name="Run prediction").click()
+        page.locator("#intake-rom").get_by_text("Most likely effort (P50)").wait_for()
         self.assertIn("batch", page.locator("#intake-fingerprint").text_content().lower())
 
         page.locator('[data-edit="1"]').click()
@@ -194,6 +212,58 @@ class JourneyUiTests(unittest.TestCase):
         page.reload()
         page.wait_for_function("document.getElementById('state-commit').textContent === 'Baseline approved'")
         self.assertEqual(self.states()["shape"], "Estimate ready")
+
+    def test_llm_writes_the_questions_and_its_forecast_is_the_central_result(self) -> None:
+        type(self).llm_enabled = True
+        page = self.page
+        page.get_by_role("button", name="Try the sample request").click()
+        page.get_by_role("button", name="Run prediction").wait_for()
+        self.assertIn("Tailored questions written by", page.locator("#intake-retrieval").inner_text())
+        self.assertEqual(page.locator("#intake-questions .q-card").count(), 4)
+        self.assertEqual([text.strip() for text in page.locator("#intake-questions legend").all_text_contents()],
+                         ["Delivery", "Data", "Privacy", "Reuse"])
+        self.assertIn("Most similar projects phased the move", page.locator("#intake-questions .q-support").first.inner_text())
+        self.assertEqual(page.locator("#intake-questions input:checked").count(), 4)
+
+        page.get_by_role("button", name="Run prediction").click()
+        page.locator("#intake-rom").get_by_text("Most likely effort (P50)").wait_for()
+        self.assertRegex(page.locator("#prediction-source").inner_text(), r"AI FORECAST · .+\n?.*Model confidence 77%")
+        hero = page.locator("#intake-rom").inner_text()
+        for value in ("4,900 h", "6,100 h", "6,900 h", "64%"):
+            self.assertIn(value, hero)
+        self.assertIn("Identity matching rules are shared", page.locator("#prediction-risks").inner_text())
+        self.assertIn("Phase scope", page.locator("#prediction-recs").inner_text())
+        self.assertGreaterEqual(page.locator("#prediction-projects .project-card").count(), 1)
+        self.assertIn("Deterministic ROM for comparison", page.locator("#prediction-compare").inner_text())
+        self.assertTrue(page.get_by_role("button", name="Continue to COMMIT →").is_visible())
+
+        page.get_by_role("button", name="Continue to COMMIT →").click()
+        page.locator("#commit-role-chart svg").wait_for()
+        self.assertIn("AI forecast baseline", page.locator("#intake-commit-explain").inner_text())
+        page.locator("#tune-scope").fill("20")
+        page.get_by_role("button", name="Recalculate confidence").click()
+        page.wait_for_function("document.getElementById('intake-commit-explain').textContent.includes('20% scope change')")
+        page.get_by_role("button", name="Reset to defaults").click()
+        page.wait_for_function("!document.getElementById('intake-commit-explain').textContent.includes('scope change')")
+        page.get_by_role("button", name="Approve baseline").click()
+        page.locator("#intake-approved").wait_for(state="visible")
+        self.assertIn("P50 4,900 h · P80 6,100 h", page.locator("#intake-approved").inner_text())
+        self.assertEqual(type(self).llm.calls.count("questions"), 1)
+        self.assertEqual(type(self).llm.calls.count("forecast"), 1)
+
+    def test_an_unusable_ai_forecast_is_labeled_and_the_flow_still_works(self) -> None:
+        type(self).llm_enabled = True
+        type(self).llm = ScriptedLLM(forecast="invalid")
+        page = self.page
+        page.get_by_role("button", name="Try the sample request").click()
+        page.get_by_role("button", name="Run prediction").click()
+        page.locator("#intake-rom").get_by_text("Most likely effort (P50)").wait_for()
+        self.assertIn("STATISTICAL ESTIMATE", page.locator("#prediction-source").inner_text())
+        page.get_by_role("button", name="Continue to COMMIT →").click()
+        page.locator("#commit-role-chart svg").wait_for()
+        self.assertIn("Statistical estimate baseline", page.locator("#intake-commit-explain").inner_text())
+        page.get_by_role("button", name="Approve baseline").click()
+        page.locator("#intake-approved").wait_for(state="visible")
 
     def test_demo_data_can_be_cleared_from_the_footer(self) -> None:
         page = self.page

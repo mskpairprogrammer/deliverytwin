@@ -188,6 +188,21 @@
     }
     .intake { margin-bottom: 16px; padding-bottom: 18px; }
     .intake-body { padding: 14px 19px 0; display: grid; gap: 14px; }
+    .prediction-source { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 6px 0 10px; font-size: 11px; color: var(--muted); }
+    .source-pill { border-radius: 999px; padding: 4px 10px; font-weight: 800; font-size: 10px; letter-spacing: .04em; }
+    .source-pill.llm { background: var(--teal-soft); color: var(--teal); }
+    .source-pill.fallback { background: #fff4e5; color: #8a5a00; }
+    .prediction-headline { font-size: 13px; line-height: 1.6; margin: 12px 0; }
+    .prediction-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 10px 0; }
+    .prediction-columns section, .project-card { border: 1px solid var(--line); border-radius: 9px; background: white; padding: 10px 12px; }
+    .prediction-columns h5, .prediction-evidence h5 { margin: 0 0 6px; font-size: 11px; }
+    .prediction-columns ul { margin: 0; padding-left: 16px; font-size: 11px; line-height: 1.6; }
+    .project-card { margin-bottom: 8px; font-size: 11px; line-height: 1.5; }
+    .project-card small { display: block; color: var(--muted); }
+    .prediction-compare { font-size: 10px; color: var(--muted); margin: 8px 0 12px; }
+    .intake-working { margin: 12px 19px 0; padding: 10px 14px; border-radius: 8px; background: #f0f7f5; color: var(--teal); font-size: 12px; font-weight: 700; }
+    .intake-working[hidden] { display: none; }
+    @media (max-width: 900px) { .prediction-columns { grid-template-columns: 1fr; } }
     .intake-step.collapsed { background: white; padding: 10px 15px; }
     .intake-step.collapsed > :not(.step-title):not(.step-summary) { display: none; }
     .step-summary { display: none; font-size: 11px; color: var(--muted); margin-top: 4px; line-height: 1.5; }
@@ -372,30 +387,37 @@
             <div class="step-summary" id="summary-2"></div>
             <p class="step-help" id="intake-retrieval"></p>
             <div id="intake-questions" class="q-grid"></div>
-            <div class="intake-actions"><button id="intake-fingerprint-btn" class="intake-btn primary" type="button">Get estimate</button></div>
+            <div class="intake-actions"><button id="intake-fingerprint-btn" class="intake-btn primary" type="button">Run prediction</button></div>
           </div>
           <div class="intake-step" id="intake-step-3" hidden>
-            <h4 class="step-title"><span class="step-num">3</span>Estimate</h4>
+            <h4 class="step-title"><span class="step-num">3</span>Prediction analysis</h4>
+            <div class="prediction-source" id="prediction-source"></div>
             <div id="intake-rom" class="rom-hero"></div>
+            <p id="prediction-headline" class="prediction-headline"></p>
+            <div class="prediction-columns">
+              <section><h5>Key risks</h5><ul id="prediction-risks"></ul></section>
+              <section><h5>Recommendations</h5><ul id="prediction-recs"></ul></section>
+            </div>
+            <section class="prediction-evidence"><h5>Completed projects that shaped this forecast</h5><div id="prediction-projects"></div></section>
+            <div class="prediction-compare" id="prediction-compare"></div>
             <div class="intake-actions"><button id="intake-commit-btn" class="intake-btn primary" type="button">Continue to COMMIT →</button></div>
             <details class="evidence-details" id="intake-evidence">
-              <summary>How we got this · matching and evidence</summary>
+              <summary>Matching and evidence details</summary>
               <p id="intake-rom-explain" class="rom-explain"></p>
               <h4 class="chart-title">What we matched on</h4>
               <div id="intake-fingerprint" class="fp-grid"></div>
               <section class="chart-card" aria-labelledby="rom-visual-title">
-                <h4 id="rom-visual-title" class="chart-title">Closest completed projects used for the estimate</h4>
+                <h4 id="rom-visual-title" class="chart-title">Closest completed projects used by the deterministic ROM</h4>
                 <div id="rom-analogs" class="history-results"></div>
               </section>
-              <section class="history-forecast" aria-labelledby="history-title">
-                <h4 class="step-title" id="history-title">Optional: probabilistic forecast from history</h4>
-                <p class="step-help">Advisory only. Uses up to ten similar completed projects (reranked by an LLM when configured) and does not change the estimate or approval gate.</p>
-                <div class="intake-actions"><button id="intake-history-forecast" class="intake-btn" type="button">Forecast from historical projects</button></div>
-                <div id="history-results" class="history-results" aria-live="polite"></div>
+              <section class="chart-card">
+                <h4 class="chart-title">All similar completed projects considered</h4>
+                <div id="history-results" class="history-results"></div>
               </section>
             </details>
           </div>
         </div>
+        <div id="intake-working" class="intake-working" role="status" aria-live="polite" hidden></div>
         <div id="intake-error" class="intake-error" role="alert" hidden></div>
       </section>
     </section>
@@ -1082,10 +1104,16 @@
       if (!response.ok) throw new Error(data.error || `Request failed (${response.status})`);
       return data;
     }
-    async function intakeRun(button, task) {
+    async function intakeRun(button, task, message = "") {
       intakeError("");
       button.disabled = true;
-      try { await task(); } catch (error) { intakeError(error.message); } finally { button.disabled = false; }
+      const working = byId("intake-working");
+      working.textContent = message;
+      working.hidden = !message;
+      try { await task(); } catch (error) { intakeError(error.message); } finally {
+        button.disabled = false;
+        working.hidden = true;
+      }
     }
     const hours = (value) => `${Number(value).toLocaleString()} h`;
     const percent = (value) => Number.isInteger(Number(value)) ? String(value) : Number(value).toFixed(1);
@@ -1304,9 +1332,11 @@
     function renderQuestions(analysis) {
       const container = byId("intake-questions");
       container.replaceChildren();
-      byId("intake-clarity").textContent = `· ${analysis.clarity.specified} of ${analysis.clarity.total} already covered in your request`;
-      byId("intake-retrieval").textContent =
-        `${analysis.retrieval.projects_searched} completed projects searched. The most common choice among the closest matches is pre-selected; change any answer.`;
+      const generated = analysis.question_source && analysis.question_source.type === "llm";
+      byId("intake-clarity").textContent = generated ? "" : `· ${analysis.clarity.specified} of ${analysis.clarity.total} already covered in your request`;
+      byId("intake-retrieval").textContent = generated
+        ? `Tailored questions written by ${analysis.question_source.model} from the ${analysis.question_source.projects_considered} most similar completed projects. Our suggested answer is pre-selected; change any of them.`
+        : `${analysis.retrieval.projects_searched} completed projects searched. No AI model is configured, so these are standard questions; the most common choice among the closest matches is pre-selected.`;
       byId("intake-retrieval").title = analysis.retrieval.method;
       analysis.clarifications.forEach((item) => {
         const card = el("fieldset", "q-card");
@@ -1330,7 +1360,9 @@
           label.append(input, text);
           card.append(label);
         });
-        if (item.support) {
+        if (item.rationale) {
+          card.append(el("div", "q-support", item.rationale));
+        } else if (item.support) {
           card.append(el("div", "q-support", `Suggested by ${item.support.agree} of the ${item.support.of} closest projects.`));
         }
         const evidence = document.createElement("details");
@@ -1366,75 +1398,68 @@
       if (hint) box.title = hint;
       return box;
     }
-    function renderRom(result) {
-      const { rom, commitment } = result;
-      byId("intake-rom").replaceChildren(
-        metric(hours(rom.p50_hours), "Likely effort (P50)", "Median of comparable projects plus an integration buffer: about half finished within this effort."),
-        metric(hours(rom.p80_hours), "Safe commitment (P80)", "About four in five comparable projects finished within this effort, including the integration buffer."),
-        metric(`${percent(commitment.confidence_pct)}%`, "On-time confidence", "Historical on-time rate multiplied by the chance the allocated capacity covers the P80 effort."),
-        metric(commitment.target_date, "Target date", "Default target date; adjust it in COMMIT."),
+    function renderPrediction(result) {
+      const { prediction, rom, deterministic_rom: baseline, commitment } = result;
+      const f = prediction.forecast;
+      const generated = prediction.source === "llm";
+      const confidence = Math.round(f.confidence * 100);
+      byId("prediction-source").replaceChildren(
+        el("span", `source-pill ${generated ? "llm" : "fallback"}`, generated ? `AI FORECAST · ${prediction.model}` : "STATISTICAL ESTIMATE · AI FORECAST UNAVAILABLE"),
+        el("span", "", generated
+          ? `Model confidence ${confidence}% · matches ${prediction.matching_source === "llm" ? "ranked by the model" : "ranked by similarity"}`
+          : "No valid AI response, so this uses a similarity-weighted fit of similar completed projects."),
       );
+      byId("intake-rom").replaceChildren(
+        metric(hours(f.p50_effort_hours), "Most likely effort (P50)", "The median outcome: about half of comparable projects finished within this effort."),
+        metric(hours(f.p80_effort_hours), "Commit-to effort (P80)", "About four in five comparable projects finished within this effort."),
+        metric(hours(f.p90_effort_hours), "Worst case (P90)", "Nine in ten comparable projects finished within this effort."),
+        metric(`${Math.round(f.on_time_probability * 100)}%`, "On-time probability", `Chance of finishing by ${prediction.target_date} with ${commitment.allocated_fte.toFixed(1)} FTE.`),
+      );
+      byId("prediction-headline").textContent =
+        `Across ${prediction.similar_projects.length} similar completed projects, the most likely effort is ${hours(f.p50_effort_hours)}. ` +
+        `Committing to ${hours(f.p80_effort_hours)} gives about four-in-five odds, and with ${commitment.allocated_fte.toFixed(1)} FTE ` +
+        `through ${prediction.target_date} the chance of finishing on time is ${Math.round(f.on_time_probability * 100)}%.`;
+      const fill = (id, items, empty) => byId(id).replaceChildren(...(items && items.length ? items : [empty]).map((text) => el("li", "", text)));
+      fill("prediction-risks", f.key_risks, "No specific risks were flagged.");
+      fill("prediction-recs", f.recommendations, "No recommendations were produced.");
+      const used = new Set(f.historical_projects_used);
+      const cards = prediction.similar_projects.filter((project) => used.has(project.project_name)).slice(0, 5).map((project) => {
+        const card = el("div", "project-card");
+        card.append(
+          el("strong", "", `${project.project_name} · ${project.similarity_pct}% match`),
+          el("small", "", `Planned ${project.planned_effort_hours.toLocaleString()} h → actual ${project.actual_effort_hours.toLocaleString()} h · ${project.outcome.replace("_", " ")}`),
+        );
+        if (project.match_reason) card.append(el("small", "", project.match_reason));
+        return card;
+      });
+      byId("prediction-projects").replaceChildren(...(cards.length ? cards : [el("small", "", "See the evidence details for the projects considered.")]));
+      const delta = Math.round((f.p50_effort_hours / baseline.p50_hours - 1) * 100);
+      byId("prediction-compare").textContent =
+        `Deterministic ROM for comparison: P50 ${hours(baseline.p50_hours)} · P80 ${hours(baseline.p80_hours)} ` +
+        `(forecast P50 is ${delta >= 0 ? "+" : ""}${delta}% vs the ROM). The forecast becomes the proposed COMMIT baseline; you still approve it.`;
       const round = (value) => hours(Math.round(value));
       byId("intake-rom-explain").textContent =
-        `The ${rom.analogs.length} closest completed projects (${rom.analogs.join("; ")}) typically took ${round(rom.base_p50_hours)} at P50 and ${round(rom.base_p80_hours)} at P80. ` +
-        `Adding a ${rom.integration_buffer_pct}% integration buffer gives ${hours(rom.p50_hours)} and ${hours(rom.p80_hours)}, rounded to 50 h. ` +
-        "This estimate is deterministic; the history forecast below is advisory.";
+        `The deterministic ROM uses the ${rom.analogs.length} closest completed projects (${rom.analogs.join("; ")}), which typically took ${round(rom.base_p50_hours)} at P50 and ${round(rom.base_p80_hours)} at P80, plus a ${rom.integration_buffer_pct}% integration buffer.`;
       renderRomAnalogs(result);
+      renderProjectsTable(prediction);
     }
-    function renderHistoryForecast(data) {
-      const f = data.forecast;
-      const root = byId("history-results");
-      const hero = el("div", "rom-hero");
-      hero.style.gridTemplateColumns = "repeat(5, minmax(0, 1fr))";
-      hero.replaceChildren(
-        metric(hours(f.p50_effort_hours), "P50 effort"),
-        metric(hours(f.p80_effort_hours), "P80 effort"),
-        metric(hours(f.p90_effort_hours), "P90 effort"),
-        metric(`${Math.round(f.on_time_probability * 100)}%`, "On-time probability"),
-        metric(`${Math.round(f.confidence * 100)}%`, "Forecast confidence"),
-      );
-      const lists = [];
-      const addList = (title, items) => {
-        if (!items || !items.length) return;
-        lists.push(el("strong", "", title));
-        const ul = el("ul", "history-list");
-        items.forEach((item) => ul.append(el("li", "", item)));
-        lists.push(ul);
-      };
-      addList("Key uncertainty drivers", f.key_risks);
-      addList("Recommendations", f.recommendations);
-      const forecastUsed = new Set(f.historical_projects_used);
+    function renderProjectsTable(data) {
+      const used = new Set(data.forecast.historical_projects_used);
       const table = el("table", "history-table");
       const head = el("tr");
-      ["Project", "ROM input", "Forecast input", "Similarity", "Team", "Integrations", "Planned h", "Actual h", "Outcome", "LLM match explanation"].forEach((label) => head.append(el("th", "", label)));
+      ["Project", "Influenced forecast", "Similarity", "Team", "Planned h", "Actual h", "Outcome", "Match explanation"].forEach((label) => head.append(el("th", "", label)));
       table.append(head);
       data.similar_projects.forEach((p) => {
         const row = el("tr");
-        [
-          p.project_name,
-          p.rom_input ? "Yes" : "—",
-          forecastUsed.has(p.project_name) ? "Yes" : "—",
-          `${p.similarity_pct}%`,
-          p.team_size,
-          p.integrations,
-          p.planned_effort_hours.toLocaleString(),
-          p.actual_effort_hours.toLocaleString(),
-          p.outcome.replace("_", " "),
-          p.match_reason || "—",
-        ]
-          .forEach((value) => row.append(el("td", "", String(value))));
+        [p.project_name, used.has(p.project_name) ? "Yes" : "—", `${p.similarity_pct}%`, p.team_size,
+          p.planned_effort_hours.toLocaleString(), p.actual_effort_hours.toLocaleString(),
+          p.outcome.replace("_", " "), p.match_reason || "—",
+        ].forEach((value) => row.append(el("td", "", String(value))));
         table.append(row);
       });
-      const tableWrap = el("div", "history-table-wrap");
-      tableWrap.append(table);
-      root.replaceChildren(
-        hero,
-        el("p", "rom-explain",
-          `Forecast: ${data.source === "llm" ? `LLM (${data.model})` : "statistical model"}; matches: ${data.matching_source === "llm" ? "LLM-ranked" : "SQLite similarity-ranked"}. ` +
-          `Capacity through ${data.target_date}: ${hours(data.capacity_hours)}. ${data.advisory}`),
-        ...lists,
-        tableWrap,
-      );
+      const wrap = el("div", "history-table-wrap");
+      wrap.append(table);
+      byId("history-results").replaceChildren(wrap);
     }
     function renderCommitment(result) {
       const c = result.commitment;
@@ -1452,7 +1477,7 @@
       );
       const explain = byId("intake-commit-explain");
       explain.replaceChildren(
-        document.createTextNode(`P80 of ${hours(c.p80_hours)}${c.scope_change_pct ? ` (including ${c.scope_change_pct}% scope change)` : ""} over ${c.weeks_to_target} weeks at ${c.hours_per_fte_week} h/FTE-week needs ${c.required_fte_p80} FTE; ${c.allocated_fte.toFixed(1)} FTE are allocated. ` +
+        document.createTextNode(`${c.basis ? `${c.basis.source === "llm" ? "AI forecast" : "Statistical estimate"} baseline. ` : ""}P80 of ${hours(c.p80_hours)}${c.scope_change_pct ? ` (including ${c.scope_change_pct}% scope change)` : ""} over ${c.weeks_to_target} weeks at ${c.hours_per_fte_week} h/FTE-week needs ${c.required_fte_p80} FTE; ${c.allocated_fte.toFixed(1)} FTE are allocated. ` +
           `Confidence is ${c.historical_confidence_pct}% historical confidence multiplied by the ${c.fit_probability_pct}% modeled chance of fitting ${hours(c.capacity_hours)} of capacity = ${percent(c.confidence_pct)}%. `),
         el("span", c.feasible ? "gate-ok" : "gate-bad", c.feasible ? "Feasible — ready for approval." : "Not feasible with current capacity."),
       );
@@ -1473,6 +1498,7 @@
     async function recalculateCommitment(adjustments) {
       intake.result = await intakePost("/api/intake/evaluate", {
         text: intake.text, answers: intake.result.answers, documents: docsPayload(), adjustments,
+        questions: intake.analysis.clarifications, basis: intake.result.basis,
       });
       renderCommitment(intake.result);
       intake.approved = false;
@@ -1484,6 +1510,7 @@
     function renderApproved(baseline) {
       intake.approved = true;
       serverBaseline = baseline;
+      saveIntake(3);
       updateJourney();
       byId("shape-stage-status").textContent = "BASELINE APPROVED";
       byId("intake-approved").textContent =
@@ -1496,15 +1523,20 @@
 
     const INTAKE_STORE = "deliverytwin.intake.v1";
     function saveIntake(step) {
-      if (!intake.text || intake.documents.length) { sessionStorage.removeItem(INTAKE_STORE); return; }
-      sessionStorage.setItem(INTAKE_STORE, JSON.stringify({
-        text: intake.text, answers: selectedAnswers(), step, sessionId: intakeSessionId,
-      }));
+      if (!intake.text || !intake.analysis || intake.documents.length) { sessionStorage.removeItem(INTAKE_STORE); return; }
+      try {
+        sessionStorage.setItem(INTAKE_STORE, JSON.stringify({
+          text: intake.text, answers: selectedAnswers(), step, sessionId: intakeSessionId,
+          analysis: intake.analysis, result: step >= 3 ? intake.result : null, approved: intake.approved,
+        }));
+      } catch (error) {
+        sessionStorage.removeItem(INTAKE_STORE);
+      }
     }
     function clearSavedIntake() { sessionStorage.removeItem(INTAKE_STORE); }
-    async function runAnalyze(restoring = false) {
+    async function runAnalyze() {
       intake.text = byId("intake-text").value;
-      if (!restoring) intakeSessionId = newIntakeSessionId();
+      intakeSessionId = newIntakeSessionId();
       intake.analysis = await intakePost("/api/intake/analyze", { text: intake.text, documents: docsPayload() });
       renderQuestions(intake.analysis);
       intakeShowUpTo(2);
@@ -1512,10 +1544,12 @@
       await loadImpactReport();
     }
     async function runEstimate() {
-      intake.result = await intakePost("/api/intake/evaluate", { text: intake.text, answers: selectedAnswers(), documents: docsPayload() });
-      byId("history-results").replaceChildren();
+      intake.result = await intakePost("/api/intake/estimate", {
+        text: intake.text, answers: selectedAnswers(), documents: docsPayload(),
+        questions: intake.analysis.clarifications,
+      });
       renderEvidence(intake.result);
-      renderRom(intake.result);
+      renderPrediction(intake.result);
       intakeShowUpTo(3);
       saveIntake(3);
       await loadImpactReport();
@@ -1529,21 +1563,29 @@
       byId("intake-continue").hidden = true;
       intakeShowUpTo(5);
     }
-    async function restoreIntake() {
+    function restoreIntake() {
       let saved = null;
       try { saved = JSON.parse(sessionStorage.getItem(INTAKE_STORE) || "null"); } catch (error) { saved = null; }
-      if (!saved || !saved.text) return;
+      if (!saved || !saved.text || !saved.analysis) return;
       try {
+        intake.text = saved.text;
         byId("intake-text").value = saved.text;
         intakeSessionId = saved.sessionId || intakeSessionId;
-        await runAnalyze(true);
+        intake.analysis = saved.analysis;
+        renderQuestions(saved.analysis);
         Object.entries(saved.answers || {}).forEach(([name, value]) => {
           const input = document.querySelector(`#intake-questions input[name="${name}"][value="${value}"]`);
           if (input) input.checked = true;
         });
-        if (saved.step >= 3) {
-          await runEstimate();
+        if (saved.step >= 3 && saved.result) {
+          intake.result = saved.result;
+          intake.approved = Boolean(saved.approved);
+          renderEvidence(saved.result);
+          renderPrediction(saved.result);
+          intakeShowUpTo(3);
           if (window.location.hash === "#commit") showCommitment();
+        } else {
+          intakeShowUpTo(2);
         }
       } catch (error) {
         clearSavedIntake();
@@ -1560,22 +1602,14 @@
     });
     byId("intake-rom-file").addEventListener("change", (event) => attachDocuments(event.currentTarget, "rom"));
     byId("intake-notes-file").addEventListener("change", (event) => attachDocuments(event.currentTarget, "meeting_notes"));
-    byId("intake-analyze").addEventListener("click", (event) => intakeRun(event.currentTarget, () => runAnalyze()));
-    byId("intake-fingerprint-btn").addEventListener("click", (event) => intakeRun(event.currentTarget, runEstimate));
+    byId("intake-analyze").addEventListener("click", (event) => intakeRun(event.currentTarget, runAnalyze, "Reading your request against the completed projects and writing tailored questions…"));
+    byId("intake-fingerprint-btn").addEventListener("click", (event) => intakeRun(event.currentTarget, runEstimate, "Predicting effort and delivery odds from similar completed projects… this can take up to a minute."));
     document.querySelectorAll("[data-edit]").forEach((button) => button.addEventListener("click", () => {
       intake.result = null;
       intake.approved = false;
       byId("commit-readiness").hidden = true;
       clearCommitmentSummary();
       intakeShowUpTo(Number(button.dataset.edit));
-    }));
-    byId("intake-history-forecast").addEventListener("click", (event) => intakeRun(event.currentTarget, async () => {
-      const data = await intakePost("/api/intake/forecast", {
-        text: intake.text,
-        answers: intake.result.answers,
-        documents: docsPayload(),
-      });
-      renderHistoryForecast(data);
     }));
     byId("intake-commit-btn").addEventListener("click", () => {
       showCommitment();
@@ -1589,6 +1623,7 @@
     byId("intake-approve").addEventListener("click", (event) => intakeRun(event.currentTarget, async () => {
       const approved = await intakePost("/api/intake/approve", {
         text: intake.text, answers: intake.result.answers, documents: docsPayload(),
+        questions: intake.analysis.clarifications, basis: intake.result.basis,
         adjustments: {
           allocated_fte: intake.result.commitment.allocated_fte,
           target_date: intake.result.commitment.target_date,

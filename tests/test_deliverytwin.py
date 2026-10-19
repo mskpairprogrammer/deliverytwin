@@ -47,6 +47,10 @@ VAGUE_REQUEST = (
 
 class DeliveryTwinTests(unittest.TestCase):
     def setUp(self) -> None:
+        # Tests must never reach a real LLM, even when a key is present in the environment.
+        patcher = patch("deliverytwin.intake.openai_configured", return_value=False)
+        patcher.start()
+        self.addCleanup(patcher.stop)
         self.connection = connect(":memory:")
         initialize_database(self.connection)
 

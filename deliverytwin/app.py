@@ -27,7 +27,7 @@ MAX_CHAT_REQUEST_BYTES = 16_384
 MAX_INTAKE_REQUEST_BYTES = 7_500_000
 INTAKE_POST_ROUTES = (
     "/api/intake/analyze", "/api/intake/evaluate", "/api/intake/approve", "/api/intake/what-if",
-    "/api/intake/forecast",
+    "/api/intake/forecast", "/api/intake/estimate",
 )
 ACT_POST_ROUTES = ("/api/act/what-if", "/api/act/apply")
 MAX_CHAT_QUESTION_LENGTH = 1_200
@@ -909,7 +909,8 @@ def serve_dashboard(database: str | Path, host: str, port: int) -> None:
         def handle_intake(self, route: str, payload: dict[str, Any]) -> None:
             from .analytics import record_intake_activity
             from .intake import (
-                analyze_intake, approve_baseline, evaluate_intake, forecast_from_history, simulate_rom,
+                analyze_intake, approve_baseline, estimate_intake, evaluate_intake,
+                forecast_from_history, simulate_rom,
             )
 
             try:
@@ -926,12 +927,17 @@ def serve_dashboard(database: str | Path, host: str, port: int) -> None:
                     elif route == "/api/intake/forecast":
                         result = forecast_from_history(
                             connection, payload.get("text"), payload.get("answers"),
-                            documents=payload.get("documents"),
+                            documents=payload.get("documents"), questions=payload.get("questions"),
+                        )
+                    elif route == "/api/intake/estimate":
+                        result = estimate_intake(
+                            connection, payload.get("text"), payload.get("answers"),
+                            documents=payload.get("documents"), questions=payload.get("questions"),
                         )
                     elif route == "/api/intake/what-if":
                         evaluation = evaluate_intake(
                             connection, payload.get("text"), payload.get("answers"),
-                            documents=payload.get("documents"),
+                            documents=payload.get("documents"), questions=payload.get("questions"),
                         )
                         commitment = evaluation["commitment"]
                         available_hours = (
@@ -951,17 +957,20 @@ def serve_dashboard(database: str | Path, host: str, port: int) -> None:
                             connection, payload.get("text"), payload.get("answers"),
                             documents=payload.get("documents"),
                             adjustments=payload.get("adjustments"),
+                            questions=payload.get("questions"), basis=payload.get("basis"),
                         )
                     else:
                         result = approve_baseline(
                             connection, payload.get("text"), payload.get("answers"),
                             documents=payload.get("documents"),
                             adjustments=payload.get("adjustments"),
+                            questions=payload.get("questions"), basis=payload.get("basis"),
                         )
                     event = {
                         "/api/intake/analyze": "started",
                         "/api/intake/evaluate": "rom_ready",
                         "/api/intake/forecast": "rom_ready",
+                        "/api/intake/estimate": "rom_ready",
                         "/api/intake/approve": "approved",
                     }.get(route)
                     if event:
