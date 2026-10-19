@@ -523,10 +523,10 @@ def _llm_questions(
     docs: list[dict[str, str]],
     evidence: list[sqlite3.Row],
     vocab: dict[str, set[str]],
-) -> list[dict[str, Any]] | None:
-    """Ask the LLM for tailored clarifying questions grounded in similar completed projects."""
+) -> tuple[list[dict[str, Any]] | None, dict[str, str] | None]:
+    """Ask the LLM for tailored questions; on failure return why, so the UI can say so truthfully."""
     if not openai_configured() or not evidence:
-        return None
+        return None, {"code": "not_configured"}
     context = [
         {
             "id": row["project_id"], "name": row["project_name"], "structure": row["structure"],
@@ -578,17 +578,20 @@ def _llm_questions(
             json_mode=True,
         )
         data = json.loads(reply)
-    except (LLMError, ValueError):
-        return None
+    except LLMError as error:
+        return None, {"code": "request_failed", "detail": str(error)}
+    except ValueError:
+        return None, {"code": "invalid_response", "detail": "The reply was not valid JSON."}
+    invalid = {"code": "invalid_response", "detail": "The questions did not pass validation."}
     raw = data.get("questions") if isinstance(data, dict) else None
     questions = _validate_question_set(raw, vocab)
     if questions is None:
-        return None
+        return None, invalid
     by_id = {row["project_id"]: row for row in evidence}
     for source, cleaned in zip(raw, questions):
         suggested = source.get("suggested")
         if suggested not in {option["value"] for option in cleaned["options"]}:
-            return None
+            return None, invalid
         cited = source.get("evidence_project_ids")
         cleaned["suggested"] = suggested
         cleaned["category"] = cleaned["category"].replace("_", " ").title()
@@ -602,7 +605,7 @@ def _llm_questions(
             for pid in (cited if isinstance(cited, list) else [])
             if isinstance(pid, str) and pid in by_id
         ][:3]
-    return questions
+    return questions, None
 
 
 def analyze_intake(
@@ -614,9 +617,9 @@ def analyze_intake(
     projects_count = _historical_count(connection)
     request_tokens = _tokens(request) | _document_tokens(docs)
     evidence = _evidence_projects(connection, request_tokens)
-    questions = _llm_questions(request, docs, evidence, _vocabulary(connection))
+    questions, reason = _llm_questions(request, docs, evidence, _vocabulary(connection))
     if questions is None:
-        return _template_analysis(connection, request, docs, request_tokens, projects_count)
+        return _template_analysis(connection, request, docs, request_tokens, projects_count, reason)
     return {
         "request": request,
         "clarity": {"specified": 0, "total": len(questions)},
@@ -636,6 +639,7 @@ def _template_analysis(
     docs: list[dict[str, str]],
     request_tokens: set[str],
     projects_count: int,
+    reason: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     """Template questions with keyword-ranked lessons (used when no LLM is available)."""
     clarifications = []
@@ -693,7 +697,7 @@ def _template_analysis(
     return {
         "request": request,
         "clarity": {"specified": specified, "total": len(clarifications)},
-        "question_source": {"type": "template"},
+        "question_source": {"type": "template", "reason": reason or {"code": "not_configured"}},
         "retrieval": {
             "method": method,
             "projects_searched": projects_count,
@@ -1181,10 +1185,10 @@ def _llm_forecast(
     initiative: dict[str, Any],
     projects: list[dict[str, Any]],
     statistical: dict[str, Any],
-) -> dict[str, Any] | None:
-    """Ask the LLM to forecast from similar historical projects; None means use the statistical forecast."""
+) -> tuple[dict[str, Any] | None, dict[str, str] | None]:
+    """Ask the LLM to forecast; on failure return why so the statistical fallback is labeled truthfully."""
     if not openai_configured():
-        return None
+        return None, {"code": "not_configured"}
     try:
         reply = complete(
             [
@@ -1215,9 +1219,14 @@ def _llm_forecast(
             json_mode=True,
         )
         data = json.loads(reply)
-    except (LLMError, ValueError):
-        return None
-    return _validate_llm_forecast(data, projects, statistical)
+    except LLMError as error:
+        return None, {"code": "request_failed", "detail": str(error)}
+    except ValueError:
+        return None, {"code": "invalid_response", "detail": "The reply was not valid JSON."}
+    forecast = _validate_llm_forecast(data, projects, statistical)
+    if forecast is None:
+        return None, {"code": "invalid_response", "detail": "The forecast did not pass validation."}
+    return forecast, None
 
 
 def _validate_llm_forecast(
@@ -1314,10 +1323,11 @@ def forecast_from_history(
         "weeks_to_target": commitment["weeks_to_target"],
         "available_capacity_hours": round(capacity_hours),
     }
-    llm = _llm_forecast(evaluation["request"], initiative, projects, statistical)
+    llm, fallback_reason = _llm_forecast(evaluation["request"], initiative, projects, statistical)
     return {
         "forecast": llm or statistical,
         "source": "llm" if llm else "statistical",
+        "fallback_reason": fallback_reason,
         "matching_source": "llm" if llm_ranked else "similarity",
         "model": openai_model() if llm else None,
         "statistical_baseline": statistical,

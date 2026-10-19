@@ -43,7 +43,8 @@ def llm_questions():
 class ScriptedLLM:
     """Stands in for the OpenAI client; each call type can succeed or fail independently."""
 
-    def __init__(self, questions=None, forecast="valid"):
+    def __init__(self, questions=None, forecast="valid", fail=()):
+        self.fail = set(fail)
         self.questions = questions if questions is not None else llm_questions()
         self.forecast = forecast
         self.calls = []
@@ -53,9 +54,13 @@ class ScriptedLLM:
         payload = json.loads(messages[1]["content"])
         if "clarifying questions" in system:
             self.calls.append("questions")
+            if "questions" in self.fail:
+                raise LLMError("OpenAI request failed with HTTP 401.")
             return json.dumps(self.questions)
         if "delivery forecasting expert" in system:
             self.calls.append("forecast")
+            if "forecast" in self.fail:
+                raise LLMError("OpenAI request failed with HTTP 429.")
             if self.forecast == "invalid":
                 return json.dumps({"p50_effort_hours": 10})
             first = payload["similar_historical_projects"][0]["project_name"]

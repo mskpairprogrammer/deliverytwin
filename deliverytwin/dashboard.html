@@ -200,6 +200,7 @@
     .project-card { margin-bottom: 8px; font-size: 11px; line-height: 1.5; }
     .project-card small { display: block; color: var(--muted); }
     .prediction-compare { font-size: 10px; color: var(--muted); margin: 8px 0 12px; }
+    .link-btn-inline { border: 0; background: none; color: var(--teal); font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; padding: 0; }
     .intake-working { margin: 12px 19px 0; padding: 10px 14px; border-radius: 8px; background: #f0f7f5; color: var(--teal); font-size: 12px; font-weight: 700; }
     .intake-working[hidden] { display: none; }
     @media (max-width: 900px) { .prediction-columns { grid-template-columns: 1fr; } }
@@ -1329,14 +1330,30 @@
       document.querySelectorAll("#intake-questions input:checked").forEach((input) => { answers[input.name] = input.value; });
       return answers;
     }
+    function aiUnavailableText(reason, fallback) {
+      const code = reason ? reason.code : "not_configured";
+      if (code === "request_failed") {
+        return `The AI service could not be reached (${reason.detail || "request failed"}). Check the API key, quota, and network. Showing ${fallback} instead.`;
+      }
+      if (code === "invalid_response") {
+        return `The AI answered, but its response did not pass validation. Showing ${fallback} instead.`;
+      }
+      return `No AI model is configured (set OPENAI_API_KEY and restart). Showing ${fallback} instead.`;
+    }
     function renderQuestions(analysis) {
       const container = byId("intake-questions");
       container.replaceChildren();
       const generated = analysis.question_source && analysis.question_source.type === "llm";
       byId("intake-clarity").textContent = generated ? "" : `· ${analysis.clarity.specified} of ${analysis.clarity.total} already covered in your request`;
-      byId("intake-retrieval").textContent = generated
+      const retry = el("button", "link-btn-inline", "Try again with AI");
+      retry.type = "button";
+      retry.addEventListener("click", () => byId("intake-analyze").click());
+      byId("intake-retrieval").replaceChildren(document.createTextNode(generated
         ? `Tailored questions written by ${analysis.question_source.model} from the ${analysis.question_source.projects_considered} most similar completed projects. Our suggested answer is pre-selected; change any of them.`
-        : `${analysis.retrieval.projects_searched} completed projects searched. No AI model is configured, so these are standard questions; the most common choice among the closest matches is pre-selected.`;
+        : `${aiUnavailableText(analysis.question_source.reason, "standard questions")} The most common choice among the closest completed projects is pre-selected. `));
+      if (!generated && analysis.question_source.reason && analysis.question_source.reason.code !== "not_configured") {
+        byId("intake-retrieval").append(retry);
+      }
       byId("intake-retrieval").title = analysis.retrieval.method;
       analysis.clarifications.forEach((item) => {
         const card = el("fieldset", "q-card");
@@ -1407,8 +1424,14 @@
         el("span", `source-pill ${generated ? "llm" : "fallback"}`, generated ? `AI FORECAST · ${prediction.model}` : "STATISTICAL ESTIMATE · AI FORECAST UNAVAILABLE"),
         el("span", "", generated
           ? `Model confidence ${confidence}% · matches ${prediction.matching_source === "llm" ? "ranked by the model" : "ranked by similarity"}`
-          : "No valid AI response, so this uses a similarity-weighted fit of similar completed projects."),
+          : `${aiUnavailableText(prediction.fallback_reason, "a similarity-weighted estimate from similar completed projects")}`),
       );
+      if (!generated && prediction.fallback_reason && prediction.fallback_reason.code !== "not_configured") {
+        const retryForecast = el("button", "link-btn-inline", "Try again with AI");
+        retryForecast.type = "button";
+        retryForecast.addEventListener("click", () => byId("intake-fingerprint-btn").click());
+        byId("prediction-source").append(retryForecast);
+      }
       byId("intake-rom").replaceChildren(
         metric(hours(f.p50_effort_hours), "Most likely effort (P50)", "The median outcome: about half of comparable projects finished within this effort."),
         metric(hours(f.p80_effort_hours), "Commit-to effort (P80)", "About four in five comparable projects finished within this effort."),
@@ -1567,6 +1590,12 @@
       let saved = null;
       try { saved = JSON.parse(sessionStorage.getItem(INTAKE_STORE) || "null"); } catch (error) { saved = null; }
       if (!saved || !saved.text || !saved.analysis) return;
+      // A fallback analysis from an earlier session should not hide an AI service that works now.
+      if (!saved.analysis.question_source || saved.analysis.question_source.type !== "llm") {
+        byId("intake-text").value = saved.text;
+        clearSavedIntake();
+        return;
+      }
       try {
         intake.text = saved.text;
         byId("intake-text").value = saved.text;

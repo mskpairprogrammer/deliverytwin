@@ -144,9 +144,13 @@ class JourneyUiTests(unittest.TestCase):
         self.assertFalse(page.locator("#intake-evidence").evaluate("node => node.open"))
         self.assertTrue(page.get_by_role("button", name="Continue to COMMIT →").is_visible())
 
+        # A standard-question analysis is not restored, so a working AI service is not hidden.
         page.reload()
+        page.wait_for_function("document.getElementById('intake-text').value.length > 0")
+        self.assertEqual(visible(), [1])
+        page.get_by_role("button", name="Analyze request").click()
+        page.get_by_role("button", name="Run prediction").click()
         page.locator("#intake-rom").get_by_text("Most likely effort (P50)").wait_for()
-        self.assertEqual((visible(), collapsed()), ([1, 2, 3], [1, 2]))
         self.assertEqual(self.states()["shape"], "Estimate ready")
 
         page.locator('[data-edit="2"]').click()
@@ -251,6 +255,20 @@ class JourneyUiTests(unittest.TestCase):
         self.assertEqual(type(self).llm.calls.count("questions"), 1)
         self.assertEqual(type(self).llm.calls.count("forecast"), 1)
 
+    def test_an_ai_estimate_survives_a_reload_without_calling_the_model_again(self) -> None:
+        type(self).llm_enabled = True
+        page = self.page
+        page.get_by_role("button", name="Try the sample request").click()
+        page.get_by_role("button", name="Run prediction").click()
+        page.locator("#intake-rom").get_by_text("Most likely effort (P50)").wait_for()
+        page.reload()
+        page.locator("#intake-rom").get_by_text("Most likely effort (P50)").wait_for()
+        self.assertIn("4,900 h", page.locator("#intake-rom").inner_text())
+        self.assertIn("AI FORECAST", page.locator("#prediction-source").inner_text())
+        self.assertEqual(self.states()["shape"], "Estimate ready")
+        self.assertEqual(type(self).llm.calls.count("questions"), 1)
+        self.assertEqual(type(self).llm.calls.count("forecast"), 1)
+
     def test_an_unusable_ai_forecast_is_labeled_and_the_flow_still_works(self) -> None:
         type(self).llm_enabled = True
         type(self).llm = ScriptedLLM(forecast="invalid")
@@ -264,6 +282,34 @@ class JourneyUiTests(unittest.TestCase):
         self.assertIn("Statistical estimate baseline", page.locator("#intake-commit-explain").inner_text())
         page.get_by_role("button", name="Approve baseline").click()
         page.locator("#intake-approved").wait_for(state="visible")
+
+    def test_a_failing_ai_service_is_reported_honestly_with_a_retry(self) -> None:
+        type(self).llm_enabled = True
+        type(self).llm = ScriptedLLM(fail=("questions", "forecast"))
+        page = self.page
+        page.get_by_role("button", name="Try the sample request").click()
+        page.get_by_role("button", name="Run prediction").wait_for()
+        notice = page.locator("#intake-retrieval").inner_text()
+        self.assertIn("could not be reached", notice)
+        self.assertIn("HTTP 401", notice)
+        self.assertNotIn("No AI model is configured", notice)
+        self.assertEqual(page.locator("#intake-retrieval button").inner_text(), "Try again with AI")
+
+        type(self).llm = ScriptedLLM()
+        page.locator("#intake-retrieval button").click()
+        page.wait_for_function("document.getElementById('intake-retrieval').textContent.includes('Tailored questions written by')")
+        self.assertEqual(page.locator("#intake-questions .q-card").count(), 4)
+
+        type(self).llm = ScriptedLLM(fail=("forecast",))
+        page.get_by_role("button", name="Run prediction").click()
+        page.locator("#intake-rom").get_by_text("Most likely effort (P50)").wait_for()
+        pill = page.locator("#prediction-source").inner_text()
+        self.assertIn("STATISTICAL ESTIMATE", pill)
+        self.assertIn("HTTP 429", pill)
+        type(self).llm = ScriptedLLM()
+        page.locator("#prediction-source button").click()
+        page.wait_for_function("document.getElementById('prediction-source').textContent.includes('AI FORECAST ·')")
+        self.assertIn("4,900 h", page.locator("#intake-rom").inner_text())
 
     def test_demo_data_can_be_cleared_from_the_footer(self) -> None:
         page = self.page

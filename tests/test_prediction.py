@@ -65,6 +65,40 @@ class PredictionTests(unittest.TestCase):
             self.assertEqual([c["id"] for c in analysis["clarifications"]],
                              ["architecture", "data", "security", "reuse"])
 
+    def test_fallbacks_say_why_the_ai_was_not_used(self) -> None:
+        def source(patches, llm=None):
+            with patches[0], patches[1]:
+                return analyze_intake(self.connection, REQUEST)["question_source"]
+
+        with patch("deliverytwin.intake.openai_configured", return_value=False):
+            self.assertEqual(analyze_intake(self.connection, REQUEST)["question_source"]["reason"],
+                             {"code": "not_configured"})
+        failing = source(self.run_with(ScriptedLLM(fail=("questions",))))
+        self.assertEqual(failing["type"], "template")
+        self.assertEqual(failing["reason"]["code"], "request_failed")
+        self.assertIn("HTTP 401", failing["reason"]["detail"])
+        broken = llm_questions()
+        broken["questions"][0]["suggested"] = "missing"
+        self.assertEqual(source(self.run_with(ScriptedLLM(questions=broken)))["reason"]["code"], "invalid_response")
+
+    def test_forecast_fallbacks_carry_their_reason(self) -> None:
+        reasons = {}
+        for name, llm in (("failed", ScriptedLLM(fail=("forecast",))), ("invalid", ScriptedLLM(forecast="invalid"))):
+            configured, complete = self.run_with(llm)
+            with configured, complete:
+                analysis = analyze_intake(self.connection, REQUEST)
+                reasons[name] = estimate_intake(
+                    self.connection, REQUEST, self.answers(analysis), DAY, questions=analysis["clarifications"]
+                )["prediction"]["fallback_reason"]
+        self.assertEqual(reasons["failed"]["code"], "request_failed")
+        self.assertIn("HTTP 429", reasons["failed"]["detail"])
+        self.assertEqual(reasons["invalid"]["code"], "invalid_response")
+        configured, complete = self.run_with(ScriptedLLM())
+        with configured, complete:
+            analysis = analyze_intake(self.connection, REQUEST)
+            ok = estimate_intake(self.connection, REQUEST, self.answers(analysis), DAY, questions=analysis["clarifications"])
+        self.assertIsNone(ok["prediction"]["fallback_reason"])
+
     def test_generated_answers_drive_the_fingerprint_and_tampering_is_rejected(self) -> None:
         configured, complete = self.run_with(ScriptedLLM())
         with configured, complete:
