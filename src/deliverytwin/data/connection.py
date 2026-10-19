@@ -1,10 +1,10 @@
 """A small, engine-neutral connection used for the app's relational tables.
 
 The simulated source-system tables (Planview, Azure DevOps, ServiceNow, UKG, Oracle HCM) and the
-historical reference projects are plain SQL; they run on the local engine (DuckDB by default, SQLite
-optionally). The application tables (baselines, intake sessions, recovery scenarios, TRACK snapshots)
-go through portable repositories and can live in Databricks. Nothing outside ``data/`` imports
-``sqlite3`` or ``duckdb``: callers use this class, ``DatabaseError`` and ``IntegrityError``.
+historical reference projects are plain SQL; they run on the local DuckDB engine. The application tables
+(baselines, intake sessions, recovery scenarios, TRACK snapshots) go through portable repositories and can
+live in Databricks. Nothing outside ``data/`` imports ``duckdb``: callers use this class,
+``DatabaseError`` and ``IntegrityError``.
 """
 from __future__ import annotations
 
@@ -21,11 +21,10 @@ from .database import (
     DuckDBDatabase,
     IntegrityError,
     Result,
-    SQLiteDatabase,
 )
 
-DIALECTS = ("duckdb", "sqlite", "databricks")
-DEFAULT_PATHS = {"duckdb": "deliverytwin.duckdb", "sqlite": "deliverytwin.db", "databricks": "/tmp/deliverytwin.duckdb"}
+DIALECTS = ("duckdb", "databricks")
+DEFAULT_PATHS = {"duckdb": "deliverytwin.duckdb", "databricks": "/tmp/deliverytwin.duckdb"}
 
 __all__ = [
     "Connection", "Cursor", "DatabaseError", "IntegrityError", "Row", "connect", "default_database_path",
@@ -237,5 +236,5 @@ def connect(
     """Open the local engine for ``dialect`` (see :func:`resolve_dialect`); ``:memory:`` is private to this call."""
     chosen = resolve_dialect(dialect)
     path = str(database) if database is not None else default_database_path(chosen)
-    local: Database = SQLiteDatabase(path) if chosen == "sqlite" else DuckDBDatabase(path)
+    local: Database = DuckDBDatabase(path)
     return Connection(local, chosen, session)

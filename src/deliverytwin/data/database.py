@@ -3,15 +3,14 @@
 Every implementation uses positional ``?`` parameters, so callers never build SQL from
 values. Identifiers are validated against the schema before interpolation.
 
-DuckDB is the default local runtime (a persistent, thread-safe analytical engine that mirrors the
-Databricks SQL surface); SQLite remains available, and Databricks hosts the portable app tables.
+DuckDB is the local runtime (a persistent, thread-safe analytical engine that mirrors the Databricks
+SQL surface), and Databricks hosts the portable app tables.
 """
 from __future__ import annotations
 
 import atexit
 import os
 import re
-import sqlite3
 import threading
 from contextlib import contextmanager, nullcontext
 from dataclasses import dataclass
@@ -19,23 +18,13 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import Any, Iterable, Iterator, Sequence
 
+import duckdb
+
 from .schema import ALL_TABLES, TABLES, check_identifier, render_create_table
 
-
-def _error_types(name: str) -> tuple[type[BaseException], ...]:
-    types: list[type[BaseException]] = [getattr(sqlite3, "Error" if name == "Error" else "IntegrityError")]
-    try:
-        import duckdb
-
-        types.append(duckdb.Error if name == "Error" else duckdb.ConstraintException)
-    except ImportError:  # SQLite-only installs
-        pass
-    return tuple(types)
-
-
-# Catch these instead of backend-specific exceptions so no caller assumes one engine.
-DatabaseError = _error_types("Error")
-IntegrityError = _error_types("IntegrityError")
+# Catch these instead of engine-specific exceptions so no caller depends on the driver module.
+DatabaseError = (duckdb.Error,)
+IntegrityError = (duckdb.ConstraintException,)
 
 
 @dataclass
@@ -45,9 +34,9 @@ class Result:
 
 
 class Database:
-    """Minimal interface shared by the SQLite, DuckDB, and Databricks backends."""
+    """Minimal interface shared by the DuckDB and Databricks backends."""
 
-    dialect = "sqlite"
+    dialect = "duckdb"
     catalog: str | None = None
     schema: str | None = None
 
@@ -175,7 +164,7 @@ _REAL = re.compile(r"\bREAL\b", re.I)
 
 
 def translate_schema(script: str, dialect: str) -> list[str]:
-    """Split the SQLite-flavoured schema into statements and adapt them to the target engine.
+    """Split the schema script into statements and adapt them to the target engine.
 
     DuckDB needs sequences instead of AUTOINCREMENT, 8-byte floats instead of REAL, and no PRAGMA.
     Foreign keys, CHECK and UNIQUE constraints are kept.
@@ -199,7 +188,7 @@ def translate_schema(script: str, dialect: str) -> list[str]:
 
 
 class _LocalEngine(Database):
-    """Shared transaction handling for the in-process engines (SQLite, DuckDB).
+    """Transaction handling for the in-process DuckDB engine.
 
     A re-entrant lock serialises statements across threads. Transactions nest: only the outermost
     ``begin``/``commit`` issues BEGIN/COMMIT, and a rollback anywhere makes the whole unit roll back.
@@ -281,48 +270,6 @@ class _LocalEngine(Database):
         return deleted
 
 
-class SQLiteDatabase(_LocalEngine):
-    """SQLite in autocommit mode with explicit BEGIN/COMMIT, so transactions are always visible."""
-
-    dialect = "sqlite"
-
-    def __init__(self, connection: sqlite3.Connection | str = ":memory:") -> None:
-        if isinstance(connection, str):
-            connection = sqlite3.connect(connection, check_same_thread=False)
-        connection.isolation_level = None
-        connection.execute("PRAGMA foreign_keys = ON")
-        self.connection = connection
-        self.lock = threading.RLock()
-        self._init_transactions()
-
-    def _params(self, params: Sequence[Any]) -> Any:
-        return tuple(params)
-
-    def clear_all(self) -> int:
-        # Children may be deleted before their parents, so enforcement is paused for the wipe.
-        self.connection.execute("PRAGMA foreign_keys = OFF")
-        try:
-            deleted = super().clear_all()
-            if "sqlite_sequence" in {row["name"] for row in self.query("SELECT name FROM sqlite_master")}:
-                self.execute("DELETE FROM sqlite_sequence")
-            return deleted
-        finally:
-            self.connection.execute("PRAGMA foreign_keys = ON")
-
-    def close(self) -> None:
-        self.connection.close()
-
-    def list_tables(self) -> list[str]:
-        return [
-            row["name"] for row in self.query(
-                "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name"
-            )
-        ]
-
-    def table_columns(self, name: str) -> list[str]:
-        return [row["name"] for row in self.query(f"PRAGMA table_info({check_identifier(name)})")]
-
-
 _DUCKDB_ROOTS: dict[str, tuple[Any, threading.RLock]] = {}
 _DUCKDB_REGISTRY_LOCK = threading.Lock()
 
@@ -350,8 +297,6 @@ class DuckDBDatabase(_LocalEngine):
     dialect = "duckdb"
 
     def __init__(self, path: str | os.PathLike[str] = ":memory:") -> None:
-        import duckdb
-
         target = str(path)
         self._owns_root = target == ":memory:"
         if self._owns_root:
@@ -511,9 +456,7 @@ class DatabricksDatabase(Database):
 
 
 def open_database(backend: str, **options: Any) -> Database:
-    """Open the configured backend: ``duckdb`` (default local runtime), ``sqlite``, or ``databricks``."""
-    if backend == "sqlite":
-        return SQLiteDatabase(options.get("connection") or options.get("path", ":memory:"))
+    """Open the configured backend: ``duckdb`` (local runtime) or ``databricks``."""
     if backend == "duckdb":
         return DuckDBDatabase(options.get("path", ":memory:"))
     if backend == "databricks":

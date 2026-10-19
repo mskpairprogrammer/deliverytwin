@@ -20,7 +20,7 @@ All source data is synthetic. There are no live connectors, and nothing is ever 
 
 | Area | Capability | Where |
 |---|---|---|
-| Data layer | DuckDB by default, SQLite and Azure Databricks (Unity Catalog / Delta) behind one portable interface; `--dialect` / `DELIVERYTWIN_DB_DIALECT`; thread-safe persistent DuckDB file | [Portfolio data layer](#portfolio-data-layer) |
+| Data layer | DuckDB (embedded, persistent, thread-safe) as the local runtime, with Azure Databricks (Unity Catalog / Delta) behind the same portable interface; `--dialect` / `DELIVERYTWIN_DB_DIALECT` | [Portfolio data layer](#portfolio-data-layer) |
 | Cloud AI | Databricks Model Serving, then Azure OpenAI, then OpenAI, then a labeled rules fallback; recorded mode for offline demos | [How the AI is used](#how-the-ai-is-used) |
 | SHAPE | Source badges (`Stated in Request`, `Found in Meeting Notes (Quote Verified)`, `AI Inference (Confirm)`) with deterministic verbatim quote verification; sample ROM and meeting notes | [SHAPE](#shape-estimate-from-similar-completed-projects) |
 | COMMIT | Role × Phase capacity bottlenecks; HR privacy guardrail (N ≥ 3); AI pre-commit review; what-if questions; baseline history | [COMMIT](#commit-challenge-the-commitment-then-approve-it) |
@@ -51,7 +51,7 @@ One synthetic request, end to end. The numbers below come from the deterministic
 ## Architecture at a glance (for judges)
 
 - **Deterministic core, AI on the edges.** Feasibility, confidence, capacity-by-role, cost and ROI metrics are plain code you can unit test. The AI writes questions, narrative and scenario proposals, and every answer is validated or replaced by a labeled rules fallback.
-- **Portable analytical data layer.** The system of record runs on **DuckDB by default**, an embedded analytical engine whose SQL and types match Databricks closely, with SQLite and **Azure Databricks (Unity Catalog / Delta)** behind the same interface. The same repositories, parameter style (`?`), and upsert semantics run on all three, and one environment variable (`DELIVERYTWIN_DB_DIALECT`) switches between them. Only [`data/database.py`](src/deliverytwin/data/database.py) knows which engine is underneath.
+- **Portable analytical data layer.** The system of record runs on **DuckDB**, an embedded analytical engine whose SQL and types match Databricks closely, with **Azure Databricks (Unity Catalog / Delta)** behind the same interface. The same repositories, parameter style (`?`), and upsert semantics run on both, and one environment variable (`DELIVERYTWIN_DB_DIALECT`) switches between them. Only [`data/database.py`](src/deliverytwin/data/database.py) knows which engine is underneath.
 - **Cloud AI in priority order.** Databricks Model Serving, then Azure OpenAI, then OpenAI, then a labeled rules fallback.
 - **Read-only by design.** Sources are simulated and the Azure DevOps hierarchy is a preview and CSV; nothing is written to an enterprise system.
 - **Privacy built in.** Oracle HCM and UKG data are used only as role-level aggregates with an N ≥ 3 suppression threshold.
@@ -155,7 +155,7 @@ python -m deliverytwin serve    # dashboard at http://127.0.0.1:8765/
 
 To enable the AI features, put `OPENAI_API_KEY=...` in a `.env` file in `src/` (or the repository root), or set it in the environment. `.env` is git-ignored. Restart the server after changing it.
 
-The local database is **DuckDB** (`deliverytwin.duckdb` in the working directory). Choose another engine with `--dialect duckdb|sqlite|databricks` after the subcommand (`init`, `seed-demo`, `report`, `demo`, `simulate`, `serve`) or with `DELIVERYTWIN_DB_DIALECT`. With neither, the default is `duckdb`, or `databricks` when `DATABRICKS_HOST` is set. `--db PATH` (before the subcommand) or `DELIVERYTWIN_DB_PATH` picks the file; `:memory:` works too. With `databricks`, the simulated source records stay in a local DuckDB file and the four application tables live in the warehouse.
+The local database is **DuckDB** (`deliverytwin.duckdb` in the working directory); SQLite is no longer used. Choose the engine with `--dialect duckdb|databricks` after the subcommand (`init`, `seed-demo`, `report`, `demo`, `simulate`, `serve`) or with `DELIVERYTWIN_DB_DIALECT`. With neither, the default is `duckdb`, or `databricks` when `DATABRICKS_HOST` is set. `--db PATH` (before the subcommand) or `DELIVERYTWIN_DB_PATH` picks the DuckDB file; `:memory:` works too. With `databricks`, the simulated source records stay in a local DuckDB file and the four application tables live in the warehouse.
 
 Other commands (all from `src/`):
 
@@ -164,7 +164,7 @@ python -m deliverytwin init                 # create the schema
 python -m deliverytwin seed-demo            # load synthetic source records
 python -m deliverytwin report               # print the signal report
 python -m deliverytwin simulate --sprints 3 # advance the simulation (--reset clears it)
-python -m deliverytwin serve --dialect sqlite --db demo.db   # run on SQLite instead
+python -m deliverytwin serve --db demo.duckdb   # use a specific DuckDB file
 python -m deliverytwin generate-data        # regenerate the portfolio dataset CSVs
 python -m deliverytwin ddl                  # print Databricks/Delta DDL
 python -m deliverytwin databricks-smoke     # verify a live Databricks workspace
@@ -181,7 +181,7 @@ python -m playwright install chromium       # once, for the browser tests
 python -m unittest discover -s tests
 ```
 
-The suite covers the data layer (all four application tables and the full SHAPE → COMMIT → TRACK → INTERVENE workflow on both DuckDB and SQLite, plus concurrent access to one DuckDB file), the quote verifier, Databricks / Azure OpenAI / OpenAI routing, the dollar-cost model and scenario ranking, the Role × Phase guardrail (no worker names or ids in the output), the ROI metrics, the `app.yaml`, the AI features with a scripted model, the scenario packs, events, file import, backlog, decision pack, and Playwright tests of the whole journey. The browser tests are skipped if Chromium is unavailable. A full run takes about two to three minutes.
+The suite covers the data layer (all four application tables and the full SHAPE → COMMIT → TRACK → INTERVENE workflow on DuckDB, plus concurrent access to one DuckDB file), the quote verifier, Databricks / Azure OpenAI / OpenAI routing, the dollar-cost model and scenario ranking, the Role × Phase guardrail (no worker names or ids in the output), the ROI metrics, the `app.yaml`, the AI features with a scripted model, the scenario packs, events, file import, backlog, decision pack, and Playwright tests of the whole journey. The browser tests are skipped if Chromium is unavailable. A full run takes about two to three minutes.
 
 ## Repository layout
 
@@ -236,7 +236,7 @@ flowchart LR
         RULES[Deterministic models: commitment, forecast, variance, capacity]
         AI[Validated AI features]
         WF[Agent Framework stage workflow]
-        DATA[(Analytical data layer: DuckDB by default, SQLite, Databricks Unity Catalog)]
+        DATA[(Analytical data layer: DuckDB, Databricks Unity Catalog)]
         UI --> API --> RULES
         API --> AI
         RULES --> WF
@@ -274,17 +274,17 @@ Microsoft Agent Framework runs the four stages as deterministic executors; it or
 
 ## Portfolio data layer
 
-[`src/deliverytwin/data/`](src/deliverytwin/data) is a portable analytical data layer. The app runs on **DuckDB** locally, keeps SQLite as an alternative, and targets **Azure Databricks Unity Catalog / Delta** for shared, durable data. Outside [`database.py`](src/deliverytwin/data/database.py) nothing assumes a particular engine, and callers catch `DatabaseError` / `IntegrityError` instead of `sqlite3` or `duckdb` exceptions.
+[`src/deliverytwin/data/`](src/deliverytwin/data) is a portable analytical data layer. The app runs on **DuckDB** locally and targets **Azure Databricks Unity Catalog / Delta** for shared, durable data. Outside [`database.py`](src/deliverytwin/data/database.py) nothing assumes a particular engine, and callers catch `DatabaseError` / `IntegrityError` instead of `duckdb` exceptions.
 
 | Piece | Purpose |
 |---|---|
 | [`schema.py`](src/deliverytwin/data/schema.py) | One definition of the seven portfolio tables plus the application tables (`commitment_baselines`, `intake_sessions`, `recovery_scenarios` with `recovery_target_updates`, `track_snapshots`), rendered per dialect. [`databricks_ddl.sql`](src/deliverytwin/data/databricks_ddl.sql) is the generated Unity Catalog / Delta DDL; a test fails if it drifts. |
-| [`database.py`](src/deliverytwin/data/database.py) | A `Database` interface with positional `?` parameters, validated identifiers, and dialect upserts (`ON CONFLICT` on DuckDB and SQLite, `MERGE INTO` on Databricks). Adapters: `DuckDBDatabase` (persistent file or `:memory:`, one lock-guarded root with a cursor per operation so concurrent HTTP requests never collide), `SQLiteDatabase`, `DatabricksDatabase`. |
+| [`database.py`](src/deliverytwin/data/database.py) | A `Database` interface with positional `?` parameters, validated identifiers, and dialect upserts (`ON CONFLICT` on DuckDB, `MERGE INTO` on Databricks). Adapters: `DuckDBDatabase` (persistent file or `:memory:`, one lock-guarded root with a cursor per operation so concurrent HTTP requests never collide), `DatabricksDatabase`. |
 | [`connection.py`](src/deliverytwin/data/connection.py) | The engine-neutral `Connection` the rest of the app uses, dialect resolution (`--dialect`, `DELIVERYTWIN_DB_DIALECT`, Databricks when `DATABRICKS_HOST` is set, else DuckDB), and nested transactions. |
 | [`repository.py`](src/deliverytwin/data/repository.py), [`app_repository.py`](src/deliverytwin/data/app_repository.py) | Portable history access, plus `BaselineRepository`, `IntakeSessionRepository`, `TrackSnapshotRepository` and `RecoveryScenarioRepository`. SHAPE, COMMIT, TRACK, INTERVENE and the reset route read and write the four application tables only through these. |
 | [`generator.py`](src/deliverytwin/data/generator.py) | A deterministic 50-project dataset (`HIST-001`…`HIST-050`) shaped like the `delivery_intel` Delta tables, checked in under [`delivery_intelligence/`](src/deliverytwin/data/delivery_intelligence). A test fails if the files drift from the generator. |
 
-**Status.** DuckDB and SQLite are fully tested (all four application tables and the whole workflow run against both). The simulated source-system tables (Planview, Azure DevOps, ServiceNow, Oracle HCM, UKG) and the history tables are read through the same `Connection`, so in `databricks` mode they stay in a local DuckDB file and only the four application tables go to the warehouse. The Databricks adapter is tested against a fake connection and has **not been run against a live workspace**. When you have access, install `requirements-databricks.txt`, set `DATABRICKS_SERVER_HOSTNAME` (or `DATABRICKS_HOST`), `DATABRICKS_HTTP_PATH`, optionally `DATABRICKS_TOKEN` (otherwise SDK default credentials), and `DELIVERYTWIN_CATALOG` / `DELIVERYTWIN_SCHEMA` (default `dpm_dev.mlops`), then run `python -m deliverytwin databricks-smoke`. It creates a throwaway schema, loads the dataset, reads it back, writes a baseline, reports PASS/FAIL per check, and drops the schema. Use a separate schema: the dataset adds extension columns (`delivery_pattern`, `actual_duration_weeks`, `outcome`, `dependency`) that existing `delivery_intel` tables may lack.
+**Status.** DuckDB is fully tested (all four application tables and the whole workflow). The simulated source-system tables (Planview, Azure DevOps, ServiceNow, Oracle HCM, UKG) and the history tables are read through the same `Connection`, so in `databricks` mode they stay in a local DuckDB file and only the four application tables go to the warehouse. The Databricks adapter is tested against a fake connection and has **not been run against a live workspace**. When you have access, install `requirements-databricks.txt`, set `DATABRICKS_SERVER_HOSTNAME` (or `DATABRICKS_HOST`), `DATABRICKS_HTTP_PATH`, optionally `DATABRICKS_TOKEN` (otherwise SDK default credentials), and `DELIVERYTWIN_CATALOG` / `DELIVERYTWIN_SCHEMA` (default `dpm_dev.mlops`), then run `python -m deliverytwin databricks-smoke`. It creates a throwaway schema, loads the dataset, reads it back, writes a baseline, reports PASS/FAIL per check, and drops the schema. Use a separate schema: the dataset adds extension columns (`delivery_pattern`, `actual_duration_weeks`, `outcome`, `dependency`) that existing `delivery_intel` tables may lack.
 
 One DuckDB behavior to know: an upsert never rewrites a primary-key or unique column, because DuckDB turns such an update into a delete and insert that breaks foreign keys. Rows are keyed by those columns, so this only affects code that tried to re-key a row.
 
@@ -398,8 +398,8 @@ Use this only if you already run AKS. You would need to write a Deployment (1 re
 | `OPENAI_API_KEY`, `OPENAI_MODEL` | Enable the AI features; model defaults to `gpt-4o-mini` |
 | `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_DEPLOYMENT`, `AZURE_OPENAI_API_KEY`, `AZURE_OPENAI_API_VERSION` | Use Azure OpenAI before `OPENAI_API_KEY`; without a key, `DefaultAzureCredential` signs in |
 | `DELIVERYTWIN_AI_MODE=recorded` | Replay deterministic sample answers with no key or internet (takes precedence over everything else) |
-| `DELIVERYTWIN_DB_DIALECT` | `duckdb` (default), `sqlite` or `databricks` (default when `DATABRICKS_HOST` is set); `--dialect` overrides it |
-| `DELIVERYTWIN_DB_PATH` | Local database file (default `deliverytwin.duckdb` / `deliverytwin.db`) |
+| `DELIVERYTWIN_DB_DIALECT` | `duckdb` (default) or `databricks` (default when `DATABRICKS_HOST` is set); `--dialect` overrides it |
+| `DELIVERYTWIN_DB_PATH` | Local DuckDB file (default `deliverytwin.duckdb`) |
 | `DELIVERYTWIN_BLENDED_RATE` | Mock blended labor rate in USD per hour behind the recovery cost impact (default 150) |
 | `DELIVERYTWIN_SIMULATION` | Allow the simulation lab (`/api/simulate`, events, import) without demo mode |
 | `FOUNDRY_PROJECT_ENDPOINT`, `FOUNDRY_MODEL` | Use Microsoft Foundry for chat |

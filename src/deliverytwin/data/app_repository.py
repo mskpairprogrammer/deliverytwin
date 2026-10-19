@@ -2,7 +2,7 @@
 
 They replace per-dialect SQL (autoincrement ids, ``ON CONFLICT DO NOTHING``, in-place
 ``UPDATE``) with portable reads and idempotent upserts, so the same code runs on
-SQLite, DuckDB, and Delta tables.
+DuckDB and Delta tables.
 """
 from __future__ import annotations
 

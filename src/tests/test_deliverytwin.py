@@ -803,7 +803,7 @@ class DeliveryTwinTests(unittest.TestCase):
                 count = self.connection.execute(f'SELECT COUNT(*) FROM "{table}"').fetchone()[0]
                 self.assertEqual(count, 0)
         schema_tables = self.connection.execute(
-            "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'source_systems'"
+            "SELECT COUNT(*) FROM information_schema.tables WHERE table_name = 'source_systems'"
         ).fetchone()[0]
         self.assertEqual(schema_tables, 1)
         loaded = simulate_sprints(self.connection, 5, start)

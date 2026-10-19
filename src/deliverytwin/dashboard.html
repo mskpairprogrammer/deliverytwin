@@ -979,7 +979,7 @@
       byId("act-apply").disabled = persisted;
       byId("act-scenario-status").textContent = persisted
         ? `Scenario #${scenario.id} saved ${scenario.saved_at}. Simulated update records are stored locally; real external systems are unchanged.`
-        : "Preview only — no records have changed. Apply to persist these simulated updates in SQLite.";
+        : "Preview only — no records have changed. Apply to persist these simulated updates in the local database.";
     }
     function actRecommended() {
       return actAnalysis ? actAnalysis.scenarios.find((item) => item.id === actAnalysis.recommended) : null;

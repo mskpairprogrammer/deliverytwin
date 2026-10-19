@@ -36,11 +36,11 @@ from deliverytwin.recovery import (
 START = date(2026, 2, 20)
 REQUEST = "We need one view of every customer. Teams get different answers."
 ANSWERS = {"architecture": "incremental", "data": "event_sync", "security": "pii_consent", "reuse": "reuse_mdm"}
-DIALECTS = ("duckdb", "sqlite")
+DIALECTS = ("duckdb",)
 
 
 class WorkflowOnEveryDialectTests(unittest.TestCase):
-    """SHAPE -> COMMIT -> TRACK -> INTERVENE, touching all four application tables, on each local engine."""
+    """SHAPE -> COMMIT -> TRACK -> INTERVENE, touching all four application tables, on DuckDB."""
 
     def test_full_workflow_and_all_four_app_tables(self) -> None:
         for dialect in DIALECTS:
@@ -92,8 +92,12 @@ class WorkflowOnEveryDialectTests(unittest.TestCase):
 
     def test_dialect_resolution(self) -> None:
         self.assertEqual(resolve_dialect(None, {}), "duckdb")
-        self.assertEqual(resolve_dialect("sqlite", {}), "sqlite")
-        self.assertEqual(resolve_dialect(None, {"DELIVERYTWIN_DB_DIALECT": "sqlite"}), "sqlite")
+        self.assertEqual(resolve_dialect("duckdb", {}), "duckdb")
+        self.assertEqual(resolve_dialect(None, {"DELIVERYTWIN_DB_DIALECT": "duckdb"}), "duckdb")
+        with self.assertRaises(ValueError):
+            resolve_dialect("sqlite", {})
+        with self.assertRaises(ValueError):
+            resolve_dialect(None, {"DELIVERYTWIN_DB_DIALECT": "sqlite"})
         self.assertEqual(resolve_dialect(None, {"DATABRICKS_HOST": "https://adb-1.azuredatabricks.net"}), "databricks")
         self.assertEqual(resolve_dialect("duckdb", {"DATABRICKS_HOST": "https://adb-1.azuredatabricks.net"}), "duckdb")
 
@@ -103,7 +107,7 @@ class WorkflowOnEveryDialectTests(unittest.TestCase):
                 self.assertEqual(main(["--db", ":memory:", "init", "--dialect", dialect]), 0)
         for command in ("init", "seed-demo", "report", "demo", "simulate", "serve"):
             with self.subTest(command=command), self.assertRaises(SystemExit):
-                main([command, "--dialect", "oracle"])
+                main([command, "--dialect", "sqlite"])
 
 
 class DuckDbThreadSafetyTests(unittest.TestCase):

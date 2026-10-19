@@ -3,7 +3,6 @@ import http.client
 import json
 import os
 import socket
-import sqlite3
 import tempfile
 import threading
 import time
@@ -25,7 +24,6 @@ from deliverytwin.data import (
     DatabricksSettings,
     DuckDBDatabase,
     HistoryRepository,
-    SQLiteDatabase,
     generate_dataset,
     load_dataset,
     render_ddl,
@@ -67,8 +65,6 @@ class FakeConnection:
 
 
 def _backends():
-    sqlite_connection = sqlite3.connect(":memory:")
-    yield "sqlite", SQLiteDatabase(sqlite_connection)
     yield "duckdb", DuckDBDatabase()
 
 
@@ -113,8 +109,7 @@ class DatasetTests(unittest.TestCase):
 
 
 class DataLayerContractTests(unittest.TestCase):
-    def test_every_local_backend_loads_idempotently_and_returns_identical_history(self) -> None:
-        histories = {}
+    def test_the_local_backend_loads_idempotently(self) -> None:
         for name, database in _backends():
             with self.subTest(backend=name):
                 self.assertFalse(dataset_loaded(database))
@@ -125,10 +120,7 @@ class DataLayerContractTests(unittest.TestCase):
                 self.assertTrue(dataset_loaded(database))
                 count = database.query(f"SELECT COUNT(*) AS n FROM {database.table('project_estimate_summary')}")
                 self.assertEqual(count[0]["n"], 50)
-                projects = HistoryRepository(database).list_projects()
-                self.assertEqual(len(projects), 50)
-                histories[name] = projects
-        self.assertEqual(histories["sqlite"], histories["duckdb"])
+                self.assertEqual(len(HistoryRepository(database).list_projects()), 50)
 
     def test_history_repository_derives_the_matching_fields(self) -> None:
         database = DuckDBDatabase()

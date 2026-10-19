@@ -7,7 +7,6 @@ from dataclasses import dataclass
 IDENTIFIER = re.compile(r"^[a-z_][a-z0-9_]*$")
 
 TYPE_MAP = {
-    "sqlite": {"string": "TEXT", "int": "INTEGER", "double": "REAL", "date": "TEXT", "timestamp": "TEXT"},
     "duckdb": {"string": "VARCHAR", "int": "BIGINT", "double": "DOUBLE", "date": "VARCHAR", "timestamp": "VARCHAR"},
     "databricks": {"string": "STRING", "int": "BIGINT", "double": "DOUBLE", "date": "DATE", "timestamp": "TIMESTAMP"},
 }
@@ -106,7 +105,7 @@ TABLES: dict[str, Table] = {
 
 
 # Tables the application itself writes (not loaded from the CSV dataset). All four go through the portable
-# repositories in app_repository.py, so they run unchanged on DuckDB, SQLite and Databricks (Delta).
+# repositories in app_repository.py, so they run unchanged on DuckDB and Databricks (Delta).
 APP_TABLES: dict[str, Table] = {
     table.name: table
     for table in (

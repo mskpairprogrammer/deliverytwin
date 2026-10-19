@@ -170,7 +170,7 @@ def _ensure_project_history_columns(connection: Connection) -> None:
         raise IntakeError("Historical projects are not loaded. Seed the demo data and try again.")
     for name, declaration in _PROJECT_HISTORY_COLUMNS.items():
         if name not in columns:
-            kind = "DOUBLE" if declaration == "REAL" and connection.dialect != "sqlite" else declaration
+            kind = "DOUBLE" if declaration == "REAL" else declaration
             connection.execute(f"ALTER TABLE historical_projects ADD COLUMN {name} {kind}")
 
 

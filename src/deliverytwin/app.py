@@ -1379,12 +1379,11 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Synthetic Delivery Twin source-system demo")
     parser.add_argument(
         "--db", default=None,
-        help="Database file (default: deliverytwin.duckdb for DuckDB, deliverytwin.db for SQLite; "
-             "DELIVERYTWIN_DB_PATH overrides)",
+        help="DuckDB database file (default: deliverytwin.duckdb; DELIVERYTWIN_DB_PATH overrides)",
     )
     engine = argparse.ArgumentParser(add_help=False)
     engine.add_argument(
-        "--dialect", choices=("duckdb", "sqlite", "databricks"), default=None,
+        "--dialect", choices=("duckdb", "databricks"), default=None,
         help="Database engine (default: DELIVERYTWIN_DB_DIALECT, else databricks when DATABRICKS_HOST is set, "
              "else duckdb). With databricks the simulated source records stay in a local DuckDB file and the "
              "application tables use the Databricks warehouse.",
@@ -1413,7 +1412,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     data_parser.add_argument("--out", default=None, help="Output directory (default: packaged dataset)")
     ddl_parser = subparsers.add_parser("ddl", help="Print table DDL for a SQL dialect")
-    ddl_parser.add_argument("--dialect", choices=("databricks", "duckdb", "sqlite"), default="databricks")
+    ddl_parser.add_argument("--dialect", choices=("databricks", "duckdb"), default="databricks")
     ddl_parser.add_argument("--catalog", default="dpm_dev")
     ddl_parser.add_argument("--schema", default="mlops")
     subparsers.add_parser(

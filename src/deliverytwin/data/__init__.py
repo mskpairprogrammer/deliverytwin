@@ -6,7 +6,6 @@ from .database import (
     DatabricksSettings,
     DuckDBDatabase,
     IntegrityError,
-    SQLiteDatabase,
     open_database,
 )
 from .app_repository import (
@@ -24,6 +23,6 @@ __all__ = [
     "BaselineRepository", "Connection", "IntakeSessionRepository", "RecoveryScenarioRepository",
     "TrackSnapshotRepository", "ALL_TABLES", "APP_TABLES", "DATASET_DIR", "Database", "DatabaseError",
     "DatabricksDatabase", "DatabricksSettings", "DuckDBDatabase", "HistoryRepository", "IntegrityError",
-    "SQLiteDatabase", "TABLES", "connect", "dataset_loaded", "default_database_path", "generate_dataset",
+    "TABLES", "connect", "dataset_loaded", "default_database_path", "generate_dataset",
     "load_dataset", "open_database", "render_ddl", "resolve_dialect", "write_dataset",
 ]
