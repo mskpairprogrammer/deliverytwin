@@ -9,10 +9,10 @@ import os
 import sqlite3
 from contextlib import contextmanager, nullcontext
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 from typing import Any, Iterable, Iterator, Sequence
 
-from .schema import TABLES, check_identifier, render_create_table
+from .schema import ALL_TABLES, TABLES, check_identifier, render_create_table
 
 
 class Database:
@@ -27,7 +27,7 @@ class Database:
         return nullcontext()
 
     def table(self, name: str) -> str:
-        if name not in TABLES:
+        if name not in ALL_TABLES:
             raise ValueError(f"Unknown table: {name!r}")
         parts = [part for part in (self.catalog, self.schema) if part]
         return ".".join([*map(check_identifier, parts), name])
@@ -41,8 +41,8 @@ class Database:
     def close(self) -> None:
         raise NotImplementedError
 
-    def create_tables(self) -> None:
-        for table in TABLES.values():
+    def create_tables(self, include_app: bool = True) -> None:
+        for table in (ALL_TABLES if include_app else TABLES).values():
             self.execute(render_create_table(table, self.dialect, self.table(table.name)))
 
     def coerce(self, column_type: str, value: Any) -> Any:
@@ -52,12 +52,14 @@ class Database:
             return int(float(value))
         if column_type == "double":
             return float(value)
-        if column_type == "date" and self.dialect == "databricks":
+        if self.dialect == "databricks" and column_type == "date":
             return date.fromisoformat(str(value))
-        return str(value) if column_type in ("string", "date") else value
+        if self.dialect == "databricks" and column_type == "timestamp":
+            return datetime.fromisoformat(str(value))
+        return str(value) if column_type in ("string", "date", "timestamp") else value
 
     def upsert(self, table_name: str, rows: Iterable[dict[str, Any]]) -> int:
-        table = TABLES[table_name]
+        table = ALL_TABLES[table_name]
         columns = [column.name for column in table.columns]
         types = {column.name: column.type for column in table.columns}
         count = 0

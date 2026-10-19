@@ -7,9 +7,9 @@ from dataclasses import dataclass
 IDENTIFIER = re.compile(r"^[a-z_][a-z0-9_]*$")
 
 TYPE_MAP = {
-    "sqlite": {"string": "TEXT", "int": "INTEGER", "double": "REAL", "date": "TEXT"},
-    "duckdb": {"string": "VARCHAR", "int": "BIGINT", "double": "DOUBLE", "date": "VARCHAR"},
-    "databricks": {"string": "STRING", "int": "BIGINT", "double": "DOUBLE", "date": "DATE"},
+    "sqlite": {"string": "TEXT", "int": "INTEGER", "double": "REAL", "date": "TEXT", "timestamp": "TEXT"},
+    "duckdb": {"string": "VARCHAR", "int": "BIGINT", "double": "DOUBLE", "date": "VARCHAR", "timestamp": "VARCHAR"},
+    "databricks": {"string": "STRING", "int": "BIGINT", "double": "DOUBLE", "date": "DATE", "timestamp": "TIMESTAMP"},
 }
 
 
@@ -105,6 +105,54 @@ TABLES: dict[str, Table] = {
 }
 
 
+# Tables the application itself writes (not loaded from the CSV dataset). They mirror the
+# SQLite tables in schema.sql so the Databricks migration has a target for each of them;
+# the application does not read or write these through the data layer yet.
+APP_TABLES: dict[str, Table] = {
+    table.name: table
+    for table in (
+        Table(
+            "commitment_baselines",
+            _cols(
+                "baseline_id:int request_text:string answers_json:string fingerprint_json:string "
+                "p50_hours:double p80_hours:double integration_buffer_pct:double "
+                "allocated_fte:double capacity_fte:double target_date:date "
+                "confidence_pct:double approved_at:timestamp"
+            ),
+            ("baseline_id",),
+            "Human-approved COMMIT baselines.",
+        ),
+        Table(
+            "intake_sessions",
+            _cols("session_id:string started_at:timestamp first_rom_at:timestamp approved_at:timestamp"),
+            ("session_id",),
+            "Anonymous intake timing; no request text or document content.",
+        ),
+        Table(
+            "recovery_scenarios",
+            _cols(
+                "scenario_id:int initiative_id:string recommended_option:string allocated_fte:double "
+                "scope_defer_pct:int target_date:date incremental_cost_k:double "
+                "confidence_pct:int saved_at:timestamp"
+            ),
+            ("scenario_id",),
+            "INTERVENE scenarios saved after a what-if preview.",
+        ),
+        Table(
+            "track_snapshots",
+            _cols(
+                "snapshot_id:string initiative_id:string sprint_number:int as_of:date "
+                "on_time_pct:double projected_slip_days:int unplanned_story_points:int "
+                "support_hours_per_week:double captured_at:timestamp"
+            ),
+            ("snapshot_id",),
+            "New: one TRACK outlook per sprint for trend history.",
+        ),
+    )
+}
+ALL_TABLES: dict[str, Table] = {**TABLES, **APP_TABLES}
+
+
 def check_identifier(name: str) -> str:
     if not IDENTIFIER.match(name):
         raise ValueError(f"Unsafe SQL identifier: {name!r}")
@@ -129,7 +177,7 @@ def render_create_table(table: Table, dialect: str, qualified_name: str | None =
 def render_ddl(dialect: str, catalog: str | None = None, schema: str | None = None) -> str:
     prefix = ".".join(check_identifier(part) for part in (catalog, schema) if part)
     statements = []
-    for table in TABLES.values():
+    for table in ALL_TABLES.values():
         target = f"{prefix}.{table.name}" if prefix else table.name
         statements.append(render_create_table(table, dialect, target) + ";")
     return "\n\n".join(statements) + "\n"

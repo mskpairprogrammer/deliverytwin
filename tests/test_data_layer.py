@@ -8,7 +8,7 @@ import tempfile
 import threading
 import time
 import unittest
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 from unittest.mock import patch
 
@@ -16,6 +16,8 @@ from deliverytwin import connect, initialize_database, seed_demo
 from deliverytwin.app import _is_loopback, serve_dashboard
 from deliverytwin.data import (
     DATASET_DIR,
+    ALL_TABLES,
+    APP_TABLES,
     TABLES,
     DatabricksDatabase,
     DatabricksSettings,
@@ -165,6 +167,59 @@ class DataLayerContractTests(unittest.TestCase):
         self.assertEqual(database.query(f"SELECT COUNT(*) AS n FROM {database.table('project_intakes')}")[0]["n"], 0)
 
 
+class AppTableTests(unittest.TestCase):
+    ROW = {
+        "commitment_baselines": {
+            "baseline_id": 1, "request_text": "r", "answers_json": "{}", "fingerprint_json": "{}",
+            "p50_hours": 4650, "p80_hours": 5750, "integration_buffer_pct": 19,
+            "allocated_fte": 7.0, "capacity_fte": 8.5, "target_date": "2027-03-31",
+            "confidence_pct": 62.2, "approved_at": "2026-10-19T02:29:25+00:00",
+        },
+        "intake_sessions": {
+            "session_id": "s-1", "started_at": "2026-10-19T02:00:00+00:00",
+            "first_rom_at": "2026-10-19T02:05:00+00:00", "approved_at": None,
+        },
+        "recovery_scenarios": {
+            "scenario_id": 1, "initiative_id": "x", "recommended_option": "C", "allocated_fte": 7.0,
+            "scope_defer_pct": 10, "target_date": "2027-03-31", "incremental_cost_k": 0,
+            "confidence_pct": 48, "saved_at": "2026-10-19T02:29:25+00:00",
+        },
+        "track_snapshots": {
+            "snapshot_id": "t-1", "initiative_id": "x", "sprint_number": 1, "as_of": "2026-11-01",
+            "on_time_pct": 53, "projected_slip_days": 21, "unplanned_story_points": 16,
+            "support_hours_per_week": 4, "captured_at": "2026-11-01T09:00:00+00:00",
+        },
+    }
+
+    def test_every_app_table_round_trips_on_the_local_backends(self) -> None:
+        self.assertEqual(set(self.ROW), set(APP_TABLES))
+        self.assertFalse(set(APP_TABLES) & set(TABLES))
+        for backend, database in _backends():
+            with self.subTest(backend=backend):
+                database.create_tables()
+                for name, row in self.ROW.items():
+                    database.upsert(name, [row])
+                    database.upsert(name, [row])
+                    rows = database.query(f"SELECT * FROM {database.table(name)}")
+                    self.assertEqual(len(rows), 1, name)
+                    self.assertEqual(rows[0][APP_TABLES[name].key[0]], row[APP_TABLES[name].key[0]])
+
+    def test_dataset_loading_does_not_create_app_tables(self) -> None:
+        database = DuckDBDatabase()
+        load_dataset(database)
+        names = {row["table_name"] for row in database.query("SELECT table_name FROM information_schema.tables")}
+        self.assertTrue(set(TABLES) <= names)
+        self.assertFalse(set(APP_TABLES) & names)
+
+    def test_databricks_binds_timestamps_as_datetimes(self) -> None:
+        connection = FakeConnection()
+        database = DatabricksDatabase(DatabricksSettings("h", "/p"), connection)
+        database.upsert("intake_sessions", [self.ROW["intake_sessions"]])
+        _, params = connection.log[-1]
+        self.assertIsInstance(params[1], datetime)
+        self.assertIsNone(params[3])
+
+
 class DatabricksAdapterTests(unittest.TestCase):
     def setUp(self) -> None:
         self.connection = FakeConnection()
@@ -176,7 +231,7 @@ class DatabricksAdapterTests(unittest.TestCase):
     def test_ddl_is_unity_catalog_delta(self) -> None:
         self.database.create_tables()
         statements = [sql for sql, _ in self.connection.log]
-        self.assertEqual(len(statements), len(TABLES))
+        self.assertEqual(len(statements), len(ALL_TABLES))
         self.assertTrue(all("USING DELTA" in sql for sql in statements))
         self.assertTrue(all(sql.startswith("CREATE TABLE IF NOT EXISTS dpm_dev.mlops.") for sql in statements))
         self.assertTrue(any("submitted_date DATE" in sql for sql in statements))

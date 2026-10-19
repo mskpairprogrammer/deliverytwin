@@ -18,7 +18,7 @@ def read_csv_rows(table_name: str, directory: Path | str = DATASET_DIR) -> list[
 
 def load_dataset(db: Database, directory: Path | str = DATASET_DIR) -> dict[str, int]:
     """Create the portfolio tables if needed and idempotently upsert every CSV row."""
-    db.create_tables()
+    db.create_tables(include_app=False)
     with db.batch():
         return {name: db.upsert(name, read_csv_rows(name, directory)) for name in TABLES}
 

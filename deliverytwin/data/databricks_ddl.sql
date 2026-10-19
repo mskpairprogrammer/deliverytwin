@@ -100,3 +100,61 @@ CREATE TABLE IF NOT EXISTS dpm_dev.mlops.project_lessons (
 )
 USING DELTA
 COMMENT 'Extension: lesson per clarification category and the option it supports.';
+
+CREATE TABLE IF NOT EXISTS dpm_dev.mlops.commitment_baselines (
+  baseline_id BIGINT NOT NULL,
+  request_text STRING,
+  answers_json STRING,
+  fingerprint_json STRING,
+  p50_hours DOUBLE,
+  p80_hours DOUBLE,
+  integration_buffer_pct DOUBLE,
+  allocated_fte DOUBLE,
+  capacity_fte DOUBLE,
+  target_date DATE,
+  confidence_pct DOUBLE,
+  approved_at TIMESTAMP,
+  PRIMARY KEY (baseline_id)
+)
+USING DELTA
+COMMENT 'Human-approved COMMIT baselines.';
+
+CREATE TABLE IF NOT EXISTS dpm_dev.mlops.intake_sessions (
+  session_id STRING NOT NULL,
+  started_at TIMESTAMP,
+  first_rom_at TIMESTAMP,
+  approved_at TIMESTAMP,
+  PRIMARY KEY (session_id)
+)
+USING DELTA
+COMMENT 'Anonymous intake timing; no request text or document content.';
+
+CREATE TABLE IF NOT EXISTS dpm_dev.mlops.recovery_scenarios (
+  scenario_id BIGINT NOT NULL,
+  initiative_id STRING,
+  recommended_option STRING,
+  allocated_fte DOUBLE,
+  scope_defer_pct BIGINT,
+  target_date DATE,
+  incremental_cost_k DOUBLE,
+  confidence_pct BIGINT,
+  saved_at TIMESTAMP,
+  PRIMARY KEY (scenario_id)
+)
+USING DELTA
+COMMENT 'INTERVENE scenarios saved after a what-if preview.';
+
+CREATE TABLE IF NOT EXISTS dpm_dev.mlops.track_snapshots (
+  snapshot_id STRING NOT NULL,
+  initiative_id STRING,
+  sprint_number BIGINT,
+  as_of DATE,
+  on_time_pct DOUBLE,
+  projected_slip_days BIGINT,
+  unplanned_story_points BIGINT,
+  support_hours_per_week DOUBLE,
+  captured_at TIMESTAMP,
+  PRIMARY KEY (snapshot_id)
+)
+USING DELTA
+COMMENT 'New: one TRACK outlook per sprint for trend history.';
