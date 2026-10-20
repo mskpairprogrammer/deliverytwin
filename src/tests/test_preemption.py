@@ -110,7 +110,11 @@ class PreemptionTests(unittest.TestCase):
             "reclaimed_hours": 400, "residual_hours": 0, "cost_usd": 12000,
         })
         self.assertEqual(planned_loss_hours(), 400)
-        self.assertEqual(analysis["recommended"], "hybrid_replan")
+        self.assertEqual(by_id["resequence"]["levers"], {
+            "deferred_hours": 400, "borrowed_fte": 0.0, "backfill_fte": 0.0,
+            "reclaimed_hours": 400, "residual_hours": 0, "cost_usd": 0,
+        })
+        self.assertIsNone(by_id["resequence"]["donor_impact"])
         self.assertEqual(analysis["scenarios"][0]["id"], "hybrid_replan")
         self.assertGreater(by_id["hybrid_replan"]["predicted_on_time_pct"], by_id["cross_portfolio"]["predicted_on_time_pct"])
         self.assertEqual(by_id["cross_portfolio"]["predicted_on_time_pct"], by_id["backfill"]["predicted_on_time_pct"])

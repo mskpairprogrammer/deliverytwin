@@ -33,7 +33,7 @@ DONOR = "PRJ-024"
 BORROW_FTE = 2.0
 POINTS_PER_PREEMPTED_HOUR = 0.05
 POINTS_PER_DEFERRED_HOUR = 0.02
-MAX_RESEQUENCE_HOURS = 120
+HYBRID_DEFER_HOURS = 120  # the composed plan defers only a prudent share, then fills the rest with capacity
 BACKFILL_PRODUCTIVITY = 0.8
 FTE_LOT = 0.5
 OPTION_ORDER = ("resequence", "cross_portfolio", "backfill", "hybrid_replan")
@@ -125,8 +125,11 @@ def _plan(kind: str, loss_hours: int) -> dict[str, Any]:
     headroom = max(0.0, donor["fte"] - donor["floor_fte"])
     deferred = borrowed = backfill = 0.0
     remaining = float(loss_hours)
-    if kind in ("resequence", "hybrid_replan"):
-        deferred = float(min(remaining, MAX_RESEQUENCE_HOURS))
+    if kind == "resequence":
+        deferred = remaining  # a pure re-sequence may defer every preempted hour
+        remaining = 0.0
+    elif kind == "hybrid_replan":
+        deferred = float(min(remaining, HYBRID_DEFER_HOURS))
         remaining -= deferred
     if kind == "cross_portfolio":
         borrowed = min(BORROW_FTE, headroom)
