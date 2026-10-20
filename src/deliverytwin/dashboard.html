@@ -422,6 +422,24 @@
     .rp-status-bottleneck, .rp-status-unstaffed { color: #c8452f; font-weight: 800; }
     .rp-status-tight { color: #8a5a00; font-weight: 800; }
     .rp-note { font-size: 11px; color: var(--muted); }
+    .pi-swimlane, .pi-replan { margin: 12px 0; }
+    .pi-table-wrap { overflow-x: auto; }
+    .pi-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .pi-table th, .pi-table td { border: 1px solid var(--line); padding: 6px 8px; text-align: center; vertical-align: middle; }
+    .pi-table th:first-child, .pi-table td:first-child { text-align: left; min-width: 190px; }
+    .pi-table th.hit { background: #fdecea; color: #a8321f; }
+    .pi-table th.now { box-shadow: inset 0 -3px 0 var(--teal); }
+    .pi-cell.collision { background: #fdecea; color: #a8321f; font-weight: 800; }
+    .pi-cell.watch { background: #fff4e5; color: #8a5a00; font-weight: 700; }
+    .pi-cell.idle { color: var(--muted); }
+    .pi-cell.work { background: #eaf6f2; }
+    .pi-cell.work.hit { background: #fff4e5; }
+    .pi-cell.next { background: #fff4e5; color: #8a5a00; font-weight: 700; }
+    .pi-tier { display: inline-block; font-size: 9px; font-weight: 800; padding: 1px 6px; border-radius: 999px; background: #eef2f6; margin-left: 6px; }
+    .pi-tier.P0 { background: #fdecea; color: #a8321f; }
+    .pi-status { display: block; font-size: 10px; font-weight: 800; }
+    .pi-status.shifted, .pi-status.next_pi, .pi-status.partly_next_pi { color: #8a5a00; }
+    .pi-pick select { margin-left: 6px; }
     .src-note { display: block; font-size: 10px; color: var(--muted); }
     .src-quote { display: block; font-size: 10px; color: var(--muted); font-style: italic; }
     .variant-toggle { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0; }
@@ -691,8 +709,14 @@
       <div class="lineage" id="track-lineage"></div>
       <div class="sim-bar">
         <button id="sim-run" class="intake-btn primary" type="button">Simulate next sprint</button>
+        <button id="sim-preempt" class="intake-btn" type="button" title="Inject a synthetic P0 project that preempts 2.5 FTE in Sprints 3-4">⚡ Simulate P0 Project Preemption (PI Conflict)</button>
         <span id="sim-status" class="sim-status" role="status"></span>
       </div>
+      <section class="card pi-swimlane" id="pi-swimlane" aria-labelledby="pi-swimlane-title" hidden>
+        <div class="card-head"><div><h3 class="step-title" id="pi-swimlane-title">Quarterly PI portfolio swimlane · Sprints 1–6</h3><div class="card-kicker" id="pi-swimlane-kicker"></div></div><span class="badge" id="pi-swimlane-badge">PI CONFLICT</span></div>
+        <div id="pi-swimlane-table" class="pi-table-wrap"></div>
+        <p class="rp-note" id="pi-swimlane-note"></p>
+      </section>
       <details class="sim-lab" id="sim-lab">
         <summary>Simulation lab · scenarios, events and file import</summary>
         <p class="step-help">No source system is connected. Choose a scripted scenario, inject an event for the current sprint, or import exports a person downloaded from Azure DevOps, ServiceNow or UKG.</p>
@@ -810,6 +834,12 @@
           <div class="prediction-source" id="act-source"></div>
           <p class="prediction-headline" id="act-diagnosis"></p>
           <div class="rec-grid" id="act-options"></div>
+          <section class="pi-replan" id="pi-replan" aria-labelledby="pi-replan-title" hidden>
+            <div class="ai-review-head"><h4 class="step-title" id="pi-replan-title">PI Sprint Re-Plan Matrix · Sprints 1–6</h4><label class="pi-pick">Plan <select id="pi-replan-select"></select></label></div>
+            <p class="step-help" id="pi-replan-intro"></p>
+            <div id="pi-replan-table" class="pi-table-wrap"></div>
+            <p class="rp-note" id="pi-replan-summary"></p>
+          </section>
           <div class="intake-actions"><button id="act-reanalyze" class="intake-btn" type="button">Re-run AI analysis</button></div>
           <p class="approval-note" id="act-note">The recommendation is advisory. No option is approved and no source-system write-back occurs.</p>
         </section>
@@ -932,11 +962,14 @@
         ...(scenario.cost_impact ? [metric(scenario.cost_impact.label, "Estimated cost impact")] : []),
       );
       if (prediction) {
+        const portfolioModel = prediction.source === "portfolio_rules";
         const generated = prediction.source === "llm";
         const header = el("div", "prediction-source");
         header.append(
-          el("span", `source-pill ${generated ? "llm" : "fallback"}`, generated ? `AI PREDICTION · ${prediction.model || "model"}` : "CAPACITY-MODEL ESTIMATE · AI UNAVAILABLE"),
-          el("span", "", generated
+          el("span", `source-pill ${generated || portfolioModel ? "llm" : "fallback"}`, portfolioModel ? "PORTFOLIO PLANNING MODEL · DETERMINISTIC" : generated ? `AI PREDICTION · ${prediction.model || "model"}` : "CAPACITY-MODEL ESTIMATE · AI UNAVAILABLE"),
+          el("span", "", portfolioModel
+            ? "Computed by code from the synthetic portfolio records; no AI is involved."
+            : generated
             ? `Capacity-model cross-check: ${scenario.model_check_pct}%`
             : aiUnavailableText(prediction.fallback_reason, "the capacity-versus-load estimate")),
         );
@@ -988,10 +1021,13 @@
       const analysis = actAnalysis;
       if (!analysis) return;
       const generated = analysis.source === "llm";
+      const portfolioModel = analysis.source === "portfolio_rules";
       const source = byId("act-source");
       source.replaceChildren(
-        el("span", `source-pill ${generated ? "llm" : "fallback"}`, generated ? `AI RECOVERY ANALYSIS · ${analysis.model}` : "RULES-BASED OPTIONS · AI UNAVAILABLE"),
-        el("span", "", generated
+        el("span", `source-pill ${generated || portfolioModel ? "llm" : "fallback"}`, portfolioModel ? "PORTFOLIO RE-PLAN · DETERMINISTIC" : generated ? `AI RECOVERY ANALYSIS · ${analysis.model}` : "RULES-BASED OPTIONS · AI UNAVAILABLE"),
+        el("span", "", portfolioModel
+          ? "A P0 preemption is active. Capacity, cost, donor impact and sprint placement are computed by code from synthetic portfolio records."
+          : generated
           ? `Scenarios are validated against capacity, date, scope, and budget limits before they are shown.${analysis.dropped_scenarios ? ` ${analysis.dropped_scenarios} proposed scenario(s) outside those limits were removed.` : ""}`
           : aiUnavailableText(analysis.fallback_reason, "rules-based options")),
       );
@@ -1023,9 +1059,13 @@
         card.append(title, el("div", "", scenario.summary), metrics, el("small", "", scenario.commentary));
         if (scenario.trade_offs.length) card.append(el("strong", "", "Trade-offs"), list(scenario.trade_offs));
         if (scenario.risks.length) card.append(el("strong", "", "Risks"), list(scenario.risks));
-        card.append(el("small", "", `Capacity-model check: ${scenario.model_check_pct}%`), button);
+        if (!portfolioModel) card.append(el("small", "", `Capacity-model check: ${scenario.model_check_pct}%`));
+        card.append(button);
+        card.dataset.scenario = scenario.id;
         return card;
       }));
+      const saved = currentReport && currentReport.recovery_scenario;
+      renderPiPlan(analysis, saved && analysis.scenarios.some((item) => item.id === saved.recommended_option) ? saved.recommended_option : analysis.recommended);
       updateJourney();
     }
     async function loadActAnalysis(force = false) {
@@ -1056,7 +1096,108 @@
         byId("act-reanalyze").disabled = false;
       }
     }
+    let actPortfolioOption = null;
+    const PI_STATUS_TEXT = {
+      shifted: (row) => `Shifts S${row.baseline_span[1]} → S${row.end_sprint}`,
+      pulled_in: (row) => `Pulled in S${row.baseline_span[1]} → S${row.end_sprint}`,
+      next_pi: () => "Moves to Next PI",
+      partly_next_pi: () => "Partly moves to Next PI",
+    };
+    function piTable(sprints, hitSprints, nowSprint, firstHeader) {
+      const table = el("table", "pi-table");
+      const head = el("tr");
+      head.append(el("th", "", firstHeader), ...sprints.map((sprint) => {
+        const th = el("th", `${hitSprints.includes(sprint) ? "hit" : ""}${sprint === nowSprint ? " now" : ""}`.trim(), `S${sprint}${hitSprints.includes(sprint) ? " ⚠" : ""}`);
+        if (sprint === nowSprint) th.title = "Current sprint";
+        return th;
+      }));
+      return { table, head };
+    }
+    function renderSwimlane(portfolio) {
+      const section = byId("pi-swimlane");
+      if (!portfolio || !portfolio.active) { section.hidden = true; return; }
+      const pre = portfolio.preemption;
+      byId("pi-swimlane-kicker").textContent =
+        `${pre.id} ${pre.name} preempts ${pre.fte} FTE in Sprints ${pre.sprints.join("–")} · ${pre.planned_loss_hours} h of capacity · ${pre.lost_hours_so_far} h lost so far`;
+      const { table, head } = piTable(portfolio.sprints, portfolio.collision_sprints, portfolio.current_sprint, "Project");
+      const thead = el("thead"); thead.append(head);
+      const body = el("tbody");
+      portfolio.projects.forEach((project) => {
+        const row = el("tr");
+        const label = el("td");
+        label.append(el("strong", "", project.id === "CURRENT" ? project.name : `${project.id} ${project.name}`), el("span", `pi-tier ${project.tier}`, project.tier));
+        if (project.role === "current") label.append(el("div", "rp-note", "This project"));
+        row.append(label);
+        project.cells.forEach((cell) => {
+          const td = el("td", `pi-cell ${cell.status}`);
+          td.dataset.status = cell.status;
+          let text = cell.status === "idle" ? "—" : `${cell.effective_fte.toFixed(1)} FTE`;
+          if (cell.status === "collision" && project.role === "current") text = `${cell.effective_fte.toFixed(1)} of ${cell.planned_fte.toFixed(1)} FTE ⚠`;
+          else if (cell.status === "collision") text = `${text} ⚠`;
+          td.textContent = text;
+          row.append(td);
+        });
+        body.append(row);
+      });
+      table.append(thead, body);
+      byId("pi-swimlane-table").replaceChildren(table);
+      byId("pi-swimlane-note").textContent = portfolio.note;
+      section.hidden = false;
+    }
+    function renderPiPlan(analysis, planId) {
+      const section = byId("pi-replan");
+      const bundle = analysis && analysis.portfolio;
+      if (!bundle || !bundle.pi_plans || !bundle.pi_plans.baseline) { section.hidden = true; return; }
+      const choices = [
+        ["baseline", "Original plan (no preemption)", bundle.pi_plans.baseline],
+        ["preempted", "No action · preempted", bundle.pi_plans.preempted],
+        ...analysis.scenarios.map((scenario) => [scenario.id, scenario.title + (scenario.id === analysis.recommended ? " · recommended" : ""), scenario.pi_plan]),
+      ];
+      const select = byId("pi-replan-select");
+      if (!select.dataset.ready || select.dataset.for !== String(analysis.scenarios.map((s) => s.id))) {
+        select.replaceChildren(...choices.map(([id, label]) => { const option = el("option", "", label); option.value = id; return option; }));
+        select.dataset.ready = "1";
+        select.dataset.for = String(analysis.scenarios.map((s) => s.id));
+      }
+      const chosen = choices.find(([id]) => id === planId) || choices.find(([id]) => id === analysis.recommended);
+      select.value = chosen[0];
+      const plan = chosen[2];
+      const hit = bundle.preemption.sprints;
+      const { table, head } = piTable(plan.sprints, hit, currentReport && currentReport.simulation ? currentReport.simulation.sprints_advanced : null, "Feature");
+      head.append(el("th", "", "Next PI"));
+      const thead = el("thead"); thead.append(head);
+      const body = el("tbody");
+      plan.features.forEach((row) => {
+        const tr = el("tr");
+        const label = el("td");
+        label.append(el("strong", "", row.title));
+        const status = row.status && PI_STATUS_TEXT[row.status];
+        if (status) label.append(el("span", `pi-status ${row.status}`, status(row)));
+        tr.append(label);
+        tr.dataset.status = row.status || "unchanged";
+        row.hours_by_sprint.forEach((hours, index) => {
+          const td = el("td", `pi-cell ${hours ? "work" : ""}${hit.includes(index + 1) ? " hit" : ""}`, hours ? `${hours} h` : "");
+          tr.append(td);
+        });
+        tr.append(el("td", `pi-cell ${row.next_pi_hours ? "next" : ""}`, row.next_pi_hours ? `${row.next_pi_hours} h` : ""));
+        body.append(tr);
+      });
+      const capacity = el("tr");
+      capacity.append(el("td", "", "Team capacity (h)"), ...plan.capacity_hours.map((hours, index) =>
+        el("td", `pi-cell ${hit.includes(index + 1) ? "collision" : ""}`, `${hours} h`)), el("td"));
+      body.append(capacity);
+      table.append(thead, body);
+      byId("pi-replan-table").replaceChildren(table);
+      const summary = plan.summary || { shifted: 0, moved_to_next_pi: 0, next_pi_hours: plan.features.reduce((sum, row) => sum + row.next_pi_hours, 0) };
+      byId("pi-replan-intro").textContent =
+        "Approved Azure DevOps Features placed into sprints by capacity, in backlog order. Hours that do not fit show as Next PI; Sprints 3–4 carry the P0 collision.";
+      byId("pi-replan-summary").textContent =
+        `${chosen[1]}: ${summary.shifted} Feature(s) shift sprint · ${summary.moved_to_next_pi} move (partly) to Next PI · ${summary.next_pi_hours.toLocaleString()} h in Next PI.`;
+      section.hidden = false;
+    }
     function selectActScenario(scenario, button) {
+      actPortfolioOption = scenario.portfolio_option || null;
+      if (actAnalysis) renderPiPlan(actAnalysis, scenario.id);
       byId("act-fte").value = scenario.allocated_fte;
       byId("act-target-date").value = scenario.target_date;
       byId("act-cost").value = scenario.incremental_cost_k;
@@ -1086,6 +1227,7 @@
         scope_defer_pct: Number(byId("act-scope-defer").value),
         incremental_cost_k: Number(byId("act-cost").value),
       };
+      if (actPortfolioOption) body.portfolio_option = actPortfolioOption;
       const echoed = reuse || (path === "/api/act/apply" ? actLastPrediction : null);
       if (echoed) body.prediction = echoed;
       byId("act-scenario-status").textContent = echoed ? "Applying…" : "Asking the AI to predict this scenario…";
@@ -1197,12 +1339,15 @@
         updateJourney();
         document.body.dataset.sim = report.simulated ? "true" : "false";
         if (!report.simulated) {
+          byId("initiative-name").textContent = "Delivery Twin";
+          byId("portfolio-label").textContent = "Portfolio";
           byId("workflow-status").textContent = "NO SPRINT DATA YET";
           byId("as-of").textContent = "BEFORE KICKOFF";
           byId("shape-stage-status").textContent = "NO DEMO DATA";
           byId("updated").textContent = `Updated ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
           byId("error").style.display = "none";
           renderTrackLineage(null);
+          renderSwimlane(null);
           loadSimCatalog();
           return;
         }
@@ -1256,6 +1401,7 @@
           byId("act-scenario-status").textContent = "";
         }
         byId("sense-capacity").textContent = `${signals.allocated_fte.toFixed(1)} / ${signals.capacity_fte.toFixed(1)} FTE`;
+        renderSwimlane(report.portfolio);
         byId("sense-support").textContent = `${signals.lead_production_support_hours_per_week} h / week`;
         byId("sense-pto").textContent = `${signals.lead_approved_pto_hours} h`;
         byId("support-hours").textContent = `${signals.lead_production_support_hours_per_week}h`;
@@ -1298,6 +1444,7 @@
     });
     ["act-fte", "act-target-date", "act-cost"].forEach((id) => {
       byId(id).addEventListener("input", () => {
+        actPortfolioOption = null;
         byId("act-apply").disabled = true;
         byId("act-what-if-results").hidden = true;
         byId("act-scenario-status").textContent = "Inputs changed — preview the scenario again.";
@@ -1334,6 +1481,13 @@
     }
     byId("sim-run").addEventListener("click", () =>
       runSimulation({ next_sprint: true }, "Advanced:"));
+    byId("sim-preempt").addEventListener("click", async () => {
+      await runSimulation({ preempt: true }, "P0 preemption injected:");
+      actAnalysis = null;
+    });
+    byId("pi-replan-select").addEventListener("change", (event) => {
+      if (actAnalysis) renderPiPlan(actAnalysis, event.target.value);
+    });
     byId("clear-all-data").addEventListener("click", async (event) => {
       if (!window.confirm("Permanently delete all demo source rows, intake approvals, and simulation state from the local database? The schema will remain. You can reload synthetic data one sprint at a time with Simulate next sprint.")) return;
       const button = event.currentTarget;
@@ -1533,6 +1687,8 @@
         "INTERVENE recommends recovery options against the approved commitment. Approve a baseline in COMMIT, then simulate a sprint in TRACK.");
       const simulate = byId("sim-run");
       simulate.disabled = !ready || (simCatalog && simCatalog.scenario === "import");
+      byId("sim-preempt").disabled = simulate.disabled;
+      byId("sim-preempt").title = simulate.disabled ? "Approve a baseline in COMMIT first (and use a scripted scenario)." : "Inject a synthetic P0 project that preempts 2.5 FTE in Sprints 3-4";
       simulate.title = !ready ? "Approve a baseline in COMMIT first."
         : (simCatalog && simCatalog.scenario === "import" ? "Imported data is a snapshot. Apply a scenario or import new exports." : "");
     }

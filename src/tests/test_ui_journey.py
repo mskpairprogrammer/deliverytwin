@@ -414,6 +414,51 @@ class JourneyUiTests(unittest.TestCase):
         self.assertRegex(roi, r"[−+]\d+% spread")
         self.assertRegex(roi, r"\d+ flagged · \d+ stated")
 
+    def test_p0_preemption_shows_the_swimlane_and_a_portfolio_aware_replan(self) -> None:
+        page = self.page
+        self.run_shape_to_commit()
+        self.approve_and_simulate()
+        self.assertTrue(page.locator("#pi-swimlane").is_hidden())
+        page.get_by_role("button", name="⚡ Simulate P0 Project Preemption (PI Conflict)").click()
+        page.locator("#pi-swimlane").wait_for(state="visible")
+        lane = page.locator("#pi-swimlane-table")
+        self.assertEqual(lane.locator("thead th").all_inner_texts()[:1], ["Project"])
+        text = lane.inner_text()
+        for expected in ("P0-REG-2026 Urgent Regulatory Compliance", "PRJ-019 Billing Migration", "PRJ-024 Claims Portal"):
+            self.assertIn(expected, text)
+        self.assertEqual(lane.locator("td[data-status='collision']").count(), 4)  # current + P0 in Sprints 3 and 4
+        self.assertEqual(lane.locator("td[data-status='watch']").count(), 4)      # both siblings in Sprints 3 and 4
+        self.assertIn("4.5 of 7.0 FTE", text)
+
+        page.get_by_role("button", name="Review recovery options →").click()
+        page.wait_for_function("document.querySelectorAll('#act-options .rec-card').length === 4")
+        self.assertIn("PORTFOLIO RE-PLAN", page.locator("#act-source").inner_text())
+        self.assertIn("RECOMMENDED: COMPOSED RE-PLAN", page.locator("#act-recommendation").inner_text())
+        cards = page.locator("#act-options .rec-card")
+        self.assertIn("+$60,000", cards.filter(has_text="Backfill preempted FTE").inner_text())
+        self.assertIn("$0", cards.filter(has_text="Re-sequence sprint backlog").inner_text())
+        borrow = cards.filter(has_text="Cross-portfolio reallocation").inner_text()
+        self.assertIn("PRJ-024", borrow)
+        self.assertIn("+2 weeks", borrow.replace("about +2", "+2"))
+
+        page.locator("#pi-replan").wait_for(state="visible")
+        self.assertEqual(page.locator("#pi-replan-table thead th").all_inner_texts()[-1], "Next PI")
+        self.assertEqual(page.locator("#pi-replan-table thead th.hit").count(), 2)
+        self.assertIn("Composed re-plan", page.locator("#pi-replan-summary").inner_text())
+        page.locator("#pi-replan-select").select_option("preempted")
+        self.assertIn("No action · preempted", page.locator("#pi-replan-summary").inner_text())
+        self.assertGreaterEqual(page.locator("#pi-replan-table tr[data-status='shifted'], #pi-replan-table tr[data-status='partly_next_pi']").count(), 1)
+
+        cards.filter(has_text="Backfill preempted FTE").get_by_role("button", name="Preview this scenario").click()
+        page.locator("#act-what-if-results").get_by_text("Predicted on-time").wait_for()
+        self.assertIn("PORTFOLIO PLANNING MODEL", page.locator("#act-what-if-results").inner_text())
+        self.assertIn("Backfill preempted FTE", page.locator("#pi-replan-summary").inner_text())
+        page.get_by_role("button", name="Apply simulated updates").click()
+        page.wait_for_function("document.getElementById('act-scenario-status').textContent.includes('saved')")
+        page.reload()
+        self.go("track")
+        page.locator("#pi-swimlane").wait_for(state="visible")
+
     def test_ai_drives_the_intervention_analysis_and_what_if_predictions(self) -> None:
         type(self).llm_enabled = True
         page = self.page
@@ -790,6 +835,19 @@ class JourneyUiTests(unittest.TestCase):
         )
         self.go("commit")
         self.assertTrue(page.locator("#commit-empty").is_visible())
+
+    def test_clearing_demo_data_resets_the_page_title_after_a_simulation(self) -> None:
+        page = self.page
+        self.run_shape_to_commit()
+        self.approve_and_simulate()
+        page.wait_for_function("document.getElementById('initiative-name').textContent !== 'Delivery Twin'")
+        self.assertNotEqual(page.locator("#initiative-name").inner_text(), "Delivery Twin")
+        page.evaluate("window.confirm = () => true")
+        page.get_by_role("button", name="Clear all demo data").click()
+        page.wait_for_function("document.getElementById('clear-data-status').textContent.startsWith('Cleared')")
+        page.wait_for_function("document.getElementById('initiative-name').textContent === 'Delivery Twin'")
+        self.assertEqual(page.locator("#portfolio-label").text_content(), "Portfolio")
+        self.assertEqual(page.locator("#as-of").text_content(), "BEFORE KICKOFF")
 
 
 if __name__ == "__main__":

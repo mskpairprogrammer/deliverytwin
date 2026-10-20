@@ -14,6 +14,7 @@ from urllib.parse import urlsplit
 from .data.connection import Connection, default_database_path, resolve_dialect
 from .data.connection import connect as open_connection
 from .data.database import DatabaseError
+from .portfolio import PREEMPT_SPRINTS, portfolio_view, preempted_hours_so_far, preemption_active, set_preemption
 from .extras import (
     EXTRA_GET_ROUTES, EXTRA_POST_ROUTES, SIMULATION_ROUTES, BaselineRequired, handle_get, handle_post,
 )
@@ -469,6 +470,7 @@ def simulate_sprints(
             raise ValueError(f"Unknown scenario. Choose one of: {', '.join(SCENARIOS)}.")
         if scenario != scenario_key(connection):
             clear_events(connection)
+            set_preemption(connection, False)
         set_scenario(connection, scenario)
     start = start or date.today()
     as_of = start + timedelta(days=sprints * SPRINT_DAYS)
@@ -542,6 +544,24 @@ def inject_event(connection: Connection, kind: str) -> dict[str, Any]:
     add_event(connection, kind, state["sprints_advanced"])
     return simulate_sprints(
         connection, state["sprints_advanced"], date.fromisoformat(state["started_on"])
+    )
+
+
+def trigger_preemption(connection: Connection, active: bool = True) -> dict[str, Any]:
+    """Inject (or clear) the synthetic P0 preemption; the simulation moves to Sprint 3 so the collision is live."""
+    from .scenarios import IMPORT_SCENARIO, scenario_key
+
+    state = simulation_state(connection)
+    if not active:
+        set_preemption(connection, False)
+        return simulate_sprints(connection, state["sprints_advanced"], date.fromisoformat(state["started_on"])) \
+            if state else {}
+    if state and scenario_key(connection) == IMPORT_SCENARIO:
+        raise ValueError("Preemption applies to scripted scenarios. Switch back to a scenario to simulate it.")
+    set_preemption(connection, True)
+    sprint = max(PREEMPT_SPRINTS[0], state["sprints_advanced"] if state else 0)
+    return simulate_sprints(
+        connection, sprint, date.fromisoformat(state["started_on"]) if state else None
     )
 
 
@@ -681,6 +701,7 @@ def build_report(connection: Connection, as_of: date | None = None) -> dict[str,
         "unplanned_story_points": scope["story_points"],
         "lead_production_support_hours_per_week": support["hours"],
         "lead_approved_pto_hours": pto["hours"],
+        "portfolio_preempted_hours": 0,
         "active_priority_1_incidents": incident["count"],
         "blocking_change_requests": [
             {
@@ -717,6 +738,9 @@ def build_report(connection: Connection, as_of: date | None = None) -> dict[str,
                 "mode": "synthetic_scenario", "label": f"Synthetic scenario: {SCENARIOS[key].label}",
                 "detail": SCENARIOS[key].description, "scenario": key, "events": events,
             }
+    portfolio_active = bool(simulation) and preemption_active(connection)
+    if portfolio_active:
+        signals["portfolio_preempted_hours"] = preempted_hours_so_far(simulation["sprints_advanced"])
     collision_detected = (
         signals["lead_production_support_hours_per_week"] >= 8
         and signals["unplanned_story_points"] >= 32
@@ -753,6 +777,10 @@ def build_report(connection: Connection, as_of: date | None = None) -> dict[str,
         "connectors": source_modes,
         "writeback_performed": False,
         "recovery_scenario": _latest_recovery_scenario(connection),
+        "portfolio": portfolio_view(
+            portfolio_active, simulation["sprints_advanced"] if simulation else None,
+            signals["allocated_fte"], initiative["name"],
+        ),
         "resource_allocations": [
             dict(row)
             for row in connection.execute(
@@ -1192,6 +1220,10 @@ def serve_dashboard(
                             result: dict[str, Any] = {"simulated": False}
                         elif not baseline_approved(connection):
                             raise BaselineRequiredError(BASELINE_REQUIRED)
+                        elif payload.get("preempt") is not None:
+                            if not isinstance(payload["preempt"], bool):
+                                raise ValueError("preempt must be true or false.")
+                            result = {"simulated": True, **trigger_preemption(connection, payload["preempt"])}
                         elif payload.get("next_sprint") is True:
                             result = {"simulated": True, **advance_one_sprint(connection)}
                         else:
@@ -1267,6 +1299,10 @@ def serve_dashboard(
                         if simulation_state(connection) is None:
                             raise ValueError("Simulate a sprint in TRACK before creating an intervention scenario.")
                         report = build_workflow_report(connection)
+                        if report["portfolio"]["active"]:
+                            from .backlog import latest_backlog
+
+                            report["portfolio"]["backlog"] = latest_backlog(connection)
                         late = [
                             dict(row) for row in connection.execute(
                                 "SELECT project_name, planned_effort_hours, actual_effort_hours, "

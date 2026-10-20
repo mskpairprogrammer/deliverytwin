@@ -323,6 +323,80 @@ def to_ado_rest(backlog: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def plan_sprints(
+    backlog: dict[str, Any], capacity_hours: list[int], deferred_hours: int = 0
+) -> dict[str, Any]:
+    """Place the approved Features into PI sprints, deterministically.
+
+    Features are worked in backlog order (discovery, dependencies, systems, release), each filling the earliest
+    sprint capacity left. `deferred_hours` is cut from the build (system) Features, latest first, and shown as
+    Next PI work. Hours that do not fit in the PI also land in Next PI.
+    """
+    features = [f for f in backlog["epic"]["features"] if f["kind"] != "deferred"]
+    efforts = {f["title"]: int(f["effort_hours"]) for f in features}
+    rows = _schedule(features, efforts, capacity_hours, {})
+    cut_hours: dict[str, int] = {}
+    to_cut = max(0, int(deferred_hours))
+    if to_cut:
+        in_pi = {row["title"] for row in rows if row["start_sprint"] is not None}
+        for feature in reversed([f for f in features if f["kind"] == "system" and f["title"] in in_pi]):
+            cut = min(to_cut, efforts[feature["title"]])
+            efforts[feature["title"]] -= cut
+            cut_hours[feature["title"]] = cut
+            to_cut -= cut
+        rows = _schedule(features, efforts, capacity_hours, cut_hours)
+    return {"sprints": list(range(1, len(capacity_hours) + 1)), "capacity_hours": list(capacity_hours), "features": rows}
+
+
+def _schedule(
+    features: list[dict[str, Any]], efforts: dict[str, int], capacity_hours: list[int], cut_hours: dict[str, int]
+) -> list[dict[str, Any]]:
+    remaining = list(capacity_hours)
+    sprint, rows = 0, []
+    for feature in features:
+        need, per_sprint = efforts[feature["title"]], [0] * len(remaining)
+        while need > 0 and sprint < len(remaining):
+            if remaining[sprint] <= 0:
+                sprint += 1
+                continue
+            take = min(need, remaining[sprint])
+            per_sprint[sprint] += take
+            remaining[sprint] -= take
+            need -= take
+        worked = [index + 1 for index, hours in enumerate(per_sprint) if hours]
+        rows.append({
+            "title": feature["title"], "kind": feature["kind"], "effort_hours": int(feature["effort_hours"]),
+            "hours_by_sprint": per_sprint, "start_sprint": worked[0] if worked else None,
+            "end_sprint": worked[-1] if worked else None, "next_pi_hours": need + cut_hours.get(feature["title"], 0),
+            "critical": feature["kind"] != "system",
+        })
+    return rows
+
+
+def compare_plans(baseline: dict[str, Any], plan: dict[str, Any]) -> dict[str, Any]:
+    """Mark each Feature as unchanged, shifted to a later or earlier sprint, or moved (partly) to Next PI."""
+    before = {row["title"]: row for row in baseline["features"]}
+    shifted = moved = 0
+    for row in plan["features"]:
+        base = before.get(row["title"], row)
+        delta = None if row["end_sprint"] is None or base["end_sprint"] is None else row["end_sprint"] - base["end_sprint"]
+        if row["next_pi_hours"] > base["next_pi_hours"]:
+            row["status"] = "next_pi" if row["end_sprint"] is None else "partly_next_pi"
+            moved += 1
+        elif delta:
+            row["status"] = "shifted" if delta > 0 else "pulled_in"
+            shifted += 1
+        else:
+            row["status"] = "unchanged"
+        row["baseline_span"] = [base["start_sprint"], base["end_sprint"]]
+        row["sprint_shift"] = delta or 0
+    plan["summary"] = {
+        "shifted": shifted, "moved_to_next_pi": moved,
+        "next_pi_hours": sum(row["next_pi_hours"] for row in plan["features"]),
+    }
+    return plan
+
+
 def _plan_inputs(connection: Connection, approved_at: str) -> tuple[list[dict[str, Any]], dict[str, Any] | None]:
     from .data import RecoveryScenarioRepository
 

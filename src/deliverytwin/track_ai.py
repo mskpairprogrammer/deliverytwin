@@ -22,7 +22,7 @@ def variance_attribution(report: dict[str, Any]) -> dict[str, Any]:
     current_pct = track["on_time_pct"]
     raw = []
     for key, label, signal, weight, unit, source in FORECAST_PENALTIES:
-        value = report["signals"][signal]
+        value = report["signals"].get(signal, 0)
         if weight * value > 0:
             raw.append((key, label, value, weight * value, unit, source))
     total = sum(item[3] for item in raw)

@@ -13,8 +13,8 @@ All source data is synthetic. There are no live connectors, and nothing is ever 
 | **SHAPE** | Describe a request, attach a ROM and meeting notes, confirm clarifying questions, get an estimate | Writes the questions and extracts facts, risks and dependencies (each badged by source, with quotes verified word for word by code); forecasts P50/P80/P90 effort and on-time odds from similar completed projects | Confirm the answers |
 | **COMMIT** | Check feasibility against capacity, date and scope, with a Role × Phase capacity table, an HR privacy guardrail and an executive ROI strip | Challenges the commitment (risks and conditions); answers plain-English what-if questions | Approve the baseline |
 | **COMMIT** (after approval) | Turn the approved baseline into an Azure DevOps Epic, Features and User Stories | None (deterministic) | Import the CSV into Azure DevOps yourself |
-| **TRACK** | Compare simulated delivery signals with the approved baseline; scenario packs, injectable events, CSV/XLSX import | Explains what changed and why the forecast moved | None (monitoring) |
-| **INTERVENE** | Compare recovery options, each with an estimated dollar cost, ranked by confidence, then cost, then date | Diagnoses the problem, proposes scenarios, predicts outcomes | Apply a simulated scenario |
+| **TRACK** | Compare simulated delivery signals with the approved baseline; scenario packs, injectable events, CSV/XLSX import, and a synthetic **P0 portfolio preemption** with a Sprints 1–6 PI swimlane | Explains what changed and why the forecast moved | None (monitoring) |
+| **INTERVENE** | Compare recovery options, each with an estimated dollar cost, ranked by confidence, then cost, then date; under a P0 preemption, portfolio-aware options and a PI Sprint Re-Plan Matrix | Diagnoses the problem, proposes scenarios, predicts outcomes (portfolio options are computed by code) | Apply a simulated scenario |
 
 ### Capabilities at a glance
 
@@ -26,7 +26,8 @@ All source data is synthetic. There are no live connectors, and nothing is ever 
 | COMMIT | Role × Phase capacity bottlenecks; HR privacy guardrail (N ≥ 3); AI pre-commit review; what-if questions; baseline history | [COMMIT](#commit-challenge-the-commitment-then-approve-it) |
 | Azure DevOps | Epic → Feature → User Story backlog, role split, recovery-plan variant and diff, ADO CSV, REST JSON, decision pack; never sent to ADO | [COMMIT](#commit-challenge-the-commitment-then-approve-it) |
 | TRACK | Four scenario packs, event injection, import of exported CSV/XLSX files, AI sprint briefing over a computed variance table, per-sprint snapshots | [TRACK](#track-what-changed-since-the-baseline) |
-| INTERVENE | AI scenarios validated against bounds, `+$XX,XXX` / `$0` cost impact at a configurable blended rate, code-ranked recommendation, simulated apply | [INTERVENE](#intervene-recover-with-ai-proposed-scenarios) |
+| INTERVENE | AI scenarios validated against bounds, `+$XX,XXX` / `$0` cost impact at a configurable blended rate, code-ranked recommendation, simulated apply; under a P0 preemption, four deterministic portfolio options and a PI Sprint Re-Plan Matrix | [INTERVENE](#intervene-recover-with-ai-proposed-scenarios) |
+| Portfolio | Synthetic P0 preemption of Sprints 3–4 with a Sprints 1–6 PI swimlane beside P2/P3 sibling projects | [TRACK](#track-what-changed-since-the-baseline) |
 | Executive ROI | Early dependency detection, estimator variance reduction, backtest MAPE and calibration, shown in COMMIT, INTERVENE and the impact panel | [COMMIT](#commit-challenge-the-commitment-then-approve-it) |
 | Deployment | Container Apps, App Service, Databricks Apps (`src/app.yaml`), AKS, ACI | [Deploy to Azure](#deploy-to-azure) |
 
@@ -47,6 +48,14 @@ One synthetic request, end to end. The numbers below come from the deterministic
 | **TRACK** | **Simulate next sprint** ×3 | On-time odds fall to **26%**, projected slip **33 days** |
 | **INTERVENE** | **Review recovery options** | Ranked by confidence, then cost, then date: **Contractors 39% on-time, +$168,143** (recommended); Squad reallocation 34%, +$33,429; Phase and unblock 34%, $0 |
 | **INTERVENE** | **Apply simulated updates** | Per-system update records stored; the backlog gains a recovery-plan variant and a diff |
+
+**Optional: a mid-PI P0 preemption.** Switch TRACK to the *Healthy delivery* scenario, simulate two sprints, then click **⚡ Simulate P0 Project Preemption (PI Conflict)**. Figures below come from that seeded run (they move with the baseline's confidence, so expect small differences):
+
+| Stage | What you do | What you see (sample numbers) |
+|---|---|---|
+| **TRACK** | Click the preemption button | The simulation moves to Sprint 3; `P0-REG-2026 Urgent Regulatory Compliance` takes **2.5 FTE** (200 h in Sprint 3, 400 h across Sprints 3–4); on-time odds drop **10 points** (67% → 57%); the swimlane marks this project (**4.5 of 7.0 FTE ⚠**) and the P0 project red in Sprints 3–4 and `PRJ-019 [P2]` / `PRJ-024 [P3]` amber |
+| **INTERVENE** | **Review recovery options** | About **47%** on-time if nothing changes. **Composed re-plan 64%, +$12,000** (recommended: re-sequence 120 h, borrow 1.5 FTE from PRJ-024, backfill 0.5 FTE); Cross-portfolio reallocation 63%, $0 (PRJ-024 falls to 2.0 FTE, about +2 weeks); Backfill 63%, +$60,000; Re-sequence alone 50%, $0 |
+| **INTERVENE** | Open the **PI Sprint Re-Plan Matrix** | Features placed into Sprints 1–6 by capacity (7.0 FTE = 560 h per sprint, 360 h in Sprints 3–4 under preemption), with Features marked *unchanged*, *shifted* or *moved to Next PI* |
 
 ## Architecture at a glance (for judges)
 
@@ -101,6 +110,7 @@ The **Simulation lab** makes the demo repeatable without any connection to a sou
 
 - **Scenario packs.** Four scripted scenarios: *Capacity collision* (the default), *Healthy delivery*, *Dependency slips* and *Incident spike*. Each defines, per sprint, the unplanned work, production-support hours, open P1 incidents, blocked-change age and time off, so the same inputs give the same forecast every time. Switching scenarios recomputes all simulated records from scratch.
 - **Event injection.** Add *Engineer leaves* (modeled as 80 lost lead-engineer hours), *Dependency slips two weeks*, *New P1 incident*, *Scope surge* or *Support spike* to the current sprint. The event stays in effect for later sprints until the scenario changes. The forecast formula is unchanged; only its inputs move, and TRACK and INTERVENE react.
+- **P0 portfolio preemption (PI conflict).** **⚡ Simulate P0 Project Preemption (PI Conflict)** (`POST /api/simulate` with `{"preempt": true}`) injects a synthetic P0 project, `P0-REG-2026 Urgent Regulatory Compliance`, that takes **2.5 FTE** from this project in **Sprints 3–4** (400 h of capacity). The simulation moves to Sprint 3 so the collision is live. A new forecast signal, *P0 portfolio preemption*, costs 0.05 confidence points per preempted hour (the same table the variance explanation reads). A **Quarterly PI portfolio swimlane (Sprints 1–6)** shows this project beside the P0 project and two sibling projects, `PRJ-019 Billing Migration [P2]` and `PRJ-024 Claims Portal [P3]`, with the Sprint 3–4 collision in red (and ⚠) and the exposed siblings in amber. The P0 and sibling records are **synthetic**; nothing is read from Planview. Switching scenario or resetting the simulation clears the preemption. See [`portfolio.py`](src/deliverytwin/portfolio.py).
 - **Import exports.** Upload CSV or XLSX files a person exported from Azure DevOps (work items), ServiceNow (incidents, change requests) and UKG (time entries, time off), up to five files. Each file's kind is detected from its columns, every row is used or skipped with a reason, and the import report shows what was read. Signals without a file count as zero. This replaces the scripted signals, and the forecast, briefing and recovery analysis work on them. **Use sample exports** loads five ready-made files from [`data/samples/exports/`](src/deliverytwin/data/samples/exports) with dates relative to today. See [`importer.py`](src/deliverytwin/importer.py) for the accepted columns.
 
 The **AI sprint briefing** (`/api/track/brief`) explains in plain language what moved the forecast. Its variance table is **computed**: the forecast formula in [`workflow.py`](src/deliverytwin/workflow.py) assigns each signal a penalty, and the table scales those penalties to the confidence actually lost since the baseline. The AI only writes the narrative, a per-driver explanation naming the source system, and what to watch next. It is rejected if it skips a driver.
@@ -112,6 +122,8 @@ The **AI sprint briefing** (`/api/track/brief`) explains in plain language what 
 On entry, the AI diagnoses why the project is at risk and proposes 2–4 recovery scenarios (`/api/act/analyze`). Each scenario's FTE, date, scope-deferral and budget levers are validated against the same bounds as the manual what-if. A scenario outside those limits is removed and the page says so. Each card also shows a capacity-model cross-check next to the AI's predicted on-time odds, because the two can disagree.
 
 - **Estimated cost impact.** Every card and preview shows `+$XX,XXX` or `$0`, computed by code from the levers: extra FTE over today's allocation for every week to the new date, plus the whole team for each week the date moves out, plus the explicit budget lever, at a mock blended rate of **$150/hour** (set `DELIVERYTWIN_BLENDED_RATE` to change it). Deferring scope is not counted as a saving. It is a planning estimate, not payroll data.
+- **Portfolio-aware recovery under a P0 preemption.** While a preemption is active (Sprint 4 or earlier), `/api/act/analyze` returns four deterministic scenarios instead of AI-proposed ones, labeled `PORTFOLIO RE-PLAN · DETERMINISTIC`: **Re-sequence sprint backlog** ($0; defers up to 120 h of non-critical Feature work), **Cross-portfolio reallocation** ($0; borrows 2.0 FTE from PRJ-024 and shows its trade-off: it falls to its 2.0 FTE floor, about +2 weeks of slip), **Backfill preempted FTE** (+$60,000: 2.5 FTE × 160 h × $150/h) and a **Composed re-plan** that sizes the levers in order — re-sequence 120 h, borrow 1.5 FTE, then backfill the remaining 0.5 FTE lot (+$12,000). Confidence is the no-preemption forecast minus 0.05 points per uncovered preempted hour and 0.02 per hour deferred to the next PI; the recommendation uses the usual ranking (on-time chance, then cost, then date), so the composed plan wins. Constants such as the 120 h cap, the 0.5 FTE lots, the 80% contractor productivity and the PRJ-024 floor are documented assumptions in `portfolio.py`. No AI is involved.
+- **PI Sprint Re-Plan Matrix (Sprints 1–6).** The approved Azure DevOps Features ([`backlog.py`](src/deliverytwin/backlog.py) `plan_sprints`) are placed into sprints in backlog order by team capacity (FTE × 80 h per sprint); hours that do not fit show under **Next PI**. A selector shows the original plan, the preempted plan with no action, or any scenario, marking each Feature *unchanged*, *shifted* (S4 → S5), or *moved (partly) to Next PI*. Re-sequencing only ever defers build (system) Features, never discovery, dependencies or the release. Applying a scenario stores it as usual, and the backlog then gains the recovery-plan variant. Because capacity is conserved, re-sequencing changes *which* Features slip, not the total hours that land in Next PI.
 - **Recommendation ranking.** The recommended scenario is the one with the **highest predicted on-time chance, then the lowest cost, then the earliest finish date**, decided by code. If the AI recommended a different scenario, the response keeps that as `ai_recommended`.
 
 - **Preview this scenario** reuses the AI's prediction with no extra call. Editing a lever invalidates it, and **Predict with AI** asks the model for the new outcome with commentary and per-system update text.
@@ -181,7 +193,7 @@ python -m playwright install chromium       # once, for the browser tests
 python -m unittest discover -s tests
 ```
 
-The suite covers the data layer (all four application tables and the full SHAPE → COMMIT → TRACK → INTERVENE workflow on DuckDB, plus concurrent access to one DuckDB file), the quote verifier, Databricks / Azure OpenAI / OpenAI routing, the dollar-cost model and scenario ranking, the Role × Phase guardrail (no worker names or ids in the output), the ROI metrics, the `app.yaml`, the AI features with a scripted model, the scenario packs, events, file import, backlog, decision pack, and Playwright tests of the whole journey. The browser tests are skipped if Chromium is unavailable. A full run takes about two to three minutes.
+The suite covers the data layer (all four application tables and the full SHAPE → COMMIT → TRACK → INTERVENE workflow on DuckDB, plus concurrent access to one DuckDB file), the quote verifier, Databricks / Azure OpenAI / OpenAI routing, the dollar-cost model and scenario ranking, the Role × Phase guardrail (no worker names or ids in the output), the ROI metrics, the P0 preemption (signal, swimlane, portfolio recovery options, sprint re-planning), the `app.yaml`, the AI features with a scripted model, the scenario packs, events, file import, backlog, decision pack, and Playwright tests of the whole journey. The browser tests are skipped if Chromium is unavailable. A full run takes about two to three minutes.
 
 ## Repository layout
 
@@ -203,6 +215,7 @@ src/                         the deployable unit: Docker build context
     provenance.py            source badges and the verbatim quote verifier for SHAPE findings
     capacity.py              Role × Phase capacity breakdown and the HR privacy guardrail
     analytics.py             portfolio backtest, calibration and the ROI metrics
+    portfolio.py             synthetic P0 preemption, PI swimlane and portfolio recovery options
     commit_ai.py             COMMIT review and what-if questions
     backlog.py               Azure DevOps Epic/Feature/Story backlog, CSV, REST JSON, recovery-plan diff
     pack.py                  decision pack (Markdown) for the latest approved baseline
@@ -262,7 +275,7 @@ Microsoft Agent Framework runs the four stages as deterministic executors; it or
 | `POST /api/commit/backlog` | Epic/Feature/User Story backlog, CSV, and (once a recovery scenario is applied) the plan-adjusted variant and its diff (409 until a baseline exists) |
 | `POST /api/commit/pack` | Decision pack Markdown and Azure DevOps REST JSON; accepts the review shown on screen (409 until a baseline exists) |
 | `GET /api/baselines` | Every approved baseline, newest first, with changes against the previous one |
-| `POST /api/simulate` | Advance the sprint simulation, optionally switching `scenario`, or reset it (needs an approved baseline; reset is demo mode only) |
+| `POST /api/simulate` | Advance the sprint simulation, optionally switching `scenario`, injecting a synthetic P0 portfolio preemption (`preempt: true`; `false` clears it), or reset it (needs an approved baseline; reset is demo mode only) |
 | `POST /api/simulate/event` | Inject an event (`engineer_leaves`, `dependency_slip`, `p1_incident`, `scope_surge`, `support_spike`) into the current sprint |
 | `POST /api/import/signals` | Import CSV/XLSX exports as the TRACK signals, returning a per-file validation report |
 | `GET /api/simulate/catalog`, `/api/samples`, `/api/ai/status` | Scenarios, event kinds and current simulation state; sample documents and exports; active AI mode |

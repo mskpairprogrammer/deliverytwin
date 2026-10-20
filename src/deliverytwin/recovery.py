@@ -331,8 +331,102 @@ def _rules_analysis(report: dict[str, Any], reason: dict[str, str] | None) -> di
     }
 
 
+def _portfolio_scenarios(report: dict[str, Any]) -> tuple[list[dict[str, Any]], dict[str, Any], float]:
+    """The four portfolio scenarios with their sprint plans, the shared baseline/preempted plans, and the base."""
+    from .backlog import compare_plans, plan_sprints
+    from .portfolio import PREEMPT_SPRINTS, capacity_vector, planned_loss_hours, portfolio_options
+    from .workflow import SLIP_DAYS_PER_POINT, forecast_confidence
+
+    signals = {**report["signals"], "portfolio_preempted_hours": 0}
+    base = forecast_confidence(report["initiative"]["initial_confidence_pct"], signals)
+    options = portfolio_options(report, base)
+    allocated = float(report["signals"]["allocated_fte"])
+    backlog = (report.get("portfolio") or {}).get("backlog")
+    plans: dict[str, Any] = {}
+    system_hours = 0
+    if backlog:
+        system_hours = sum(f["effort_hours"] for f in backlog["epic"]["features"] if f["kind"] == "system")
+        baseline = plan_sprints(backlog, capacity_vector(allocated, preempted=False))
+        preempted = compare_plans(baseline, plan_sprints(backlog, capacity_vector(allocated)))
+        plans = {"baseline": baseline, "preempted": preempted}
+    loss = planned_loss_hours()
+    actions = dict(report["workflow"]["stages"]["intervene"]["actions"])
+    for option in options:
+        lever = option["levers"]
+        option["scope_defer_pct"] = (
+            min(100, round(lever["deferred_hours"] / system_hours * 100)) if system_hours else 0
+        )
+        option["predicted_slip_days"] = max(0, round((100 - option["predicted_on_time_pct"]) * SLIP_DAYS_PER_POINT))
+        option["commentary"] = (
+            f"Covers {lever['reclaimed_hours']} of the {loss} h the P0 project takes in Sprints "
+            f"{PREEMPT_SPRINTS[0]}-{PREEMPT_SPRINTS[1]}; {lever['residual_hours']} h stay uncovered. Confidence is the "
+            "no-preemption forecast minus 0.05 points per uncovered hour and 0.02 per hour deferred to the next PI."
+        )
+        option["actions"] = actions
+        if backlog:
+            extra = lever["borrowed_fte"] + lever["backfill_fte"]
+            option["pi_plan"] = compare_plans(
+                plans["baseline"], plan_sprints(backlog, capacity_vector(allocated, extra), lever["deferred_hours"])
+            )
+    return options, plans, base
+
+
+def _portfolio_analysis(report: dict[str, Any]) -> dict[str, Any]:
+    from .portfolio import P0, PREEMPT_FTE, PREEMPT_SPRINTS, option_confidence, planned_loss_hours
+
+    options, plans, base = _portfolio_scenarios(report)
+    ranked = rank_scenarios(options)
+    loss = planned_loss_hours()
+    unmanaged = option_confidence(base, {"residual_hours": loss, "deferred_hours": 0})
+    track = report["workflow"]["stages"]["track"]
+    return {
+        "source": "portfolio_rules", "model": None, "fallback_reason": None,
+        "diagnosis": (
+            f"{P0['id']} ({P0['name']}, P0) preempts {PREEMPT_FTE:g} FTE from this project in Sprints "
+            f"{PREEMPT_SPRINTS[0]}-{PREEMPT_SPRINTS[1]}: {loss} h of capacity and about {unmanaged}% on-time if "
+            f"nothing changes (Sprint {track['sprint_number']} forecast: {track['on_time_pct']}%). Recovery levers are "
+            "sized in order: re-sequence Features, borrow from the lower-priority project, then backfill."
+        ),
+        "scenarios": ranked, "recommended": ranked[0]["id"], "recommendation_basis": RECOMMENDATION_BASIS,
+        "portfolio": {
+            "preemption": report["portfolio"]["preemption"], "unmanaged_confidence_pct": unmanaged,
+            "pi_plans": plans,
+        },
+    }
+
+
+def predict_portfolio_scenario(report: dict[str, Any], payload: dict[str, Any]) -> dict[str, Any]:
+    """Deterministic preview of one portfolio scenario; no AI prediction is involved."""
+    from .portfolio import OPTION_ORDER
+
+    option_id = payload.get("portfolio_option")
+    if option_id not in OPTION_ORDER or not (report.get("portfolio") or {}).get("active"):
+        raise ValueError("Unknown portfolio recovery option, or no P0 preemption is active.")
+    options, _plans, _base = _portfolio_scenarios(report)
+    option = next(item for item in options if item["id"] == option_id)
+    base = preview_recovery_scenario(report, {
+        key: option[key] for key in ("allocated_fte", "target_date", "scope_defer_pct", "incremental_cost_k")
+    })
+    base["recommended_option"] = option_id
+    prediction = {
+        "predicted_on_time_pct": option["predicted_on_time_pct"], "predicted_slip_days": option["predicted_slip_days"],
+        "commentary": option["commentary"], "trade_offs": option["trade_offs"], "risks": option["risks"],
+        "actions": option["actions"],
+    }
+    result = _overlay(base, prediction, "portfolio_rules", None, None)
+    result["model_check_pct"] = option["predicted_on_time_pct"]
+    result["levers"], result["donor_impact"] = option["levers"], option["donor_impact"]
+    result["pi_plan"] = option.get("pi_plan")
+    return result
+
+
 def analyze_intervention(report: dict[str, Any], late_projects: list[dict[str, Any]]) -> dict[str, Any]:
     """AI-written recovery diagnosis and scenarios; rules-based options when the AI is unusable."""
+    from .portfolio import PREEMPT_SPRINTS
+
+    if (report.get("portfolio") or {}).get("active") and \
+            report["workflow"]["stages"]["track"]["sprint_number"] <= PREEMPT_SPRINTS[-1]:
+        return _portfolio_analysis(report)
     data, reason = _llm_json([
         {
             "role": "system",
@@ -417,6 +511,8 @@ def _rules_prediction(base: dict[str, Any], report: dict[str, Any]) -> dict[str,
 
 def predict_scenario(report: dict[str, Any], payload: object, late_projects: list[dict[str, Any]]) -> dict[str, Any]:
     """Validate a what-if, then let the AI predict its outcome (echoed predictions are reused, not re-asked)."""
+    if isinstance(payload, dict) and payload.get("portfolio_option"):
+        return predict_portfolio_scenario(report, payload)
     base = preview_recovery_scenario(report, payload)
     echoed = payload.get("prediction") if isinstance(payload, dict) else None
     if echoed is not None:
