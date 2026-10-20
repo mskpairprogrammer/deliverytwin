@@ -459,6 +459,27 @@ class JourneyUiTests(unittest.TestCase):
         self.go("track")
         page.locator("#pi-swimlane").wait_for(state="visible")
 
+    def test_a_cached_ai_analysis_does_not_hide_the_preemption_options(self) -> None:
+        type(self).llm_enabled = True
+        page = self.page
+        self.run_shape_to_commit()
+        self.approve_and_simulate()
+        for _ in range(2):
+            self.assertEqual(self.post_status("/api/simulate", {"next_sprint": True}), 200)
+        page.reload()
+        self.go("intervene")
+        page.wait_for_function("document.querySelectorAll('#act-options .rec-card').length === 3")
+        self.assertIn("AI RECOVERY ANALYSIS", page.locator("#act-source").inner_text())
+        self.assertTrue(page.locator("#pi-replan").is_hidden())
+
+        self.go("track")
+        page.get_by_role("button", name="⚡ Simulate P0 Project Preemption (PI Conflict)").click()
+        page.locator("#pi-swimlane").wait_for(state="visible")
+        self.go("intervene")
+        page.wait_for_function("document.querySelectorAll('#act-options .rec-card').length === 4")
+        self.assertIn("PORTFOLIO RE-PLAN", page.locator("#act-source").inner_text())
+        page.locator("#pi-replan").wait_for(state="visible")
+
     def test_ai_drives_the_intervention_analysis_and_what_if_predictions(self) -> None:
         type(self).llm_enabled = True
         page = self.page

@@ -1070,7 +1070,7 @@
     }
     async function loadActAnalysis(force = false) {
       if (!currentReport || !currentReport.simulated || actLoading) return;
-      const key = `${currentReport.as_of}|${currentReport.workflow.stages.track.sprint_number}`;
+      const key = `${currentReport.as_of}|${currentReport.workflow.stages.track.sprint_number}|${currentReport.portfolio && currentReport.portfolio.active ? "p0" : "-"}`;
       if (!force && actAnalysis && actAnalysis.key === key) return;
       if (!force) {
         try {
@@ -1484,6 +1484,7 @@
     byId("sim-preempt").addEventListener("click", async () => {
       await runSimulation({ preempt: true }, "P0 preemption injected:");
       actAnalysis = null;
+      sessionStorage.removeItem(ACT_STORE);
     });
     byId("pi-replan-select").addEventListener("change", (event) => {
       if (actAnalysis) renderPiPlan(actAnalysis, event.target.value);
