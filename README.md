@@ -102,113 +102,16 @@ Delivery Twin runs on **Azure App Service** (Linux, Python 3.13) as a code deplo
 container. Microsoft Entra ID sign-in protects every page, and the database is a DuckDB file on the app's
 persistent `/home` storage.
 
-### What you need
-
-- An Azure subscription where you can create resource groups and app registrations.
-- The Azure CLI (`az login`) and Python on the machine you deploy from.
-- Outbound access from App Service to PyPI during deployment, or a private package index (see
-  [Packages from Artifactory](#packages-from-artifactory-no-internet-access)).
-
-### Option A: scripted install
-
 ```powershell
 ./infra/deploy.ps1 -ResourceGroup rg-deliverytwin -AppName deliverytwin-demo -Location eastus
 ```
 
-The script:
-1. creates the Entra ID app registration for sign-in;
-2. deploys [`infra/main.bicep`](infra/main.bicep): the plan, web app, settings, health check and managed identity;
-3. zips `src/` and pushes it.
+The script creates the Entra ID app registration, deploys [`infra/main.bicep`](infra/main.bicep) and pushes the
+code. Re-run it with `-SkipInfra` to push code only.
 
-Re-run it with `-SkipInfra` to push code only. Every option is in
-[docs/deploy-azure-app-service.md](docs/deploy-azure-app-service.md).
-
-### Option B: manual install (portal)
-
-Turn on sign-in **before** the app goes live. The app has no login of its own.
-
-1. **Create the web app.** Go to **Create a resource → Web App**.
-   - **Resource group:** new, for example `rg-deliverytwin`.
-   - **Name:** for example `deliverytwin-demo`.
-   - **Publish:** Code. **Runtime:** Python 3.13. **OS:** Linux.
-   - **Plan:** Basic B1 or higher.
-2. **Turn on sign-in.** Go to **Settings → Authentication → Add identity provider**.
-   - **Provider:** Microsoft, and create a new app registration.
-   - **Account types:** current tenant only.
-   - **Access:** require authentication, and redirect unauthenticated requests (HTTP 302).
-3. **Add the app settings.** Go to **Settings → Environment variables**:
-
-   | Name | Value |
-   |---|---|
-   | `SCM_DO_BUILD_DURING_DEPLOYMENT` | `true` |
-   | `DELIVERYTWIN_HOST` / `DELIVERYTWIN_PORT` | `0.0.0.0` / `8000` |
-   | `DELIVERYTWIN_DB_PATH` | `/home/data/deliverytwin.duckdb` |
-   | `DELIVERYTWIN_TRUSTED_AUTH` | `1` (only with step 2 done) |
-   | `DELIVERYTWIN_DEMO_MODE` | `1` |
-   | `DELIVERYTWIN_FOUNDRY_ENABLED` / `DELIVERYTWIN_DATABRICKS_ENABLED` | `0` / `0` |
-
-   Don't add `OPENAI_API_KEY`; the app ignores it on App Service.
-4. **Set startup, health check and identity.**
-   - **Configuration → General settings:**
-     - **Startup Command:** `python -m deliverytwin serve`
-     - **Always On:** On. **HTTPS Only:** On. **FTP:** Disabled.
-   - **Monitoring → Health check:** path `/healthz`.
-   - **Identity → System assigned:** On.
-5. **Build and push the code.** From the repository root:
-
-   ```powershell
-   python scripts/package_app.py
-   az webapp deploy --resource-group rg-deliverytwin --name deliverytwin-demo `
-       --src-path dist/deliverytwin-app.zip --type zip
-   ```
-
-   App Service installs `requirements.txt` during the deploy, which takes a few minutes the first time.
-   Without the CLI, use **Advanced Tools (Kudu) → Tools → Zip Push Deploy** and drag the zip in.
-
-### Packages from Artifactory (no internet access)
-
-When App Service can't reach the internet, point the deploy-time `pip install` at your Artifactory PyPI
-repository. pip reads its index from the `PIP_INDEX_URL` app setting.
-
-1. **Find the index URL.** Use a PyPI *virtual* repository in Artifactory that proxies PyPI:
-   `https://<artifactory-host>/artifactory/api/pypi/<pypi-virtual-repo>/simple`.
-   If it needs credentials, include them in the URL:
-   `https://<user>:<token>@<artifactory-host>/artifactory/api/pypi/<pypi-virtual-repo>/simple`.
-2. **Set it before the first code push.**
-   - **Scripted:** `./infra/deploy.ps1 … -PipIndexUrl "https://<user>:<token>@<artifactory-host>/artifactory/api/pypi/<repo>/simple"`.
-   - **Manual:** add `PIP_INDEX_URL` under **Settings → Environment variables**.
-   - **Private certificate authority:** if Artifactory's certificate comes from a private CA that App Service doesn't
-     trust, also add `PIP_TRUSTED_HOST=<artifactory-host>`. Trusting your CA is the better fix if your platform team can do it.
-3. **Keep the token out of plain settings.** Store the full URL as a Key Vault secret and set the app setting to
-   `@Microsoft.KeyVault(SecretUri=https://<vault>.vault.azure.net/secrets/<name>/)`. Grant the web app's managed
-   identity **Key Vault Secrets User** on the vault.
-4. **Make sure the network allows it.** App Service needs a route to Artifactory, usually VNet integration plus
-   DNS for a private host. The install runs in App Service's deployment container, so confirm with your network
-   team that deployment traffic also follows that route.
-5. **Push the code** (step 5 of option B, or re-run the script). The log stream should show pip downloading from
-   your Artifactory host. Check that Artifactory has cached every package in `src/requirements.txt` (and
-   `src/requirements-databricks.txt` if you use Databricks).
-
-### Turn on Foundry models
-
-1. **Settings:** set `FOUNDRY_PROJECT_ENDPOINT`
-   (`https://<resource>.services.ai.azure.com/api/projects/<project>`) and `FOUNDRY_MODEL` (your deployment name).
-   Then change `DELIVERYTWIN_FOUNDRY_ENABLED` to `1`. The scripted equivalent is `-EnableFoundry`
-   `-FoundryProjectEndpoint … -FoundryModel …`.
-2. **Access:** give the web app's managed identity **Cognitive Services OpenAI User** on the Foundry resource, and
-   **Azure AI User** on the project for the chat.
-3. **Restart:** restart the app. The log stream then shows `AI: foundry`.
-
-### Check and operate
-
-- **Log stream:** shows `Data: duckdb · AI: … · Databricks: off · Foundry: …` at startup.
-- **Sign-in:** `https://<app>.azurewebsites.net` asks you to sign in, then opens the dashboard.
-- **Health check:** if it reports unhealthy because sign-in blocks it, run
-  `az webapp auth update -g <rg> -n <app> --excluded-paths "[\"/healthz\"]"`.
-- **One instance:** keep the plan at one instance, because DuckDB is a single-writer file.
-- **Data:** the database on `/home` survives restarts and starts empty, so load demo data from the dashboard.
-- **Code updates:** repeat the code push (option B step 5, or `deploy.ps1 -SkipInfra`).
-- **Untested:** none of this has been run against a live subscription yet.
+[docs/deploy-azure-app-service.md](docs/deploy-azure-app-service.md) has the full guide: every script option,
+a manual portal install, installing packages from Artifactory when App Service has no internet access, turning
+on Foundry models, and day-to-day operations.
 
 ## Configuration
 
@@ -228,50 +131,9 @@ Only the five application tables move to Unity Catalog / Delta: baselines, intak
 and their target updates, and TRACK snapshots. The simulated source records and the historical dataset stay in a
 local DuckDB file, and models still come from Foundry. No code changes are needed.
 
-1. **Prepare Databricks.**
-   - **Workspace and warehouse:** a workspace with Unity Catalog, and a SQL warehouse. Note its HTTP path from
-     **Connection details**, for example `/sql/1.0/warehouses/<id>`.
-   - **Schema:** a dedicated catalog and schema (default `dpm_dev.mlops`).
-   - **Identity:** a service principal, or a personal access token for a local test.
-   - **Permissions:** **CAN USE** on the warehouse, and **USE CATALOG**, **USE SCHEMA**, **CREATE TABLE**,
-     **SELECT** and **MODIFY** on the schema. The smoke test in step 3 also needs **CREATE SCHEMA** on the catalog.
-2. **Configure.** Install the libraries with `python -m pip install -r src/requirements-databricks.txt`, then set:
-
-   ```
-   DELIVERYTWIN_DATABRICKS_ENABLED=1
-   DATABRICKS_HOST=https://adb-<id>.<n>.azuredatabricks.net
-   DATABRICKS_HTTP_PATH=/sql/1.0/warehouses/<id>
-   DATABRICKS_TOKEN=<token>          # or DATABRICKS_CLIENT_ID + DATABRICKS_CLIENT_SECRET
-   DELIVERYTWIN_CATALOG=dpm_dev
-   DELIVERYTWIN_SCHEMA=mlops
-   ```
-
-   The data moves only when the switch is `1` and both the host and the HTTP path are set.
-3. **Smoke test.** Run `python -m deliverytwin databricks-smoke` from `src/`.
-   - It creates a throwaway schema, creates the tables, loads the dataset, reads it back and writes a baseline.
-   - It prints PASS or FAIL for each check, then drops the schema.
-4. **Switch.** Restart the app. The startup line shows `Data: databricks`. Local baselines and scenarios don't
-   migrate, so approve a baseline again in COMMIT.
-5. **On Azure App Service.**
-   - **Scripted:** `./infra/deploy.ps1 … -EnableDatabricks -DatabricksHost … -DatabricksHttpPath … -DatabricksToken …`.
-     This also installs the Databricks libraries.
-   - **Manual:** add the same app settings, package with `python scripts/package_app.py --with-databricks`, and
-     deploy the zip.
-   - **Token:** store it as a Key Vault reference.
-
-**How the tables are deployed.** The app creates each table the first time it uses it, with
-`CREATE TABLE IF NOT EXISTS <catalog>.<schema>.dt_<name> (…) USING DELTA`.
-- **Columns and keys:** `STRING`, `BIGINT`, `DOUBLE`, `DATE` and `TIMESTAMP` columns, with `NOT NULL` keys and an
-  informational `PRIMARY KEY`.
-- **Writes:** `MERGE INTO`, so writes are upserts.
-- **Creating them in advance:** run [`scripts/databricks_ddl.sql`](scripts/databricks_ddl.sql) in the SQL editor.
-  It has all 12 tables for `dpm_dev.mlops`; regenerate it for another schema with
-  `python -m deliverytwin ddl --catalog <c> --schema <s>`.
-- **Schema changes:** existing tables are never altered, so a later column change needs a manual `ALTER TABLE`.
-
-**Switch back** with `DELIVERYTWIN_DATABRICKS_ENABLED=0` and a restart. Nothing in the warehouse is deleted, and
-nothing is copied back. The Databricks adapter has so far been tested only against a fake connection, so run the
-smoke test before relying on it.
+[docs/databricks.md](docs/databricks.md) covers the required permissions, configuration, the smoke test
+(`python -m deliverytwin databricks-smoke`), the table DDL ([`scripts/databricks_ddl.sql`](scripts/databricks_ddl.sql))
+and switching on App Service.
 
 ## Repository layout
 
@@ -282,7 +144,7 @@ src/                 deployable app: deliverytwin/ package, data/ files, require
 scripts/             maintenance: dataset generator, Databricks smoke test and DDL, App Service packager
 tests/               unit and browser tests
 infra/               Azure App Service template and deploy script
-docs/                deployment guide and screenshots
+docs/                App Service and Databricks guides, screenshots
 ```
 
 ## Status and limits

@@ -55,7 +55,73 @@ To redeploy only the code after a change:
 | `-AuthClientId`, `-AuthClientSecret` | — | Use an existing app registration. Its redirect URI must be `https://<app>.azurewebsites.net/.auth/login/aad/callback`, and its Application ID URI `api://<client-id>`. |
 | `-EnableFoundry`, `-FoundryProjectEndpoint`, `-FoundryModel` | off | Foundry models for the AI features and chat (see below). |
 | `-NoDemoMode` | off | Hides the simulation lab and the data reset and reload routes. |
-| `-PipIndexUrl` | — | Private PyPI index, such as Artifactory, for the deploy-time `pip install` when App Service has no internet access. It is set as `PIP_INDEX_URL`; prefer a Key Vault reference (see the README). |
+| `-PipIndexUrl` | — | Private PyPI index, such as Artifactory, for the deploy-time `pip install` when App Service has no internet access. It is set as `PIP_INDEX_URL`; prefer a Key Vault reference (see [Artifactory](#packages-from-artifactory-no-internet-access)). |
+
+## Manual install (portal)
+
+Turn on sign-in **before** the app goes live. The app has no login of its own.
+
+1. **Create the web app.** Go to **Create a resource → Web App**.
+   - **Resource group:** new, for example `rg-deliverytwin`.
+   - **Name:** for example `deliverytwin-demo`.
+   - **Publish:** Code. **Runtime:** Python 3.13. **OS:** Linux.
+   - **Plan:** Basic B1 or higher.
+2. **Turn on sign-in.** Go to **Settings → Authentication → Add identity provider**.
+   - **Provider:** Microsoft, and create a new app registration.
+   - **Account types:** current tenant only.
+   - **Access:** require authentication, and redirect unauthenticated requests (HTTP 302).
+3. **Add the app settings.** Go to **Settings → Environment variables**:
+
+   | Name | Value |
+   |---|---|
+   | `SCM_DO_BUILD_DURING_DEPLOYMENT` | `true` |
+   | `DELIVERYTWIN_HOST` / `DELIVERYTWIN_PORT` | `0.0.0.0` / `8000` |
+   | `DELIVERYTWIN_DB_PATH` | `/home/data/deliverytwin.duckdb` |
+   | `DELIVERYTWIN_TRUSTED_AUTH` | `1` (only with step 2 done) |
+   | `DELIVERYTWIN_DEMO_MODE` | `1` |
+   | `DELIVERYTWIN_FOUNDRY_ENABLED` / `DELIVERYTWIN_DATABRICKS_ENABLED` | `0` / `0` |
+
+   Don't add `OPENAI_API_KEY`; the app ignores it on App Service.
+4. **Set startup, health check and identity.**
+   - **Configuration → General settings:**
+     - **Startup Command:** `python -m deliverytwin serve`
+     - **Always On:** On. **HTTPS Only:** On. **FTP:** Disabled.
+   - **Monitoring → Health check:** path `/healthz`.
+   - **Identity → System assigned:** On.
+5. **Build and push the code.** From the repository root:
+
+   ```powershell
+   python scripts/package_app.py
+   az webapp deploy --resource-group rg-deliverytwin --name deliverytwin-demo `
+       --src-path dist/deliverytwin-app.zip --type zip
+   ```
+
+   App Service installs `requirements.txt` during the deploy, which takes a few minutes the first time.
+   Without the CLI, use **Advanced Tools (Kudu) → Tools → Zip Push Deploy** and drag the zip in.
+
+## Packages from Artifactory (no internet access)
+
+When App Service can't reach the internet, point the deploy-time `pip install` at your Artifactory PyPI
+repository. pip reads its index from the `PIP_INDEX_URL` app setting.
+
+1. **Find the index URL.** Use a PyPI *virtual* repository in Artifactory that proxies PyPI:
+   `https://<artifactory-host>/artifactory/api/pypi/<pypi-virtual-repo>/simple`.
+   If it needs credentials, include them in the URL:
+   `https://<user>:<token>@<artifactory-host>/artifactory/api/pypi/<pypi-virtual-repo>/simple`.
+2. **Set it before the first code push.**
+   - **Scripted:** `./infra/deploy.ps1 … -PipIndexUrl "https://<user>:<token>@<artifactory-host>/artifactory/api/pypi/<repo>/simple"`.
+   - **Manual:** add `PIP_INDEX_URL` under **Settings → Environment variables**.
+   - **Private certificate authority:** if Artifactory's certificate comes from a private CA that App Service doesn't
+     trust, also add `PIP_TRUSTED_HOST=<artifactory-host>`. Trusting your CA is the better fix if your platform team can do it.
+3. **Keep the token out of plain settings.** Store the full URL as a Key Vault secret and set the app setting to
+   `@Microsoft.KeyVault(SecretUri=https://<vault>.vault.azure.net/secrets/<name>/)`. Grant the web app's managed
+   identity **Key Vault Secrets User** on the vault.
+4. **Make sure the network allows it.** App Service needs a route to Artifactory, usually VNet integration plus
+   DNS for a private host. The install runs in App Service's deployment container, so confirm with your network
+   team that deployment traffic also follows that route.
+5. **Push the code** (step 5 of the [manual install](#manual-install-portal), or re-run the script). The log stream
+   should show pip downloading from your Artifactory host. Check that Artifactory has cached every package in
+   `src/requirements.txt` (and `src/requirements-databricks.txt` if you use Databricks).
 
 ## Microsoft Foundry and Azure Databricks
 
@@ -88,21 +154,16 @@ portal. Re-running the infrastructure step replaces all application settings, so
    az role assignment create --assignee $principal --role "Cognitive Services OpenAI User" --scope $foundry
    ```
 
+3. Restart the app. The log stream then shows `AI: foundry`.
+
+**Manual equivalent:** set `FOUNDRY_PROJECT_ENDPOINT`
+(`https://<resource>.services.ai.azure.com/api/projects/<project>`) and `FOUNDRY_MODEL` (your deployment name),
+change `DELIVERYTWIN_FOUNDRY_ENABLED` to `1`, grant the roles above and restart.
+
 ### Databricks
 
-```powershell
-./infra/deploy.ps1 -ResourceGroup rg-deliverytwin -AppName deliverytwin-demo -EnableDatabricks `
-    -DatabricksHost https://adb-<id>.<n>.azuredatabricks.net -DatabricksHttpPath /sql/1.0/warehouses/<id> `
-    -DatabricksToken <token>
-```
-
-- **What it does:** the four application tables move to `<catalog>.<schema>.dt_*` (default `dpm_dev.mlops`)
-  once `-DatabricksHttpPath` is set. Models still come from Foundry: Databricks Model Serving is not used on
-  App Service.
-- **Libraries:** with `-EnableDatabricks` the package also installs the Databricks SQL connector and SDK.
-- **Check first:** run `python -m deliverytwin databricks-smoke` against the workspace before switching on,
-  because the adapter has not yet been run against a live workspace.
-- **Token:** prefer replacing it with a Key Vault reference afterwards.
+Permissions, configuration, the smoke test, the table DDL and the App Service switches are in
+[databricks.md](databricks.md).
 
 `/api/ai/status` reports the active AI backend and both switches, and the log stream's first lines show the
 data engine. [`.env.example`](../.env.example) lists every setting with its meaning.
@@ -121,17 +182,23 @@ The template sets these application settings:
 | `DELIVERYTWIN_BLENDED_RATE` | `150` | Mock labor rate behind recovery cost impact. |
 | `MICROSOFT_PROVIDER_AUTHENTICATION_SECRET` | the client secret | Read by App Service Authentication. |
 
-## Operations
+## Check and operate
 
+- **Startup line:** the log stream shows `Data: duckdb · AI: … · Databricks: off · Foundry: …` at startup.
+- **Sign-in:** `https://<app>.azurewebsites.net` asks you to sign in, then opens the dashboard.
+- **Health check:** if it reports unhealthy because sign-in blocks it, run
+  `az webapp auth update -g <rg> -n <app> --excluded-paths "[\"/healthz\"]"`.
+- **Code updates:** repeat the code push (manual step 5, or `deploy.ps1 -SkipInfra`).
 - **Logs:** run `az webapp log tail -g rg-deliverytwin -n deliverytwin-demo`, or open **Log stream** in the
   portal.
 - **Scaling:** keep one instance. DuckDB is a single file with one writer, so scaling out would put several
   writers on the same file. Scale up (a larger SKU) instead. For shared, durable data across instances, use
-  the Databricks data layer (`DELIVERYTWIN_DB_DIALECT=databricks`; see the README).
+  the [Databricks data layer](databricks.md).
 - **Data:** the database is synthetic. On first start the app creates the schema. Use the dashboard to load
   and simulate data. Deleting `/home/data/deliverytwin.duckdb` (through Kudu/SSH) starts fresh.
 - **Secret rotation:** the app registration secret expires after one year. Rotate it with
   `az ad app credential reset` and update `MICROSOFT_PROVIDER_AUTHENTICATION_SECRET`.
+- **Untested:** none of this has been run against a live subscription yet.
 
 ## Container alternative
 
