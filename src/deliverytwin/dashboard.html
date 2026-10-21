@@ -316,6 +316,9 @@
     .act-target-updates { margin-top: 10px; }
     .act-target-updates strong { display: block; overflow-wrap: anywhere; font-size: 10px; }
     .act-scenario-status { min-height: 1.4em; margin-top: 8px; font-size: 11px; color: var(--muted); }
+    .tune-grid [hidden] { display: none; }
+    .act-mode-note { margin: 4px 0 6px; padding: 8px 12px; border-radius: 8px; background: var(--amber-soft); color: #7a4a0d; font-size: 11px; line-height: 1.5; }
+    .act-mode-note[hidden] { display: none; }
     .act-tune { margin: 14px 0 4px; }
     .act-tune .step-help { margin: 0; }
     .act-tune-target { display: flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 700; white-space: nowrap; }
@@ -859,12 +862,16 @@
           <p class="approval-note" id="act-note">The recommendation is advisory. No option is approved and no source-system write-back occurs.</p>
         </section>
         <section class="card full act-what-if">
-          <div class="card-head"><div><h3 class="card-title">Intervention what-if</h3><div class="card-kicker">Adjust any lever and ask the AI to predict the outcome, then persist simulated target updates.</div></div><span class="badge">AI PREDICTION · LOCAL SIMULATION</span></div>
+          <div class="card-head"><div><h3 class="card-title">Intervention what-if</h3><div class="card-kicker" id="act-whatif-kicker">Adjust any lever and ask the AI to predict the outcome, then persist simulated target updates.</div></div><span class="badge" id="act-whatif-badge">AI PREDICTION · LOCAL SIMULATION</span></div>
+          <p class="act-mode-note" id="act-mode-note" hidden></p>
           <div class="tune-grid">
             <label for="act-fte"><span>Team allocation (FTE)</span><input id="act-fte" type="number" min="0.5" step="0.5"></label>
             <label for="act-target-date"><span>Target date</span><input id="act-target-date" type="date"></label>
-            <label for="act-cost"><span>Incremental budget (USD $K)</span><input id="act-cost" type="number" min="0" max="100000" step="0.5" value="0"></label>
-            <label for="act-scope-defer"><span>Scope to defer <output id="act-scope-defer-value" for="act-scope-defer">0%</output></span><input id="act-scope-defer" type="range" min="0" max="100" step="5" value="0"></label>
+            <label for="act-cost" class="act-generic-only"><span>Incremental budget (USD $K)</span><input id="act-cost" type="number" min="0" max="100000" step="0.5" value="0"></label>
+            <label for="act-scope-defer" class="act-generic-only"><span>Scope to defer <output id="act-scope-defer-value" for="act-scope-defer">0%</output></span><input id="act-scope-defer" type="range" min="0" max="100" step="5" value="0"></label>
+            <label for="act-p-defer" class="act-portfolio-only" hidden><span>Defer Feature hours to Sprints 5–6 / next PI <output id="act-p-defer-value" for="act-p-defer">0 h</output></span><input id="act-p-defer" type="range" min="0" max="400" step="20" value="0"></label>
+            <label for="act-p-borrow" class="act-portfolio-only" hidden><span>Borrow from PRJ-024 Claims Portal (FTE)</span><input id="act-p-borrow" type="number" min="0" max="2" step="0.5" value="0"></label>
+            <label for="act-p-backfill" class="act-portfolio-only" hidden><span>Contractor backfill (FTE) <output id="act-p-backfill-cost" for="act-p-backfill">$0</output></span><input id="act-p-backfill" type="number" min="0" max="5" step="0.5" value="0"></label>
           </div>
           <div class="ask-box act-tune">
             <label class="ask-label" for="act-tune-input">Tune this scenario with AI</label>
@@ -981,9 +988,15 @@
         metric(`${scenario.confidence_pct}%`, prediction ? "Predicted on-time" : "Adjusted on-time confidence"),
         metric(scenario.projected_slip_days !== undefined ? `${scenario.projected_slip_days} days` : "—", "Projected slip"),
         metric(`${scenario.allocated_fte.toFixed(1)} FTE`, "Team allocation"),
-        metric(`${deferredPoints} pts`, "Scope deferred"),
+        ...(scenario.levers ? [
+          metric(`${scenario.levers.deferred_hours} h`, "Feature hours deferred"),
+          metric(`${scenario.levers.borrowed_fte} FTE`, "Borrowed from PRJ-024"),
+          metric(`${scenario.levers.backfill_fte} FTE`, "Contractor backfill"),
+        ] : [
+          metric(`${deferredPoints} pts`, "Scope deferred"),
+        ]),
         metric(scenario.target_date, "Target date"),
-        metric(`$${scenario.incremental_cost_k.toLocaleString()}K`, "Incremental budget"),
+        ...(scenario.levers ? [] : [metric(`$${scenario.incremental_cost_k.toLocaleString()}K`, "Incremental budget")]),
         ...(scenario.cost_impact ? [metric(scenario.cost_impact.label, "Estimated cost impact")] : []),
       );
       const tuning = scenario.tuning || null;
@@ -1112,6 +1125,18 @@
       }));
       const saved = currentReport && currentReport.recovery_scenario;
       renderPiPlan(analysis, saved && analysis.scenarios.some((item) => item.id === saved.recommended_option) ? saved.recommended_option : analysis.recommended);
+      if (portfolioModel) {
+        applyLeverBounds(analysis.portfolio && analysis.portfolio.lever_bounds);
+        setActMode("portfolio");
+        if (actPortfolioOption !== "custom") {  // keep a plan the user is editing; otherwise start from the recommendation
+          const start = actRecommended();
+          actPortfolioOption = start.portfolio_option;
+          fillPortfolioLevers(start.levers, start.allocated_fte, start.target_date);
+        }
+      } else {
+        if (isPortfolioMode()) { actPortfolioOption = null; actPortfolioLevers = null; }
+        setActMode("what_if");
+      }
       updateJourney();
     }
     async function loadActAnalysis(force = false) {
@@ -1144,8 +1169,71 @@
       }
     }
     let actPortfolioOption = null;
-    let actPortfolioLevers = null;  // the defer / borrow / backfill mix of a tuned ("custom") portfolio plan
+    let actPortfolioLevers = null;  // the defer / borrow / backfill mix of a custom portfolio plan
     let actTunedPlan = null;  // its PI sprint plan, offered in the re-plan matrix
+    // The what-if card has two lever sets. "what_if" (AI scenarios): FTE, date, budget and scope, scored by the
+    // capacity model. "portfolio" (P0 re-plan): FTE, date, deferred hours, borrowed and backfill FTE, scored by
+    // the same portfolio model as the option cards, so numbers never jump between models.
+    let actMode = "what_if";
+    let actPreviewTimer = null;
+    let actPreviewedLevers = null;  // the portfolio levers the shown preview scored; repeated change events are ignored
+    const isPortfolioMode = () => actMode === "portfolio";
+    function setActMode(mode) {
+      actMode = mode;
+      const portfolio = mode === "portfolio";
+      document.querySelectorAll(".act-generic-only").forEach((node) => { node.hidden = portfolio; });
+      document.querySelectorAll(".act-portfolio-only").forEach((node) => { node.hidden = !portfolio; });
+      byId("act-whatif-badge").textContent = portfolio ? "PORTFOLIO MODEL · DETERMINISTIC" : "AI PREDICTION · LOCAL SIMULATION";
+      byId("act-whatif-kicker").textContent = portfolio
+        ? "Choose how the preempted capacity is recovered. Every change is scored by the same portfolio model as the options above."
+        : "Adjust any lever and ask the AI to predict the outcome, then persist simulated target updates.";
+      byId("act-preview").textContent = portfolio ? "Preview plan" : "Predict with AI";
+      const note = byId("act-mode-note");
+      const preemption = portfolio && actAnalysis && actAnalysis.portfolio && actAnalysis.portfolio.preemption;
+      if (preemption) {
+        note.textContent = `P0 preemption active: ${preemption.id} takes ${preemption.fte} FTE in Sprints ` +
+          `${preemption.sprints.join("–")} (${preemption.planned_loss_hours} h). Defer, borrow and backfill recover those hours; ` +
+          "a later date or more FTE adds headroom on top.";
+      }
+      note.hidden = !preemption;
+    }
+    function applyLeverBounds(bounds) {
+      if (!bounds) return;
+      [["act-p-defer", bounds.deferred_hours], ["act-p-borrow", bounds.borrowed_fte], ["act-p-backfill", bounds.backfill_fte]]
+        .forEach(([id, range]) => Object.assign(byId(id), { min: range.min, max: range.max, step: range.step }));
+    }
+    function updatePortfolioLabels() {
+      byId("act-p-defer-value").textContent = `${byId("act-p-defer").value} h`;
+      const perFte = actAnalysis && actAnalysis.portfolio && actAnalysis.portfolio.lever_bounds
+        ? actAnalysis.portfolio.lever_bounds.backfill_cost_per_fte_usd : 0;
+      const cost = Number(byId("act-p-backfill").value || 0) * perFte;
+      byId("act-p-backfill-cost").textContent = cost ? `+$${cost.toLocaleString()}` : "$0";
+    }
+    function fillPortfolioLevers(levers, fte, targetDate) {
+      byId("act-p-defer").value = levers.deferred_hours;
+      byId("act-p-borrow").value = levers.borrowed_fte;
+      byId("act-p-backfill").value = levers.backfill_fte;
+      byId("act-fte").value = fte;
+      byId("act-target-date").value = targetDate;
+      updatePortfolioLabels();
+    }
+    function portfolioLeversFromForm() {
+      return {
+        deferred_hours: Number(byId("act-p-defer").value || 0), borrowed_fte: Number(byId("act-p-borrow").value || 0),
+        backfill_fte: Number(byId("act-p-backfill").value || 0),
+        allocated_fte: Number(byId("act-fte").value), target_date: byId("act-target-date").value,
+      };
+    }
+    function onPortfolioLeverChange() {
+      updatePortfolioLabels();
+      if (JSON.stringify(portfolioLeversFromForm()) === actPreviewedLevers) return;  // e.g. the change event fired on blur
+      actPortfolioOption = "custom";
+      actPortfolioLevers = portfolioLeversFromForm();
+      byId("act-apply").disabled = true;
+      byId("act-scenario-status").textContent = "Scoring your plan…";
+      clearTimeout(actPreviewTimer);
+      actPreviewTimer = setTimeout(() => submitActScenario("/api/act/what-if", byId("act-preview")), 350);
+    }
     const PI_STATUS_TEXT = {
       shifted: (row) => `Shifts S${row.baseline_span[1]} → S${row.end_sprint}`,
       pulled_in: (row) => `Pulled in S${row.baseline_span[1]} → S${row.end_sprint}`,
@@ -1201,7 +1289,7 @@
         ["baseline", "Original plan (no preemption)", bundle.pi_plans.baseline],
         ["preempted", "No action · preempted", bundle.pi_plans.preempted],
         ...analysis.scenarios.map((scenario) => [scenario.id, scenario.title + (scenario.id === analysis.recommended ? " · recommended" : ""), scenario.pi_plan]),
-        ...(actTunedPlan ? [["custom", "Tuned re-plan · from your instruction", actTunedPlan]] : []),
+        ...(actTunedPlan ? [["custom", "Custom re-plan · from the what-if", actTunedPlan]] : []),
       ];
       const select = byId("pi-replan-select");
       const choiceKey = String(choices.map(([id]) => id));
@@ -1247,9 +1335,12 @@
       section.hidden = false;
     }
     function selectActScenario(scenario, button) {
+      clearTimeout(actPreviewTimer);
       actPortfolioOption = scenario.portfolio_option || null;
       actPortfolioLevers = null;
       if (actAnalysis) renderPiPlan(actAnalysis, scenario.id);
+      setActMode(scenario.portfolio_option ? "portfolio" : "what_if");
+      if (scenario.portfolio_option) fillPortfolioLevers(scenario.levers, scenario.allocated_fte, scenario.target_date);
       byId("act-fte").value = scenario.allocated_fte;
       byId("act-target-date").value = scenario.target_date;
       byId("act-cost").value = scenario.incremental_cost_k;
@@ -1280,13 +1371,19 @@
         incremental_cost_k: Number(byId("act-cost").value),
       };
       if (actPortfolioOption) body.portfolio_option = actPortfolioOption;
-      if (actPortfolioOption === "custom") body.portfolio_levers = actPortfolioLevers;
+      if (actPortfolioOption === "custom") body.portfolio_levers = isPortfolioMode() ? portfolioLeversFromForm() : actPortfolioLevers;
       const echoed = reuse || (path === "/api/act/apply" ? actLastPrediction : null);
       if (echoed) body.prediction = echoed;
-      byId("act-scenario-status").textContent = echoed ? "Applying…" : "Asking the AI to predict this scenario…";
+      byId("act-scenario-status").textContent = echoed ? "Applying…"
+        : isPortfolioMode() ? "Scoring your plan…" : "Asking the AI to predict this scenario…";
       try {
         const data = await intakePost(path, body);
         persisted = data.status === "simulated_updates_persisted";
+        actPreviewedLevers = isPortfolioMode() ? JSON.stringify(portfolioLeversFromForm()) : null;
+        if (data.portfolio_option === "custom" && data.pi_plan && actAnalysis) {
+          actTunedPlan = data.pi_plan;
+          renderPiPlan(actAnalysis, "custom");
+        }
         renderActScenario(data, persisted);
         if (persisted) {
           await refreshReport();
@@ -1313,7 +1410,8 @@
         scope_defer_pct: Number(byId("act-scope-defer").value), incremental_cost_k: Number(byId("act-cost").value),
       };
       if (actPortfolioOption) body.portfolio_option = actPortfolioOption;
-      if (actPortfolioOption === "custom") body.portfolio_levers = actPortfolioLevers;
+      if (actPortfolioOption === "custom") body.portfolio_levers = isPortfolioMode() ? portfolioLeversFromForm() : actPortfolioLevers;
+      clearTimeout(actPreviewTimer);
       button.disabled = true;
       byId("act-apply").disabled = true;
       status.textContent = "Tuning… the AI proposes levers and the planning model scores each try.";
@@ -1326,6 +1424,8 @@
         byId("act-scope-defer-value").textContent = `${data.scope_defer_pct}%`;
         actPortfolioOption = data.portfolio_option || null;
         actPortfolioLevers = data.portfolio_levers || null;
+        if (actPortfolioLevers) fillPortfolioLevers(actPortfolioLevers, data.allocated_fte, data.target_date);
+        actPreviewedLevers = isPortfolioMode() ? JSON.stringify(portfolioLeversFromForm()) : null;
         actTunedPlan = data.pi_plan || null;
         if (actAnalysis && actTunedPlan) renderPiPlan(actAnalysis, "custom");
         renderActScenario(data);
@@ -1534,8 +1634,13 @@
       byId("act-what-if-results").hidden = true;
       byId("act-scenario-status").textContent = "Inputs changed — preview the scenario again.";
     });
+    ["act-p-defer", "act-p-borrow", "act-p-backfill"].forEach((id) => {
+      byId(id).addEventListener(id === "act-p-defer" ? "input" : "change", onPortfolioLeverChange);
+    });
+    ["act-p-borrow", "act-p-backfill"].forEach((id) => byId(id).addEventListener("input", updatePortfolioLabels));
     ["act-fte", "act-target-date", "act-cost"].forEach((id) => {
       byId(id).addEventListener("input", () => {
+        if (isPortfolioMode() && id !== "act-cost") { onPortfolioLeverChange(); return; }
         actPortfolioOption = null;
         actPortfolioLevers = null;
         byId("act-apply").disabled = true;

@@ -129,6 +129,13 @@ class PreemptionTests(unittest.TestCase):
         self.assertLess(analysis["portfolio"]["unmanaged_confidence_pct"], 50)
         self.assertEqual(analysis, analyze_intervention(self.report(), []))
 
+    def test_the_analysis_carries_the_lever_bounds_for_the_what_if_controls(self) -> None:
+        trigger_preemption(self.connection)
+        bounds = analyze_intervention(self.report(), [])["portfolio"]["lever_bounds"]
+        self.assertEqual(bounds["deferred_hours"]["max"], planned_loss_hours())
+        self.assertEqual(bounds["borrowed_fte"]["max"], 2.0)
+        self.assertEqual(bounds["backfill_cost_per_fte_usd"], 24000)  # 160 h x $150/h
+
     def test_borrowing_from_the_p3_project_shows_its_trade_off_and_respects_its_floor(self) -> None:
         trigger_preemption(self.connection)
         analysis = analyze_intervention(self.report(), [])

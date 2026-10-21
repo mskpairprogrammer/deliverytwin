@@ -415,6 +415,42 @@ class JourneyUiTests(unittest.TestCase):
         self.assertRegex(roi, r"[−+]\d+% spread")
         self.assertRegex(roi, r"\d+ flagged · \d+ stated")
 
+    def test_the_what_if_switches_to_portfolio_levers_under_a_p0(self) -> None:
+        page = self.page
+        self.run_shape_to_commit()
+        self.approve_and_simulate()
+        page.get_by_role("button", name="⚡ Simulate P0 Project Preemption (PI Conflict)").click()
+        page.locator("#pi-swimlane").wait_for(state="visible")
+        page.get_by_role("button", name="Review recovery options →").click()
+        page.wait_for_function("document.querySelectorAll('#act-options .rec-card').length === 4")
+
+        # The card switches to the portfolio levers, pre-filled with the recommended composed re-plan.
+        self.assertEqual(page.locator("#act-whatif-badge").inner_text(), "PORTFOLIO MODEL · DETERMINISTIC")
+        self.assertTrue(page.locator("#act-cost").is_hidden())
+        self.assertTrue(page.locator("#act-scope-defer").is_hidden())
+        self.assertIn("P0 preemption active", page.locator("#act-mode-note").inner_text())
+        self.assertEqual(page.get_by_role("button", name="Preview plan").count(), 1)
+        self.assertEqual((page.locator("#act-p-defer").input_value(), page.locator("#act-p-borrow").input_value(),
+                          page.locator("#act-p-backfill").input_value()), ("120", "1.5", "0.5"))
+        self.assertEqual(page.locator("#act-p-backfill-cost").inner_text(), "+$12,000")
+
+        # Removing the borrowed and contractor capacity re-scores on the same portfolio model, live.
+        page.locator("#act-p-borrow").fill("0")
+        page.locator("#act-p-borrow").dispatch_event("change")
+        page.locator("#act-p-backfill").fill("0")
+        page.locator("#act-p-backfill").dispatch_event("change")
+        self.assertEqual(page.locator("#act-p-backfill-cost").inner_text(), "$0")
+        page.wait_for_function("document.getElementById('act-scenario-status').textContent.startsWith('Preview only')")
+        results = page.locator("#act-what-if-results").inner_text()
+        self.assertIn("PORTFOLIO PLANNING MODEL", results)
+        self.assertRegex(results, r"120 h\s+Feature hours deferred")
+        self.assertRegex(results, r"0 FTE\s+Borrowed from PRJ-024")
+        self.assertRegex(results, r"0 FTE\s+Contractor backfill")
+        self.assertNotIn("Incremental budget", results)
+        self.assertIn("Custom re-plan", page.locator("#pi-replan-summary").inner_text())
+        page.get_by_role("button", name="Apply simulated updates").click()
+        page.wait_for_function("document.getElementById('act-scenario-status').textContent.includes('saved')")
+
     def test_the_what_if_tunes_a_portfolio_scenario_from_an_instruction(self) -> None:
         page = self.page
         self.run_shape_to_commit()
@@ -440,7 +476,7 @@ class JourneyUiTests(unittest.TestCase):
         self.assertIn("LEVER SEARCH", results)
         self.assertIn("target 70% reached", results)
         self.assertEqual(page.locator("#act-cost").input_value(), "0")
-        self.assertIn("Tuned re-plan", page.locator("#pi-replan-summary").inner_text())
+        self.assertIn("Custom re-plan", page.locator("#pi-replan-summary").inner_text())
         page.get_by_role("button", name="Apply simulated updates").click()
         page.wait_for_function("document.getElementById('act-scenario-status').textContent.includes('saved')")
 

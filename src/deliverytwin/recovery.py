@@ -465,6 +465,21 @@ def _custom_portfolio_option(report: dict[str, Any], raw_levers: object) -> dict
     return option
 
 
+def _portfolio_lever_bounds() -> dict[str, Any]:
+    """Limits of the three portfolio levers and the contractor cost per FTE, for the what-if controls."""
+    from .portfolio import (
+        FTE_LOT, MAX_BACKFILL_FTE, PREEMPT_SPRINTS, SPRINT_HOURS_PER_FTE, borrow_headroom, planned_loss_hours,
+    )
+
+    window_hours = SPRINT_HOURS_PER_FTE * len(PREEMPT_SPRINTS)
+    return {
+        "deferred_hours": {"min": 0, "max": planned_loss_hours(), "step": 20},
+        "borrowed_fte": {"min": 0, "max": borrow_headroom(), "step": FTE_LOT},
+        "backfill_fte": {"min": 0, "max": MAX_BACKFILL_FTE, "step": FTE_LOT},
+        "backfill_cost_per_fte_usd": round(window_hours * blended_rate()),
+    }
+
+
 def _portfolio_analysis(report: dict[str, Any]) -> dict[str, Any]:
     from .portfolio import P0, PREEMPT_FTE, PREEMPT_SPRINTS, option_confidence, planned_loss_hours
 
@@ -484,7 +499,7 @@ def _portfolio_analysis(report: dict[str, Any]) -> dict[str, Any]:
         "scenarios": ranked, "recommended": ranked[0]["id"], "recommendation_basis": RECOMMENDATION_BASIS,
         "portfolio": {
             "preemption": report["portfolio"]["preemption"], "unmanaged_confidence_pct": unmanaged,
-            "pi_plans": plans,
+            "pi_plans": plans, "lever_bounds": _portfolio_lever_bounds(),
         },
     }
 
