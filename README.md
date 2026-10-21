@@ -106,6 +106,62 @@ Azure App Service (Linux, Python), with Microsoft Entra ID sign-in required:
 The script provisions the plan and web app ([`infra/main.bicep`](infra/main.bicep)), creates the sign-in app
 registration, zips `src/` and deploys it. See [docs/deploy-azure-app-service.md](docs/deploy-azure-app-service.md).
 
+### Deploy to Azure manually (portal)
+
+Turn on sign-in **before** the app goes live. The app has no login of its own.
+
+1. **Create the web app.** In the portal: **Create a resource → Web App**.
+   - **Resource group:** new, for example `rg-deliverytwin`.
+   - **Name:** for example `deliverytwin-demo`.
+   - **Publish:** Code. **Runtime:** Python 3.13. **OS:** Linux.
+   - **Plan:** Basic B1 or higher.
+2. **Turn on sign-in.** **Settings → Authentication → Add identity provider**.
+   - **Provider:** Microsoft, and create a new app registration.
+   - **Account types:** current tenant only.
+   - **Access:** require authentication, and redirect unauthenticated requests (HTTP 302).
+3. **Add the app settings.** **Settings → Environment variables**:
+
+   | Name | Value |
+   |---|---|
+   | `SCM_DO_BUILD_DURING_DEPLOYMENT` | `true` |
+   | `DELIVERYTWIN_HOST` / `DELIVERYTWIN_PORT` | `0.0.0.0` / `8000` |
+   | `DELIVERYTWIN_DB_PATH` | `/home/data/deliverytwin.duckdb` |
+   | `DELIVERYTWIN_TRUSTED_AUTH` | `1` (only with step 2 done) |
+   | `DELIVERYTWIN_DEMO_MODE` | `1` |
+   | `DELIVERYTWIN_FOUNDRY_ENABLED` / `DELIVERYTWIN_DATABRICKS_ENABLED` | `0` / `0` |
+
+   Do not add `OPENAI_API_KEY`; the app ignores it on App Service.
+4. **Set startup, health check and identity.**
+   - **Configuration → General settings:**
+     - **Startup Command:** `python -m deliverytwin serve`
+     - **Always On:** On. **HTTPS Only:** On. **FTP:** Disabled.
+   - **Monitoring → Health check:** path `/healthz`.
+   - **Identity → System assigned:** On.
+5. **Build and push the code.** From the repository root:
+
+   ```powershell
+   python scripts/package_app.py
+   az webapp deploy --resource-group rg-deliverytwin --name deliverytwin-demo `
+       --src-path dist/deliverytwin-app.zip --type zip
+   ```
+
+   App Service installs `requirements.txt` during the deploy, which takes a few minutes the first time.
+   Without the CLI, use **Advanced Tools (Kudu) → Tools → Zip Push Deploy** and drag the zip in.
+6. **Check it.**
+   - The **log stream** shows `Data: duckdb · AI: off · Databricks: off · Foundry: off`.
+   - `https://<app>.azurewebsites.net` asks you to sign in, then opens the dashboard.
+   - If the health check reports unhealthy because sign-in blocks it, run
+     `az webapp auth update -g <rg> -n <app> --excluded-paths "[\"/healthz\"]"`.
+7. **Turn on Foundry models (later).**
+   - **Settings:** set `FOUNDRY_PROJECT_ENDPOINT` (`https://<resource>.services.ai.azure.com/api/projects/<project>`),
+     set `FOUNDRY_MODEL` (your deployment name), then change `DELIVERYTWIN_FOUNDRY_ENABLED` to `1`.
+   - **Access:** give the web app's managed identity **Cognitive Services OpenAI User** on the Foundry resource,
+     and **Azure AI User** on the project for the chat.
+   - **Restart:** restart the app. The log stream then shows `AI: foundry`.
+
+Keep the plan at one instance, because DuckDB is a single-writer file. The database on `/home` survives restarts and
+starts empty, so load demo data from the dashboard. Code updates repeat step 5.
+
 ## Configuration
 
 Two switches control the cloud integrations. Both are off by default.
@@ -117,6 +173,57 @@ Two switches control the cloud integrations. Both are off by default.
 
 On Azure App Service only Foundry models are used. `OPENAI_API_KEY` is ignored there and never deployed.
 Every setting is listed in [`.env.example`](.env.example).
+
+## Switch to Azure Databricks
+
+Only the five application tables move to Unity Catalog / Delta: baselines, intake sessions, recovery scenarios
+and their target updates, and TRACK snapshots. The simulated source records and the historical dataset stay in a
+local DuckDB file, and models still come from Foundry. No code changes are needed.
+
+1. **Prepare Databricks.**
+   - **Workspace and warehouse:** a workspace with Unity Catalog, and a SQL warehouse. Note its HTTP path from
+     **Connection details**, for example `/sql/1.0/warehouses/<id>`.
+   - **Schema:** a dedicated catalog and schema (default `dpm_dev.mlops`).
+   - **Identity:** a service principal, or a personal access token for a local test.
+   - **Permissions:** **CAN USE** on the warehouse, and **USE CATALOG**, **USE SCHEMA**, **CREATE TABLE**,
+     **SELECT** and **MODIFY** on the schema. The smoke test in step 3 also needs **CREATE SCHEMA** on the catalog.
+2. **Configure.** Install the libraries with `python -m pip install -r src/requirements-databricks.txt`, then set:
+
+   ```
+   DELIVERYTWIN_DATABRICKS_ENABLED=1
+   DATABRICKS_HOST=https://adb-<id>.<n>.azuredatabricks.net
+   DATABRICKS_HTTP_PATH=/sql/1.0/warehouses/<id>
+   DATABRICKS_TOKEN=<token>          # or DATABRICKS_CLIENT_ID + DATABRICKS_CLIENT_SECRET
+   DELIVERYTWIN_CATALOG=dpm_dev
+   DELIVERYTWIN_SCHEMA=mlops
+   ```
+
+   The data moves only when the switch is `1` and both the host and the HTTP path are set.
+3. **Smoke test.** Run `python -m deliverytwin databricks-smoke` from `src/`.
+   - It creates a throwaway schema, creates the tables, loads the dataset, reads it back and writes a baseline.
+   - It prints PASS or FAIL for each check, then drops the schema.
+4. **Switch.** Restart the app. The startup line shows `Data: databricks`. Local baselines and scenarios don't
+   migrate, so approve a baseline again in COMMIT.
+5. **On Azure App Service.**
+   - **Scripted:** `./infra/deploy.ps1 … -EnableDatabricks -DatabricksHost … -DatabricksHttpPath … -DatabricksToken …`.
+     This also installs the Databricks libraries.
+   - **Manual:** add the same app settings, package with `python scripts/package_app.py --with-databricks`, and
+     deploy the zip.
+   - **Token:** store it as a Key Vault reference.
+
+**How the tables are deployed.** The app creates each table the first time it uses it, with
+`CREATE TABLE IF NOT EXISTS <catalog>.<schema>.dt_<name> (…) USING DELTA`.
+- **Columns and keys:** `STRING`, `BIGINT`, `DOUBLE`, `DATE` and `TIMESTAMP` columns, with `NOT NULL` keys and an
+  informational `PRIMARY KEY`.
+- **Writes:** `MERGE INTO`, so writes are upserts.
+- **Creating them in advance:** run [`scripts/databricks_ddl.sql`](scripts/databricks_ddl.sql) in the SQL editor.
+  It has all 12 tables for `dpm_dev.mlops`; regenerate it for another schema with
+  `python -m deliverytwin ddl --catalog <c> --schema <s>`.
+- **Schema changes:** existing tables are never altered, so a later column change needs a manual `ALTER TABLE`.
+
+**Switch back** with `DELIVERYTWIN_DATABRICKS_ENABLED=0` and a restart. Nothing in the warehouse is deleted, and
+nothing is copied back. The Databricks adapter has so far been tested only against a fake connection, so run the
+smoke test before relying on it.
 
 ## Repository layout
 
