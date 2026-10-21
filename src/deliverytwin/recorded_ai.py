@@ -240,6 +240,8 @@ def recorded_complete(messages: list[dict[str, str]], *, json_mode: bool = False
             return json.dumps(_ask(payload))
         if "delivery tracking analyst" in system:
             return json.dumps(_brief(payload))
+        if "tuning a recovery scenario" in system:
+            raise RecordedError("Recorded mode has no tuning sample; the deterministic lever search is used instead.")
         if "recovery advisor" in system:
             return json.dumps(_recovery_analysis(payload) if "propose 3 distinct recovery scenarios" in system
                               else _recovery_prediction(payload))

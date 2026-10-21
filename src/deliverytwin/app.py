@@ -5,15 +5,16 @@ import ipaddress
 import json
 import logging
 import os
+import sys
 from datetime import date, datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
 
-from .data.connection import Connection, default_database_path, resolve_dialect
-from .data.connection import connect as open_connection
-from .data.database import DatabaseError
+from .storage.connection import Connection, default_database_path, resolve_dialect
+from .storage.connection import connect as open_connection
+from .storage.database import DatabaseError
 from .portfolio import PREEMPT_SPRINTS, planned_loss_hours, portfolio_view, preemption_active, set_preemption
 from .extras import (
     EXTRA_GET_ROUTES, EXTRA_POST_ROUTES, SIMULATION_ROUTES, BaselineRequired, handle_get, handle_post,
@@ -23,11 +24,11 @@ SCHEMA_PATH = Path(__file__).with_name("schema.sql")
 DASHBOARD_PATH = Path(__file__).with_name("dashboard.html")
 INITIATIVE_ID = "autopay-modernization"
 SOURCE_SYSTEMS = {
-    "planview": ("Planview", ("planview_projects", "planview_milestones", "planview_resource_assignments")),
-    "azure_devops": ("Azure DevOps", ("ado_projects", "ado_sprints", "ado_work_items")),
-    "servicenow": ("ServiceNow", ("servicenow_incidents", "servicenow_change_requests")),
-    "oracle_hcm": ("Oracle HR / HCM", ("oracle_workers", "oracle_worker_skills")),
-    "ukg_wfm": ("UKG Pro WFM", ("ukg_shifts", "ukg_time_entries", "ukg_pto_requests")),
+    "planview": ("Planview", ("dt_planview_projects", "dt_planview_milestones", "dt_planview_resource_assignments")),
+    "azure_devops": ("Azure DevOps", ("dt_ado_projects", "dt_ado_sprints", "dt_ado_work_items")),
+    "servicenow": ("ServiceNow", ("dt_servicenow_incidents", "dt_servicenow_change_requests")),
+    "oracle_hcm": ("Oracle HR / HCM", ("dt_oracle_workers", "dt_oracle_worker_skills")),
+    "ukg_wfm": ("UKG Pro WFM", ("dt_ukg_shifts", "dt_ukg_time_entries", "dt_ukg_pto_requests")),
 }
 MAX_CHAT_REQUEST_BYTES = 16_384
 MAX_INTAKE_REQUEST_BYTES = 7_500_000
@@ -35,7 +36,7 @@ INTAKE_POST_ROUTES = (
     "/api/intake/analyze", "/api/intake/evaluate", "/api/intake/approve", "/api/intake/what-if",
     "/api/intake/forecast", "/api/intake/estimate", "/api/intake/challenge", "/api/intake/ask",
 )
-ACT_POST_ROUTES = ("/api/act/analyze", "/api/act/what-if", "/api/act/apply")
+ACT_POST_ROUTES = ("/api/act/analyze", "/api/act/what-if", "/api/act/apply", "/api/act/tune")
 TRACK_POST_ROUTES = ("/api/track/brief",)
 COMMIT_POST_ROUTES = ("/api/commit/backlog",)
 MAX_CHAT_QUESTION_LENGTH = 1_200
@@ -65,7 +66,7 @@ def initialize_database(connection: Connection, register_sources: bool = True) -
         with connection:
             connection.executemany(
                 """
-                INSERT INTO source_systems (source_key, display_name, integration_mode, writeback_enabled)
+                INSERT INTO dt_source_systems (source_key, display_name, integration_mode, writeback_enabled)
                 VALUES (?, ?, 'simulated', 0)
                 ON CONFLICT(source_key) DO NOTHING
                 """,
@@ -104,7 +105,7 @@ def seed_demo(connection: Connection, as_of: date | None = None) -> dict[str, An
     with connection:
         _upsert_many(
             connection,
-            "delivery_initiatives",
+            "dt_delivery_initiatives",
             ("id", "name", "portfolio", "planned_start", "target_end", "baseline_p50_hours",
              "baseline_p80_hours", "integration_buffer_pct", "initial_confidence_pct"),
             [(INITIATIVE_ID, "Customer 360", "Q4 value stream",
@@ -114,7 +115,7 @@ def seed_demo(connection: Connection, as_of: date | None = None) -> dict[str, An
         )
         _upsert_many(
             connection,
-            "people",
+            "dt_people",
             ("id", "display_name", "active"),
             [("lead-engineer", "Customer 360 Lead", 1),
              ("data-engineer", "Customer Data Engineer", 1),
@@ -122,12 +123,12 @@ def seed_demo(connection: Connection, as_of: date | None = None) -> dict[str, An
              ("privacy-engineer", "Customer Privacy Engineer", 1)],
             ("display_name", "active"),
         )
-        connection.execute("DELETE FROM person_skills WHERE skill_id = 'kafka'")
-        connection.execute("DELETE FROM oracle_worker_skills WHERE skill_id = 'kafka'")
-        connection.execute("DELETE FROM skills WHERE id = 'kafka'")
+        connection.execute("DELETE FROM dt_person_skills WHERE skill_id = 'kafka'")
+        connection.execute("DELETE FROM dt_oracle_worker_skills WHERE skill_id = 'kafka'")
+        connection.execute("DELETE FROM dt_skills WHERE id = 'kafka'")
         _upsert_many(
             connection,
-            "skills",
+            "dt_skills",
             ("id", "name"),
             [("data-engineering", "Data Engineering"),
              ("customer-data-management", "Customer Data Management"),
@@ -139,7 +140,7 @@ def seed_demo(connection: Connection, as_of: date | None = None) -> dict[str, An
         )
         connection.executemany(
             """
-            INSERT INTO person_skills (person_id, skill_id, proficiency) VALUES (?, ?, ?)
+            INSERT INTO dt_person_skills (person_id, skill_id, proficiency) VALUES (?, ?, ?)
             ON CONFLICT(person_id, skill_id) DO UPDATE SET proficiency=excluded.proficiency
             """,
             [("data-engineer", "data-engineering", "senior"),
@@ -152,7 +153,7 @@ def seed_demo(connection: Connection, as_of: date | None = None) -> dict[str, An
         )
         _upsert_many(
             connection,
-            "delivery_milestones",
+            "dt_delivery_milestones",
             ("id", "initiative_id", "name", "target_date", "status"),
             [("customer-profile-api-v1", INITIATIVE_ID, "Customer profile API v1", target_date, "at_risk")],
             ("name", "target_date", "status"),
@@ -160,21 +161,21 @@ def seed_demo(connection: Connection, as_of: date | None = None) -> dict[str, An
 
         _upsert_many(
             connection,
-            "planview_projects",
+            "dt_planview_projects",
             ("external_id", "initiative_id", "project_status", "capacity_fte", "allocated_fte", "planned_hours"),
             [("PV-AUTO-001", INITIATIVE_ID, "approved_baseline", 8.5, 7.0, 4650)],
             ("project_status", "capacity_fte", "allocated_fte", "planned_hours"),
         )
         _upsert_many(
             connection,
-            "planview_milestones",
+            "dt_planview_milestones",
             ("external_id", "initiative_id", "name", "baseline_date", "status"),
             [("PV-MS-API", INITIATIVE_ID, "Customer profile API v1", target_date, "at_risk")],
             ("name", "baseline_date", "status"),
         )
         _upsert_many(
             connection,
-            "planview_resource_assignments",
+            "dt_planview_resource_assignments",
             ("external_id", "initiative_id", "person_id", "role_name", "allocated_fte"),
             [("PV-RES-LEAD", INITIATIVE_ID, "lead-engineer", "Customer 360 Lead", 1.0),
              ("PV-RES-DATA", INITIATIVE_ID, "data-engineer", "Customer Data Engineer", 2.0),
@@ -185,7 +186,7 @@ def seed_demo(connection: Connection, as_of: date | None = None) -> dict[str, An
 
         _upsert_many(
             connection,
-            "ado_projects",
+            "dt_ado_projects",
             ("external_id", "initiative_id", "name"),
             [("ADO-AUTO", INITIATIVE_ID, "Customer 360")],
             ("initiative_id", "name"),
@@ -194,7 +195,7 @@ def seed_demo(connection: Connection, as_of: date | None = None) -> dict[str, An
         sprint_end = (demo_date + timedelta(days=7)).isoformat()
         _upsert_many(
             connection,
-            "ado_sprints",
+            "dt_ado_sprints",
             ("external_id", "project_external_id", "name", "start_date", "end_date"),
             [("ADO-SPRINT-DEMO", "ADO-AUTO", "Demo sprint", sprint_start, sprint_end)],
             ("project_external_id", "name", "start_date", "end_date"),
@@ -207,7 +208,7 @@ def seed_demo(connection: Connection, as_of: date | None = None) -> dict[str, An
         ]
         _upsert_many(
             connection,
-            "ado_work_items",
+            "dt_ado_work_items",
             ("external_id", "project_external_id", "sprint_external_id", "title",
              "work_item_type", "state", "story_points", "is_unplanned"),
             unplanned_items,
@@ -217,7 +218,7 @@ def seed_demo(connection: Connection, as_of: date | None = None) -> dict[str, An
 
         _upsert_many(
             connection,
-            "servicenow_incidents",
+            "dt_servicenow_incidents",
             ("external_id", "initiative_id", "assignee_person_id", "priority", "state",
              "short_description", "opened_at"),
             [("INC-P1-001", INITIATIVE_ID, "lead-engineer", 1, "in_progress",
@@ -226,7 +227,7 @@ def seed_demo(connection: Connection, as_of: date | None = None) -> dict[str, An
         )
         _upsert_many(
             connection,
-            "servicenow_change_requests",
+            "dt_servicenow_change_requests",
             ("external_id", "initiative_id", "short_description", "state", "opened_at",
              "planned_start", "is_blocking"),
             [("CHG-C360-001", INITIATIVE_ID, "Customer identity matching rules deployment", "cab_review",
@@ -236,7 +237,7 @@ def seed_demo(connection: Connection, as_of: date | None = None) -> dict[str, An
 
         _upsert_many(
             connection,
-            "oracle_workers",
+            "dt_oracle_workers",
             ("external_id", "person_id", "department", "job_title", "worker_status"),
             [("ORCL-EMP-1001", "lead-engineer", "Customer 360", "Customer 360 Lead", "active"),
              ("ORCL-EMP-1002", "data-engineer", "Customer Data", "Customer Data Engineer", "active"),
@@ -246,7 +247,7 @@ def seed_demo(connection: Connection, as_of: date | None = None) -> dict[str, An
         )
         connection.executemany(
             """
-            INSERT INTO oracle_worker_skills (worker_external_id, skill_id, proficiency)
+            INSERT INTO dt_oracle_worker_skills (worker_external_id, skill_id, proficiency)
             VALUES (?, ?, ?)
             ON CONFLICT(worker_external_id, skill_id) DO UPDATE SET proficiency=excluded.proficiency
             """,
@@ -260,7 +261,7 @@ def seed_demo(connection: Connection, as_of: date | None = None) -> dict[str, An
         )
         connection.executemany(
             """
-            INSERT INTO source_entity_map (source_key, entity_type, external_id, twin_entity_id)
+            INSERT INTO dt_source_entity_map (source_key, entity_type, external_id, twin_entity_id)
             VALUES (?, ?, ?, ?)
             ON CONFLICT(source_key, entity_type, external_id)
             DO UPDATE SET twin_entity_id=excluded.twin_entity_id
@@ -275,14 +276,14 @@ def seed_demo(connection: Connection, as_of: date | None = None) -> dict[str, An
 
         _upsert_many(
             connection,
-            "ukg_shifts",
+            "dt_ukg_shifts",
             ("external_id", "person_id", "shift_date", "start_time", "end_time", "shift_type"),
             [("UKG-SHIFT-001", "lead-engineer", demo_date.isoformat(), "09:00", "17:00", "regular")],
             ("person_id", "shift_date", "start_time", "end_time", "shift_type"),
         )
         _upsert_many(
             connection,
-            "ukg_time_entries",
+            "dt_ukg_time_entries",
             ("external_id", "person_id", "initiative_id", "work_date", "work_type", "hours"),
             [("UKG-TIME-SUPPORT-001", "lead-engineer", INITIATIVE_ID,
               (demo_date - timedelta(days=4)).isoformat(), "production_support", 8),
@@ -292,7 +293,7 @@ def seed_demo(connection: Connection, as_of: date | None = None) -> dict[str, An
         )
         _upsert_many(
             connection,
-            "ukg_pto_requests",
+            "dt_ukg_pto_requests",
             ("external_id", "person_id", "start_date", "end_date", "hours", "status"),
             [("UKG-PTO-001", "lead-engineer", target_date, target_date, 40, "approved")],
             ("person_id", "start_date", "end_date", "hours", "status"),
@@ -305,7 +306,7 @@ def seed_demo(connection: Connection, as_of: date | None = None) -> dict[str, An
             )
             connection.execute(
                 """
-                INSERT INTO ingestion_runs
+                INSERT INTO dt_ingestion_runs
                     (source_key, started_at, completed_at, status, records_loaded)
                 VALUES (?, ?, ?, 'succeeded', ?)
                 """,
@@ -329,9 +330,9 @@ def _purge_simulated_rows(connection: Connection) -> None:
     parent inside one transaction while foreign keys are enforced.
     """
     for table, pattern in (
-        ("ado_work_items", "ADO-SIM-WI-%"), ("ado_sprints", "ADO-SIM-SPRINT-%"),
-        ("ukg_time_entries", "UKG-SIM-%"), ("servicenow_incidents", "INC-SIM-%"),
-        ("servicenow_change_requests", "CHG-SIM-%"), ("ukg_pto_requests", "UKG-SIM-PTO-%"),
+        ("dt_ado_work_items", "ADO-SIM-WI-%"), ("dt_ado_sprints", "ADO-SIM-SPRINT-%"),
+        ("dt_ukg_time_entries", "UKG-SIM-%"), ("dt_servicenow_incidents", "INC-SIM-%"),
+        ("dt_servicenow_change_requests", "CHG-SIM-%"), ("dt_ukg_pto_requests", "UKG-SIM-PTO-%"),
     ):
         connection.execute(f"DELETE FROM {table} WHERE external_id LIKE ?", (pattern,))
 
@@ -348,16 +349,16 @@ def _seed_simulated_sprints(
     with connection:
         connection.execute(
             """
-            UPDATE ukg_time_entries SET hours = 0
+            UPDATE dt_ukg_time_entries SET hours = 0
             WHERE external_id IN ('UKG-TIME-SUPPORT-001', 'UKG-TIME-SUPPORT-002')
             """
         )
         connection.execute(
-            "UPDATE servicenow_incidents SET state = 'resolved' WHERE external_id = 'INC-P1-001'"
+            "UPDATE dt_servicenow_incidents SET state = 'resolved' WHERE external_id = 'INC-P1-001'"
         )
         connection.execute(
             """
-            UPDATE servicenow_change_requests SET state = 'closed', is_blocking = 0
+            UPDATE dt_servicenow_change_requests SET state = 'closed', is_blocking = 0
             WHERE external_id = 'CHG-C360-001'
             """
         )
@@ -372,7 +373,7 @@ def _seed_simulated_sprints(
         with connection:
             _upsert_many(
                 connection,
-                "ado_sprints",
+                "dt_ado_sprints",
                 ("external_id", "project_external_id", "name", "start_date", "end_date"),
                 [(sprint_id, "ADO-AUTO", f"Sprint {sprint_number}",
                   sprint_start.isoformat(), sprint_end.isoformat())],
@@ -380,7 +381,7 @@ def _seed_simulated_sprints(
             )
             _upsert_many(
                 connection,
-                "ado_work_items",
+                "dt_ado_work_items",
                 ("external_id", "project_external_id", "sprint_external_id", "title",
                  "work_item_type", "state", "story_points", "is_unplanned"),
                 [
@@ -394,7 +395,7 @@ def _seed_simulated_sprints(
             )
             _upsert_many(
                 connection,
-                "ukg_time_entries",
+                "dt_ukg_time_entries",
                 ("external_id", "person_id", "initiative_id", "work_date", "work_type", "hours"),
                 [(f"UKG-SIM-SUPPORT-{sprint_number:03d}", "lead-engineer", INITIATIVE_ID,
                   sprint_end.isoformat(), "production_support", signals.support_hours)],
@@ -402,7 +403,7 @@ def _seed_simulated_sprints(
             )
             _upsert_many(
                 connection,
-                "servicenow_incidents",
+                "dt_servicenow_incidents",
                 ("external_id", "initiative_id", "assignee_person_id", "priority", "state",
                  "short_description", "opened_at"),
                 [
@@ -418,7 +419,7 @@ def _seed_simulated_sprints(
             if signals.change_age_days is not None:
                 _upsert_many(
                     connection,
-                    "servicenow_change_requests",
+                    "dt_servicenow_change_requests",
                     ("external_id", "initiative_id", "short_description", "state", "opened_at",
                      "planned_start", "is_blocking"),
                     [(f"CHG-SIM-SPRINT-{sprint_number:03d}", INITIATIVE_ID,
@@ -432,7 +433,7 @@ def _seed_simulated_sprints(
             if signals.pto_hours:
                 _upsert_many(
                     connection,
-                    "ukg_pto_requests",
+                    "dt_ukg_pto_requests",
                     ("external_id", "person_id", "start_date", "end_date", "hours", "status"),
                     [(f"UKG-SIM-PTO-{sprint_number:03d}", "lead-engineer",
                       (sprint_end - timedelta(days=2)).isoformat(),
@@ -443,7 +444,7 @@ def _seed_simulated_sprints(
 
 def simulation_state(connection: Connection) -> dict[str, Any] | None:
     row = connection.execute(
-        "SELECT started_on, as_of, sprints_advanced, sprint_days FROM simulation_state WHERE id = 1"
+        "SELECT started_on, as_of, sprints_advanced, sprint_days FROM dt_simulation_state WHERE id = 1"
     ).fetchone()
     return dict(row) if row else None
 
@@ -479,13 +480,13 @@ def simulate_sprints(
     baseline = latest_baseline(connection)
     with connection:
         connection.execute(
-            "UPDATE delivery_initiatives SET planned_start = ? WHERE id = ?",
+            "UPDATE dt_delivery_initiatives SET planned_start = ? WHERE id = ?",
             (start.isoformat(), INITIATIVE_ID),
         )
         if baseline:
             connection.execute(
                 """
-                UPDATE delivery_initiatives
+                UPDATE dt_delivery_initiatives
                 SET baseline_p50_hours = ?, baseline_p80_hours = ?, integration_buffer_pct = ?,
                     initial_confidence_pct = ?, target_end = ?
                 WHERE id = ?
@@ -495,7 +496,7 @@ def simulate_sprints(
             )
         connection.execute(
             """
-            INSERT INTO simulation_state (id, started_on, as_of, sprints_advanced, sprint_days)
+            INSERT INTO dt_simulation_state (id, started_on, as_of, sprints_advanced, sprint_days)
             VALUES (1, ?, ?, ?, ?)
             ON CONFLICT(id) DO UPDATE SET started_on = excluded.started_on, as_of = excluded.as_of,
                 sprints_advanced = excluded.sprints_advanced, sprint_days = excluded.sprint_days
@@ -569,8 +570,8 @@ def reset_simulation(connection: Connection) -> None:
     from .scenarios import clear_events
 
     with connection:
-        connection.execute("DELETE FROM simulation_state")
-        connection.execute("DELETE FROM simulation_settings")
+        connection.execute("DELETE FROM dt_simulation_state")
+        connection.execute("DELETE FROM dt_simulation_settings")
     clear_events(connection)
     _purge_simulated_rows(connection)
     seed_demo(connection)
@@ -580,7 +581,7 @@ def clear_demo_data(connection: Connection) -> int:
     """Delete every application data row while preserving the schema (local tables and portable app tables)."""
     deleted = connection.local.clear_all()
     if connection.dialect == "databricks":
-        from .data import (
+        from .storage import (
             BaselineRepository, IntakeSessionRepository, RecoveryScenarioRepository, TrackSnapshotRepository,
         )
 
@@ -608,14 +609,14 @@ def build_report(connection: Connection, as_of: date | None = None) -> dict[str,
         sprint_id = "ADO-SPRINT-DEMO"
         sprint_start = None
     initiative = connection.execute(
-        "SELECT * FROM delivery_initiatives WHERE id = ?", (INITIATIVE_ID,)
+        "SELECT * FROM dt_delivery_initiatives WHERE id = ?", (INITIATIVE_ID,)
     ).fetchone()
     if initiative is None:
         raise RuntimeError("Demo data is missing; run the seed-demo command first.")
 
     plan = connection.execute(
         """
-        SELECT capacity_fte, allocated_fte FROM planview_projects
+        SELECT capacity_fte, allocated_fte FROM dt_planview_projects
         WHERE initiative_id = ?
         """,
         (INITIATIVE_ID,),
@@ -623,8 +624,8 @@ def build_report(connection: Connection, as_of: date | None = None) -> dict[str,
     scope = connection.execute(
         """
         SELECT COUNT(*) AS item_count, COALESCE(SUM(story_points), 0) AS story_points
-        FROM ado_work_items AS wi
-        JOIN ado_projects AS p ON p.external_id = wi.project_external_id
+        FROM dt_ado_work_items AS wi
+        JOIN dt_ado_projects AS p ON p.external_id = wi.project_external_id
         WHERE p.initiative_id = ? AND wi.is_unplanned = 1 AND wi.sprint_external_id = ?
         """,
         (INITIATIVE_ID, sprint_id),
@@ -632,7 +633,7 @@ def build_report(connection: Connection, as_of: date | None = None) -> dict[str,
     support = connection.execute(
         """
         SELECT COALESCE(SUM(hours), 0) AS hours
-        FROM ukg_time_entries
+        FROM dt_ukg_time_entries
         WHERE initiative_id = ? AND work_type = 'production_support'
           AND work_date BETWEEN ? AND ?
         """,
@@ -642,7 +643,7 @@ def build_report(connection: Connection, as_of: date | None = None) -> dict[str,
         pto = connection.execute(
             """
             SELECT COALESCE(SUM(hours), 0) AS hours
-            FROM ukg_pto_requests
+            FROM dt_ukg_pto_requests
             WHERE person_id = 'lead-engineer' AND status = 'approved'
               AND start_date <= ? AND end_date >= ?
             """,
@@ -651,7 +652,7 @@ def build_report(connection: Connection, as_of: date | None = None) -> dict[str,
         changes = connection.execute(
             """
             SELECT external_id, short_description, opened_at
-            FROM servicenow_change_requests
+            FROM dt_servicenow_change_requests
             WHERE external_id = ? AND initiative_id = ? AND is_blocking = 1
               AND state NOT IN ('closed', 'cancelled')
             """,
@@ -665,14 +666,14 @@ def build_report(connection: Connection, as_of: date | None = None) -> dict[str,
         pto = connection.execute(
             """
             SELECT COALESCE(SUM(hours), 0) AS hours
-            FROM ukg_pto_requests
+            FROM dt_ukg_pto_requests
             WHERE person_id = 'lead-engineer' AND status = 'approved'
             """,
         ).fetchone()
         changes = connection.execute(
             """
             SELECT external_id, short_description, opened_at
-            FROM servicenow_change_requests
+            FROM dt_servicenow_change_requests
             WHERE initiative_id = ? AND is_blocking = 1
               AND state NOT IN ('closed', 'cancelled')
             """,
@@ -687,7 +688,7 @@ def build_report(connection: Connection, as_of: date | None = None) -> dict[str,
     incident = connection.execute(
         f"""
         SELECT COUNT(*) AS count
-        FROM servicenow_incidents
+        FROM dt_servicenow_incidents
         WHERE initiative_id = ? AND priority = 1 AND state NOT IN ('resolved', 'closed')
         {incident_filter}
         """,
@@ -713,6 +714,12 @@ def build_report(connection: Connection, as_of: date | None = None) -> dict[str,
         ],
         "oldest_blocking_change_age_days": max_change_age,
     }
+    from .intake import latest_baseline
+
+    baseline = latest_baseline(connection)
+    if baseline:
+        # TRACK measures against the commitment, so the approved FTE replaces the seeded Planview allocation.
+        signals["allocated_fte"] = baseline["allocated_fte"]
     data_origin: dict[str, Any] = {
         "mode": "synthetic_default", "label": "Synthetic demo data",
         "detail": "Seeded records for five simulated systems.",
@@ -751,7 +758,7 @@ def build_report(connection: Connection, as_of: date | None = None) -> dict[str,
         dict(row)
         for row in connection.execute(
             "SELECT source_key, display_name, integration_mode, writeback_enabled "
-            "FROM source_systems ORDER BY source_key"
+            "FROM dt_source_systems ORDER BY source_key"
         )
     ]
     return {
@@ -787,7 +794,7 @@ def build_report(connection: Connection, as_of: date | None = None) -> dict[str,
             for row in connection.execute(
                 """
                 SELECT role_name, ROUND(SUM(allocated_fte), 1) AS allocated_fte
-                FROM planview_resource_assignments
+                FROM dt_planview_resource_assignments
                 WHERE initiative_id = ?
                 GROUP BY role_name
                 ORDER BY role_name
@@ -808,12 +815,34 @@ def build_workflow_report(
     return run_delivery_workflow_sync(build_report(connection, as_of))
 
 
+def _managed_host() -> bool:
+    """Databricks Apps and Azure App Service route traffic to the app from outside its own loopback."""
+    from .integrations import azure_app_service
+
+    return bool(os.environ.get("DATABRICKS_APP_PORT")) or azure_app_service()
+
+
+def _data_script(parser: argparse.ArgumentParser, name: str) -> Any:
+    """Import a maintenance script from the repository's `scripts/`; deployments ship only `src/`, not scripts."""
+    import importlib
+
+    repository_root = str(Path(__file__).resolve().parents[2])
+    if repository_root not in sys.path:
+        sys.path.insert(0, repository_root)
+    try:
+        return importlib.import_module(f"scripts.{name}")
+    except ModuleNotFoundError as error:
+        if error.name not in ("scripts", f"scripts.{name}"):
+            raise
+        parser.error(f"scripts/{name}.py is not available here; run this command from a clone of the repository.")
+
+
 def _write_json(payload: dict[str, Any]) -> None:
     print(json.dumps(payload, indent=2))
 
 
 def _latest_recovery_scenario(connection: Connection) -> dict[str, Any] | None:
-    from .data import RecoveryScenarioRepository
+    from .storage import RecoveryScenarioRepository
 
     scenario = RecoveryScenarioRepository(connection.app_database()).latest()
     if scenario is None:
@@ -841,7 +870,7 @@ def save_recovery_scenario(
     connection: Connection, scenario: dict[str, Any]
 ) -> dict[str, Any]:
     """Persist a recovery what-if and its simulated per-system update records through the portable layer."""
-    from .data import RecoveryScenarioRepository
+    from .storage import RecoveryScenarioRepository
 
     RecoveryScenarioRepository(connection.app_database()).save(
         {key: scenario[key] for key in (
@@ -855,7 +884,7 @@ def save_recovery_scenario(
 
 def record_track_snapshot(connection: Connection, report: dict[str, Any]) -> list[dict[str, Any]]:
     """Keep this sprint's TRACK outlook (idempotent per sprint) and return the whole trend."""
-    from .data import TrackSnapshotRepository
+    from .storage import TrackSnapshotRepository
 
     repository = TrackSnapshotRepository(connection.app_database())
     outlook = report["workflow"]["stages"]["track"]
@@ -1049,9 +1078,9 @@ def serve_dashboard(
                 with connect(database) as connection:
                     # Intake needs reference history and capacity; load them on demand after a clear.
                     if not connection.execute(
-                        "SELECT EXISTS(SELECT 1 FROM historical_projects) "
-                        "AND EXISTS(SELECT 1 FROM historical_project_lessons) "
-                        "AND EXISTS(SELECT 1 FROM planview_projects)"
+                        "SELECT EXISTS(SELECT 1 FROM dt_historical_projects) "
+                        "AND EXISTS(SELECT 1 FROM dt_historical_project_lessons) "
+                        "AND EXISTS(SELECT 1 FROM dt_planview_projects)"
                     ).fetchone()[0]:
                         seed_demo(connection)
                     if route == "/api/intake/analyze":
@@ -1291,7 +1320,7 @@ def serve_dashboard(
                 self.send_json(200, result)
                 return
             if route in ACT_POST_ROUTES:
-                from .recovery import analyze_intervention, predict_scenario
+                from .recovery import analyze_intervention, predict_scenario, tune_scenario
 
                 try:
                     with connect(database) as connection:
@@ -1308,13 +1337,15 @@ def serve_dashboard(
                             dict(row) for row in connection.execute(
                                 "SELECT project_name, planned_effort_hours, actual_effort_hours, "
                                 "planned_duration_weeks, actual_duration_weeks, outcome, lessons_learned "
-                                "FROM historical_projects WHERE actual_duration_weeks > planned_duration_weeks "
+                                "FROM dt_historical_projects WHERE actual_duration_weeks > planned_duration_weeks "
                                 "ORDER BY (actual_duration_weeks - planned_duration_weeks) * 1.0 / planned_duration_weeks DESC "
                                 "LIMIT 6"
                             )
                         ]
                         if route == "/api/act/analyze":
                             result = analyze_intervention(report, late)
+                        elif route == "/api/act/tune":
+                            result = tune_scenario(report, payload, late)
                         else:
                             result = predict_scenario(report, payload, late)
                             if route == "/api/act/apply":
@@ -1404,6 +1435,12 @@ def serve_dashboard(
 
     server = ThreadingHTTPServer((host, port), DashboardHandler)
     print(f"Delivery Twin dashboard: http://{host}:{server.server_port}/", flush=True)
+    from .integrations import describe
+    from .llm import ai_mode
+
+    switches = describe()
+    print(f"Data: {chosen_dialect} · AI: {ai_mode()} · Databricks: {switches['databricks']} · "
+          f"Foundry: {switches['foundry']}", flush=True)
     try:
         server.serve_forever()
     except KeyboardInterrupt:
@@ -1437,12 +1474,13 @@ def main(argv: list[str] | None = None) -> int:
     simulate_parser.add_argument("--reset", action="store_true", help="Clear the simulation so the other tabs go blank")
     serve_parser = subparsers.add_parser("serve", parents=[engine], help="Run the local web dashboard")
     serve_parser.add_argument(
-        "--host", default=os.environ.get("DELIVERYTWIN_HOST") or ("0.0.0.0" if os.environ.get("DATABRICKS_APP_PORT") else "127.0.0.1"),
-        help="Dashboard bind address (default: 127.0.0.1; 0.0.0.0 inside Databricks Apps)",
+        "--host", default=os.environ.get("DELIVERYTWIN_HOST") or ("0.0.0.0" if _managed_host() else "127.0.0.1"),
+        help="Dashboard bind address (default: 127.0.0.1; 0.0.0.0 inside Databricks Apps or Azure App Service)",
     )
     serve_parser.add_argument(
-        "--port", type=int, default=int(os.environ.get("DATABRICKS_APP_PORT") or os.environ.get("DELIVERYTWIN_PORT") or 8765),
-        help="Dashboard port (default: DATABRICKS_APP_PORT, DELIVERYTWIN_PORT, else 8765)",
+        "--port", type=int,
+        default=int(os.environ.get("DATABRICKS_APP_PORT") or os.environ.get("DELIVERYTWIN_PORT") or os.environ.get("PORT") or 8765),
+        help="Dashboard port (default: DATABRICKS_APP_PORT, DELIVERYTWIN_PORT, PORT (Azure App Service), else 8765)",
     )
     data_parser = subparsers.add_parser(
         "generate-data", help="Regenerate the deterministic delivery_intel-shaped CSV dataset"
@@ -1459,19 +1497,17 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     if args.command == "databricks-smoke":
-        from .data.smoke import run_databricks_smoke
-
         try:
-            return run_databricks_smoke()
+            return _data_script(parser, "databricks_smoke").run_databricks_smoke()
         except RuntimeError as error:
             parser.error(str(error))
     if args.command == "generate-data":
-        from .data import DATASET_DIR, write_dataset
+        from .storage import DATASET_DIR
 
-        _write_json(write_dataset(args.out or DATASET_DIR))
+        _write_json(_data_script(parser, "generate_data").write_dataset(args.out or DATASET_DIR))
         return 0
     if args.command == "ddl":
-        from .data import render_ddl
+        from .storage import render_ddl
 
         qualified = args.dialect == "databricks"
         print(render_ddl(args.dialect, args.catalog if qualified else None, args.schema if qualified else None), end="")

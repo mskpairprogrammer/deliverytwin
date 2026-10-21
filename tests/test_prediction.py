@@ -192,7 +192,7 @@ class PredictionTests(unittest.TestCase):
             adjustments={"allocated_fte": 8.0}, questions=analysis["clarifications"], basis=good,
         )
         self.assertEqual((approved["baseline"]["p50_hours"], approved["baseline"]["p80_hours"]), (4900, 6100))
-        stored = self.connection.execute("SELECT answers_json FROM commitment_baselines").fetchone()[0]
+        stored = self.connection.execute("SELECT answers_json FROM dt_commitment_baselines").fetchone()[0]
         self.assertEqual(json.loads(stored)["basis"]["source"], "llm")
 
 

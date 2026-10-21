@@ -13,7 +13,7 @@ from unittest.mock import patch
 
 from deliverytwin import connect, initialize_database, seed_demo
 from deliverytwin.app import _is_loopback, serve_dashboard
-from deliverytwin.data import (
+from deliverytwin.storage import (
     BaselineRepository,
     IntakeSessionRepository,
     DATASET_DIR,
@@ -24,12 +24,12 @@ from deliverytwin.data import (
     DatabricksSettings,
     DuckDBDatabase,
     HistoryRepository,
-    generate_dataset,
     load_dataset,
     render_ddl,
 )
-from deliverytwin.data.repository import dataset_loaded, read_csv_rows
-from deliverytwin.data.schema import check_identifier
+from deliverytwin.storage.repository import dataset_loaded, read_csv_rows
+from deliverytwin.storage.schema import check_identifier
+from scripts.generate_data import generate_dataset
 from deliverytwin.intake import evaluate_intake
 
 REQUEST = "We need one view of every customer across the business."
@@ -71,7 +71,7 @@ def _backends():
 class DatasetTests(unittest.TestCase):
     def test_checked_in_csvs_match_the_deterministic_generator(self) -> None:
         generated = generate_dataset()
-        for name in TABLES:
+        for name in (table.dataset for table in TABLES.values()):
             expected = [{k: str(v) for k, v in row.items()} for row in generated[name]]
             actual = [
                 {k: v for k, v in row.items()}
@@ -116,9 +116,9 @@ class DataLayerContractTests(unittest.TestCase):
                 first = load_dataset(database)
                 second = load_dataset(database)
                 self.assertEqual(first, second)
-                self.assertEqual(first["project_estimate_summary"], 50)
+                self.assertEqual(first["dt_project_estimate_summary"], 50)
                 self.assertTrue(dataset_loaded(database))
-                count = database.query(f"SELECT COUNT(*) AS n FROM {database.table('project_estimate_summary')}")
+                count = database.query(f"SELECT COUNT(*) AS n FROM {database.table('dt_project_estimate_summary')}")
                 self.assertEqual(count[0]["n"], 50)
                 self.assertEqual(len(HistoryRepository(database).list_projects()), 50)
 
@@ -152,36 +152,36 @@ class DataLayerContractTests(unittest.TestCase):
     def test_values_are_bound_as_parameters_not_interpolated(self) -> None:
         database = DuckDBDatabase()
         database.create_tables()
-        hostile = "x'); DROP TABLE project_intakes; --"
-        database.upsert("project_lessons", [{
+        hostile = "x'); DROP TABLE dt_project_intakes; --"
+        database.upsert("dt_project_lessons", [{
             "project_id": hostile, "category": "data", "lesson": "l", "suggested_option": "o",
         }])
-        rows = database.query(f"SELECT project_id FROM {database.table('project_lessons')}")
+        rows = database.query(f"SELECT project_id FROM {database.table('dt_project_lessons')}")
         self.assertEqual(rows, [{"project_id": hostile}])
-        self.assertEqual(database.query(f"SELECT COUNT(*) AS n FROM {database.table('project_intakes')}")[0]["n"], 0)
+        self.assertEqual(database.query(f"SELECT COUNT(*) AS n FROM {database.table('dt_project_intakes')}")[0]["n"], 0)
 
 
 class AppTableTests(unittest.TestCase):
     ROW = {
-        "commitment_baselines": {
+        "dt_commitment_baselines": {
             "baseline_id": "b-1", "request_text": "r", "answers_json": "{}", "fingerprint_json": "{}",
             "p50_hours": 4650, "p80_hours": 5750, "integration_buffer_pct": 19,
             "allocated_fte": 7.0, "capacity_fte": 8.5, "target_date": "2027-03-31",
             "confidence_pct": 62.2, "approved_at": "2026-10-19T02:29:25+00:00",
         },
-        "intake_sessions": {
+        "dt_intake_sessions": {
             "session_id": "s-1", "started_at": "2026-10-19T02:00:00+00:00",
             "first_rom_at": "2026-10-19T02:05:00+00:00", "approved_at": None,
         },
-        "recovery_scenarios": {
+        "dt_recovery_scenarios": {
             "scenario_id": 1, "initiative_id": "x", "recommended_option": "C", "allocated_fte": 7.0,
             "scope_defer_pct": 10, "target_date": "2027-03-31", "incremental_cost_k": 0,
             "confidence_pct": 48, "saved_at": "2026-10-19T02:29:25+00:00",
         },
-        "recovery_target_updates": {
+        "dt_recovery_target_updates": {
             "scenario_id": 1, "source_key": "servicenow", "payload_json": "{\"action\": \"escalate\"}",
         },
-        "track_snapshots": {
+        "dt_track_snapshots": {
             "snapshot_id": "t-1", "initiative_id": "x", "sprint_number": 1, "as_of": "2026-11-01",
             "on_time_pct": 53, "projected_slip_days": 21, "unplanned_story_points": 16,
             "support_hours_per_week": 4, "captured_at": "2026-11-01T09:00:00+00:00",
@@ -211,7 +211,7 @@ class AppTableTests(unittest.TestCase):
     def test_databricks_binds_timestamps_as_datetimes(self) -> None:
         connection = FakeConnection()
         database = DatabricksDatabase(DatabricksSettings("h", "/p"), connection)
-        database.upsert("intake_sessions", [self.ROW["intake_sessions"]])
+        database.upsert("dt_intake_sessions", [self.ROW["dt_intake_sessions"]])
         _, params = connection.log[-1]
         self.assertIsInstance(params[1], datetime)
         self.assertIsNone(params[3])
@@ -263,7 +263,7 @@ class AppRepositoryTests(unittest.TestCase):
         database = DuckDBDatabase()
         BaselineRepository(database)
         names = {row["table_name"] for row in database.query("SELECT table_name FROM information_schema.tables")}
-        self.assertEqual(names, {"commitment_baselines"})
+        self.assertEqual(names, {"dt_commitment_baselines"})
 
     def test_databricks_returns_datetimes_and_dates_normalised(self) -> None:
         columns = [(name,) for name in (
@@ -293,7 +293,7 @@ class AppRepositoryTests(unittest.TestCase):
 
 class SmokeTests(unittest.TestCase):
     def test_smoke_checks_pass_on_every_local_backend(self) -> None:
-        from deliverytwin.data.smoke import format_report, run_checks
+        from scripts.databricks_smoke import format_report, run_checks
 
         for backend, database in _backends():
             with self.subTest(backend=backend):
@@ -302,7 +302,7 @@ class SmokeTests(unittest.TestCase):
                 self.assertEqual(len(results), 8)
 
     def test_smoke_reports_failures_instead_of_raising(self) -> None:
-        from deliverytwin.data.smoke import format_report, run_checks
+        from scripts.databricks_smoke import format_report, run_checks
 
         class Broken(DuckDBDatabase):
             def execute(self, sql, params=()):
@@ -337,18 +337,18 @@ class DatabricksAdapterTests(unittest.TestCase):
         self.assertTrue(any("submitted_date DATE" in sql for sql in statements))
 
     def test_upsert_uses_merge_with_positional_parameters(self) -> None:
-        self.database.upsert("project_lessons", [{
+        self.database.upsert("dt_project_lessons", [{
             "project_id": "HIST-001", "category": "data", "lesson": "text", "suggested_option": "event_sync",
         }])
         sql, params = self.connection.log[-1]
-        self.assertTrue(sql.startswith("MERGE INTO dpm_dev.mlops.project_lessons AS t USING (SELECT ? AS project_id"))
+        self.assertTrue(sql.startswith("MERGE INTO dpm_dev.mlops.dt_project_lessons AS t USING (SELECT ? AS project_id"))
         self.assertIn("t.project_id = s.project_id AND t.category = s.category", sql)
         self.assertIn("WHEN MATCHED THEN UPDATE SET t.lesson = s.lesson", sql)
         self.assertNotIn("HIST-001", sql)
         self.assertEqual(params, ["HIST-001", "data", "text", "event_sync"])
 
     def test_dates_are_bound_as_dates_for_delta_date_columns(self) -> None:
-        self.database.upsert("project_intakes", [{"project_id": "HIST-001", "submitted_date": "2024-03-04"}])
+        self.database.upsert("dt_project_intakes", [{"project_id": "HIST-001", "submitted_date": "2024-03-04"}])
         _, params = self.connection.log[-1]
         self.assertIn(date(2024, 3, 4), params)
 
@@ -363,7 +363,7 @@ class DatabricksAdapterTests(unittest.TestCase):
             DatabricksSettings.from_env({})
 
     def test_checked_in_delta_ddl_matches_the_schema(self) -> None:
-        checked_in = (Path(__file__).parents[1] / "deliverytwin" / "data" / "databricks_ddl.sql").read_text(encoding="utf-8")
+        checked_in = (Path(__file__).parents[1] / "scripts" / "databricks_ddl.sql").read_text(encoding="utf-8")
         self.assertEqual(checked_in.strip(), render_ddl("databricks", "dpm_dev", "mlops").strip())
 
 

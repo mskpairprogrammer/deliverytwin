@@ -8,18 +8,23 @@ a fixed seed; no real project data is used.
 """
 from __future__ import annotations
 
+import argparse
 import csv
+import json
 import math
 import random
+import sys
 from datetime import date, timedelta
 from pathlib import Path
 from typing import Any
 
-from .schema import TABLES
+if not __package__:  # run as `python scripts/generate_data.py`: make the package in src/ importable
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+
+from deliverytwin.storage.paths import DATASET_DIR, TRANSCRIPT_DIRNAME
+from deliverytwin.storage.schema import TABLE_PREFIX, TABLES
 
 SEED = 2026
-DATASET_DIR = Path(__file__).with_name("delivery_intelligence")
-TRANSCRIPT_DIRNAME = "ram_transcripts"
 
 ROLE_SKILL = {
     "lead-engineer": "senior",
@@ -315,7 +320,7 @@ def generate_dataset(seed: int = SEED) -> dict[str, list[dict[str, Any]]]:
         for name in family["names"]:
             projects.append(_build_project(rng, family, name, len(projects)))
 
-    tables: dict[str, list[dict[str, Any]]] = {name: [] for name in TABLES}
+    tables: dict[str, list[dict[str, Any]]] = {table.dataset: [] for table in TABLES.values()}
     workitem_number = 1000
     for project in projects:
         pid = project["id"]
@@ -479,10 +484,22 @@ def write_dataset(directory: Path | str = DATASET_DIR, seed: int = SEED) -> dict
                 )
             counts["ram_transcripts"] = len(rows)
             continue
-        columns = [column.name for column in TABLES[name].columns]
+        columns = [column.name for column in TABLES[TABLE_PREFIX + name].columns]
         with (root / f"{name}.csv").open("w", encoding="utf-8", newline="") as handle:
             writer = csv.DictWriter(handle, fieldnames=columns, lineterminator="\n")
             writer.writeheader()
             writer.writerows(rows)
         counts[name] = len(rows)
     return counts
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="Regenerate the deterministic delivery_intel-shaped CSV dataset.")
+    parser.add_argument("--out", default=None, help=f"Output directory (default: {DATASET_DIR})")
+    args = parser.parse_args(argv)
+    print(json.dumps(write_dataset(args.out or DATASET_DIR), indent=2))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

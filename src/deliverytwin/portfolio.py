@@ -15,7 +15,7 @@ import math
 from datetime import date
 from typing import Any
 
-from .data.connection import Connection
+from .storage.connection import Connection
 
 SETTING_KEY = "preemption"
 PI_SPRINTS = 6
@@ -36,20 +36,22 @@ POINTS_PER_DEFERRED_HOUR = 0.02
 HYBRID_DEFER_HOURS = 120  # the composed plan defers only a prudent share, then fills the rest with capacity
 BACKFILL_PRODUCTIVITY = 0.8
 FTE_LOT = 0.5
+MAX_BACKFILL_FTE = 5.0
 OPTION_ORDER = ("resequence", "cross_portfolio", "backfill", "hybrid_replan")
+CUSTOM_OPTION = "custom"  # a lever mix tuned from a plain-English instruction in the what-if
 
 
 def preemption_active(connection: Connection) -> bool:
-    row = connection.execute("SELECT value FROM simulation_settings WHERE key = ?", (SETTING_KEY,)).fetchone()
+    row = connection.execute("SELECT value FROM dt_simulation_settings WHERE key = ?", (SETTING_KEY,)).fetchone()
     return bool(row and row["value"] == P0["id"])
 
 
 def set_preemption(connection: Connection, active: bool) -> None:
     with connection:
-        connection.execute("DELETE FROM simulation_settings WHERE key = ?", (SETTING_KEY,))
+        connection.execute("DELETE FROM dt_simulation_settings WHERE key = ?", (SETTING_KEY,))
         if active:
             connection.execute(
-                "INSERT INTO simulation_settings (key, value) VALUES (?, ?)", (SETTING_KEY, P0["id"])
+                "INSERT INTO dt_simulation_settings (key, value) VALUES (?, ?)", (SETTING_KEY, P0["id"])
             )
 
 
@@ -151,6 +153,48 @@ def _plan(kind: str, loss_hours: int) -> dict[str, Any]:
     }
 
 
+def borrow_headroom() -> float:
+    donor = next(item for item in SIBLINGS if item["id"] == DONOR)
+    return max(0.0, donor["fte"] - donor["floor_fte"])
+
+
+def _fte_lots(value: object, high: float, name: str) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+        raise ValueError(f"{name} must be a number.")
+    if not 0 <= value <= high or abs(value / FTE_LOT - round(value / FTE_LOT)) > 1e-9:
+        raise ValueError(f"{name} must be between 0 and {high:g} FTE in {FTE_LOT:g} FTE steps.")
+    return round(float(value), 1)
+
+
+def validate_levers(raw: object) -> dict[str, Any]:
+    """Bounds-check a tuned lever mix: hours deferred, FTE borrowed from the donor, contractor FTE."""
+    if not isinstance(raw, dict):
+        raise ValueError("Portfolio levers must be an object.")
+    deferred = raw.get("deferred_hours", 0)
+    loss = planned_loss_hours()
+    if isinstance(deferred, bool) or not isinstance(deferred, (int, float)) or not math.isfinite(deferred) \
+            or not 0 <= deferred <= loss:
+        raise ValueError(f"Deferred hours must be a number from 0 to {loss}.")
+    return {
+        "deferred_hours": round(deferred),
+        "borrowed_fte": _fte_lots(raw.get("borrowed_fte", 0), borrow_headroom(), "Borrowed FTE"),
+        "backfill_fte": _fte_lots(raw.get("backfill_fte", 0), MAX_BACKFILL_FTE, "Backfill FTE"),
+    }
+
+
+def custom_plan(levers: dict[str, Any], loss_hours: int) -> dict[str, Any]:
+    """Account a validated lever mix the same way the fixed options are: defer, then borrow, then backfill."""
+    window_hours = SPRINT_HOURS_PER_FTE * len(PREEMPT_SPRINTS)
+    deferred, borrowed, backfill = levers["deferred_hours"], levers["borrowed_fte"], levers["backfill_fte"]
+    remaining = loss_hours - deferred - borrowed * window_hours
+    reclaimed = deferred + borrowed * window_hours + min(max(remaining, 0.0), backfill * window_hours * BACKFILL_PRODUCTIVITY)
+    return {
+        "deferred_hours": round(deferred), "borrowed_fte": borrowed, "backfill_fte": backfill,
+        "reclaimed_hours": round(min(reclaimed, loss_hours)), "residual_hours": round(max(0.0, loss_hours - reclaimed)),
+        "cost_usd": round(backfill * window_hours * _rate()),
+    }
+
+
 def _rate() -> float:
     from .recovery import blended_rate
 
@@ -184,45 +228,45 @@ TITLES = {
     "cross_portfolio": ("Cross-portfolio reallocation", "Borrow 2.0 FTE from the lower-priority PRJ-024 Claims Portal in Sprints 3-4."),
     "backfill": ("Backfill preempted FTE", "Surge contractor capacity in Sprints 3-4 to protect the whole PI plan."),
     "hybrid_replan": ("Composed re-plan", "Re-sequence first, borrow only the remaining gap from PRJ-024, then backfill whatever is left."),
+    CUSTOM_OPTION: ("Tuned re-plan", "A lever mix tuned from your instruction: defer, borrow from PRJ-024 and backfill."),
 }
+
+
+def build_option(report: dict[str, Any], kind: str, plan: dict[str, Any], base_without_preemption: float) -> dict[str, Any]:
+    """One portfolio scenario from its plan: confidence, cost, donor impact, trade-offs and risks."""
+    from .recovery import cost_impact
+
+    signals, target = report["signals"], report["initiative"]["target_end"]
+    confidence = option_confidence(base_without_preemption, plan)
+    donor = donor_impact(plan["borrowed_fte"])
+    cost_k = plan["cost_usd"] / 1000
+    impact = cost_impact(report, signals["allocated_fte"], date.fromisoformat(target), cost_k)
+    trade_offs, risks = [], []
+    if plan["deferred_hours"]:
+        trade_offs.append(f"{plan['deferred_hours']} h of non-critical Feature work moves to Sprints 5-6 or the next PI.")
+    if donor:
+        trade_offs.append(
+            f"{donor['project_id']} {donor['project_name']} [{donor['tier']}] drops to {donor['fte_after']:g} FTE "
+            f"in Sprints 3-4: about +{donor['slip_weeks']:g} weeks of slip there."
+        )
+    if plan["backfill_fte"]:
+        trade_offs.append(
+            f"{plan['backfill_fte']:g} FTE of contractors for Sprints 3-4 at ${_rate():,.0f}/h "
+            f"(assumed {int(BACKFILL_PRODUCTIVITY * 100)}% productive)."
+        )
+    if plan["residual_hours"]:
+        risks.append(f"{plan['residual_hours']} h of the 400 h loss is still uncovered and will slip the plan.")
+    return {
+        "id": kind, "title": TITLES[kind][0], "summary": TITLES[kind][1], "portfolio_option": kind,
+        "allocated_fte": signals["allocated_fte"], "target_date": target,
+        "incremental_cost_k": cost_k, "cost_impact": impact,
+        "predicted_on_time_pct": confidence, "model_check_pct": confidence,
+        "levers": plan, "donor_impact": donor, "trade_offs": trade_offs, "risks": risks,
+        "composed": kind == "hybrid_replan",
+    }
 
 
 def portfolio_options(report: dict[str, Any], base_without_preemption: float) -> list[dict[str, Any]]:
     """The four portfolio-aware recovery scenarios with their deterministic plans, cost and donor impact."""
-    from .recovery import cost_impact
-
     loss = planned_loss_hours()
-    signals, initiative = report["signals"], report["initiative"]
-    target = initiative["target_end"]
-
-    options = []
-    for kind in OPTION_ORDER:
-        plan = _plan(kind, loss)
-        confidence = option_confidence(base_without_preemption, plan)
-        donor = donor_impact(plan["borrowed_fte"])
-        cost_k = plan["cost_usd"] / 1000
-        impact = cost_impact(report, signals["allocated_fte"], date.fromisoformat(target), cost_k)
-        trade_offs, risks = [], []
-        if plan["deferred_hours"]:
-            trade_offs.append(f"{plan['deferred_hours']} h of non-critical Feature work moves to Sprints 5-6 or the next PI.")
-        if donor:
-            trade_offs.append(
-                f"{donor['project_id']} {donor['project_name']} [{donor['tier']}] drops to {donor['fte_after']:g} FTE "
-                f"in Sprints 3-4: about +{donor['slip_weeks']:g} weeks of slip there."
-            )
-        if plan["backfill_fte"]:
-            trade_offs.append(
-                f"{plan['backfill_fte']:g} FTE of contractors for Sprints 3-4 at ${_rate():,.0f}/h "
-                f"(assumed {int(BACKFILL_PRODUCTIVITY * 100)}% productive)."
-            )
-        if plan["residual_hours"]:
-            risks.append(f"{plan['residual_hours']} h of the 400 h loss is still uncovered and will slip the plan.")
-        options.append({
-            "id": kind, "title": TITLES[kind][0], "summary": TITLES[kind][1], "portfolio_option": kind,
-            "allocated_fte": signals["allocated_fte"], "target_date": target,
-            "incremental_cost_k": cost_k, "cost_impact": impact,
-            "predicted_on_time_pct": confidence, "model_check_pct": confidence,
-            "levers": plan, "donor_impact": donor, "trade_offs": trade_offs, "risks": risks,
-            "composed": kind == "hybrid_replan",
-        })
-    return options
+    return [build_option(report, kind, _plan(kind, loss), base_without_preemption) for kind in OPTION_ORDER]

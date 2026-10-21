@@ -217,8 +217,9 @@ class JourneyUiTests(unittest.TestCase):
         page.locator("#track-next").wait_for(state="visible")
         self.assertRegex(self.states()["track"], r"^Sprint 1 · \d+% on time$")
         titles = page.locator("#panel-track .card-title").all_inner_texts()
-        self.assertEqual(titles[0], "AI sprint briefing", titles)
-        self.assertTrue(any(title.startswith("Sprint 1 delivery outlook") for title in titles), titles)
+        # The outlook comes first so a simulated sprint shows the on-time change right under the button.
+        self.assertEqual(titles[0], "Sprint 1 delivery outlook", titles)
+        self.assertIn("AI sprint briefing", titles)
         page.wait_for_function("document.getElementById('brief-drivers').children.length > 0")
         self.assertIn("RULES-BASED BRIEFING", page.locator("#brief-source").inner_text())
         self.assertIn("Production support load", page.locator("#brief-drivers").inner_text())
@@ -413,6 +414,35 @@ class JourneyUiTests(unittest.TestCase):
         self.assertRegex(roi, r"\d+% caught at intake")
         self.assertRegex(roi, r"[−+]\d+% spread")
         self.assertRegex(roi, r"\d+ flagged · \d+ stated")
+
+    def test_the_what_if_tunes_a_portfolio_scenario_from_an_instruction(self) -> None:
+        page = self.page
+        self.run_shape_to_commit()
+        self.approve_and_simulate()
+        page.wait_for_function("document.getElementById('confidence').textContent !== '—'")
+        page.get_by_role("button", name="Simulate next sprint").click()
+        page.locator("#confidence-delta:not([hidden])").wait_for()
+        self.assertRegex(page.locator("#confidence-delta").inner_text(), r"since Sprint 1 · \d+% → \d+%")
+        page.get_by_role("button", name="⚡ Simulate P0 Project Preemption (PI Conflict)").click()
+        page.locator("#pi-swimlane").wait_for(state="visible")
+        page.wait_for_function("document.getElementById('confidence-delta').textContent.includes('P0 preemption')")
+        self.assertIn("▼", page.locator("#confidence-delta").inner_text())
+        page.get_by_role("button", name="Review recovery options →").click()
+        page.wait_for_function("document.querySelectorAll('#act-options .rec-card').length === 4")
+        cards = page.locator("#act-options .rec-card")
+        cards.filter(has_text="Composed re-plan").get_by_role("button", name="Preview this scenario").click()
+        page.locator("#act-what-if-results").get_by_text("Predicted on-time").wait_for()
+
+        page.locator("#act-tune-chips").get_by_role("button", name="No extra budget").click()
+        page.get_by_role("button", name="Tune with AI").click()
+        page.locator("#act-what-if-results .tune-summary").wait_for()
+        results = page.locator("#act-what-if-results").inner_text()
+        self.assertIn("LEVER SEARCH", results)
+        self.assertIn("target 70% reached", results)
+        self.assertEqual(page.locator("#act-cost").input_value(), "0")
+        self.assertIn("Tuned re-plan", page.locator("#pi-replan-summary").inner_text())
+        page.get_by_role("button", name="Apply simulated updates").click()
+        page.wait_for_function("document.getElementById('act-scenario-status').textContent.includes('saved')")
 
     def test_p0_preemption_shows_the_swimlane_and_a_portfolio_aware_replan(self) -> None:
         page = self.page

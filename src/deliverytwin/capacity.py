@@ -13,7 +13,7 @@ import re
 from datetime import date
 from typing import Any
 
-from .data.connection import Connection
+from .storage.connection import Connection
 
 MIN_GROUP_SIZE = 3
 HOURS_PER_FTE_WEEK = 40
@@ -76,7 +76,7 @@ def hr_guardrail(connection: Connection, target: date, today: date, weeks: float
     """Role-level HR aggregates with small groups suppressed; returns counts and one team-wide factor only."""
     groups: dict[str, int] = {}
     for row in connection.execute(
-        "SELECT job_title, COUNT(*) AS workers FROM oracle_workers WHERE worker_status = 'active' GROUP BY job_title"
+        "SELECT job_title, COUNT(*) AS workers FROM dt_oracle_workers WHERE worker_status = 'active' GROUP BY job_title"
     ):
         family = role_family(row["job_title"])
         groups[family] = groups.get(family, 0) + int(row["workers"])
@@ -86,7 +86,7 @@ def hr_guardrail(connection: Connection, target: date, today: date, weeks: float
     time_away_hours = None
     if not suppressed_team and weeks > 0:
         total = connection.execute(
-            "SELECT COALESCE(SUM(hours), 0) FROM ukg_pto_requests WHERE status = 'approved' "
+            "SELECT COALESCE(SUM(hours), 0) FROM dt_ukg_pto_requests WHERE status = 'approved' "
             "AND end_date >= ? AND start_date <= ?", (today.isoformat(), target.isoformat()),
         ).fetchone()[0]
         time_away_hours = round(float(total))

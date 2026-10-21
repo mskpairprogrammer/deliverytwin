@@ -5,6 +5,7 @@ import json
 import os
 from typing import Any
 
+from .integrations import foundry_switch
 from .llm import complete, openai_configured, openai_model
 
 
@@ -31,17 +32,25 @@ class ChatNotConfiguredError(RuntimeError):
     """Raised when Microsoft Foundry chat settings are missing."""
 
 
-def chat_configuration_status() -> dict[str, Any]:
+def foundry_chat_settings() -> tuple[str, str] | None:
+    """(project endpoint, model) for the Foundry agent; None when unset or DELIVERYTWIN_FOUNDRY_ENABLED=0."""
+    if foundry_switch() is False:
+        return None
     endpoint = os.environ.get("FOUNDRY_PROJECT_ENDPOINT", "").strip()
     model = os.environ.get("FOUNDRY_MODEL", "").strip()
-    if (not endpoint or not model) and openai_configured():
-        return {"available": True, "message": f"OpenAI chat is configured ({openai_model()})."}
-    if not endpoint or not model:
+    return (endpoint, model) if endpoint and model else None
+
+
+def chat_configuration_status() -> dict[str, Any]:
+    foundry = foundry_chat_settings()
+    if foundry is None and openai_configured():
+        return {"available": True, "message": f"Chat uses the configured model ({openai_model()})."}
+    if foundry is None:
         return {
             "available": False,
             "message": (
-                "Chat is disabled: configure OPENAI_API_KEY, or set "
-                "FOUNDRY_PROJECT_ENDPOINT and FOUNDRY_MODEL with Azure CLI or managed "
+                "Chat is disabled: set FOUNDRY_PROJECT_ENDPOINT and FOUNDRY_MODEL (OPENAI_API_KEY "
+                "also works for local runs) with Azure CLI or managed "
                 "identity authentication, then restart the server."
             ),
         }
@@ -115,10 +124,8 @@ async def answer_delivery_question(
     if not configuration["available"]:
         raise ChatNotConfiguredError(configuration["message"])
 
-    if not (
-        os.environ.get("FOUNDRY_PROJECT_ENDPOINT", "").strip()
-        and os.environ.get("FOUNDRY_MODEL", "").strip()
-    ):
+    foundry = foundry_chat_settings()
+    if foundry is None:
         answer = await asyncio.to_thread(
             complete,
             [
@@ -137,11 +144,7 @@ async def answer_delivery_question(
     credential = _create_credential()
     agent: Agent[Any] | None = None
     try:
-        client = FoundryChatClient(
-            project_endpoint=os.environ["FOUNDRY_PROJECT_ENDPOINT"].strip(),
-            model=os.environ["FOUNDRY_MODEL"].strip(),
-            credential=credential,
-        )
+        client = FoundryChatClient(project_endpoint=foundry[0], model=foundry[1], credential=credential)
         agent = Agent(
             client=client,
             name="DeliveryTwinDashboardAssistant",

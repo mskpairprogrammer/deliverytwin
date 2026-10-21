@@ -16,7 +16,7 @@ import zipfile
 from datetime import date, datetime, timedelta
 from typing import Any
 
-from .data.connection import Connection
+from .storage.connection import Connection
 
 MAX_FILES = 5
 MAX_FILE_BYTES = 2_000_000
@@ -360,11 +360,11 @@ def parse_exports(files: object, as_of: date | None = None) -> dict[str, Any]:
 def save_import(connection: Connection, parsed: dict[str, Any]) -> None:
     with connection:
         connection.execute(
-            "INSERT INTO simulation_settings (key, value) VALUES ('import_signals', ?) "
+            "INSERT INTO dt_simulation_settings (key, value) VALUES ('import_signals', ?) "
             "ON CONFLICT(key) DO UPDATE SET value = excluded.value", (json.dumps(parsed),),
         )
 
 
 def load_import(connection: Connection) -> dict[str, Any] | None:
-    row = connection.execute("SELECT value FROM simulation_settings WHERE key = 'import_signals'").fetchone()
+    row = connection.execute("SELECT value FROM dt_simulation_settings WHERE key = 'import_signals'").fetchone()
     return json.loads(row["value"]) if row else None

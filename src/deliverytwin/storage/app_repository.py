@@ -38,7 +38,7 @@ def _columns(table: str) -> list[str]:
 
 
 class BaselineRepository:
-    TABLE = "commitment_baselines"
+    TABLE = "dt_commitment_baselines"
 
     def __init__(self, db: Database) -> None:
         self.db = db
@@ -109,7 +109,7 @@ class BaselineRepository:
 class IntakeSessionRepository:
     """Anonymous intake timing; never stores request text or document content."""
 
-    TABLE = "intake_sessions"
+    TABLE = "dt_intake_sessions"
 
     def __init__(self, db: Database) -> None:
         self.db = db
@@ -157,8 +157,8 @@ class IntakeSessionRepository:
 class RecoveryScenarioRepository:
     """INTERVENE scenarios saved after a what-if preview, with their simulated per-system update records."""
 
-    TABLE = "recovery_scenarios"
-    UPDATES = "recovery_target_updates"
+    TABLE = "dt_recovery_scenarios"
+    UPDATES = "dt_recovery_target_updates"
 
     def __init__(self, db: Database) -> None:
         self.db = db
@@ -207,7 +207,7 @@ class RecoveryScenarioRepository:
 class TrackSnapshotRepository:
     """One TRACK outlook per initiative and sprint, so the trend survives restarts."""
 
-    TABLE = "track_snapshots"
+    TABLE = "dt_track_snapshots"
 
     def __init__(self, db: Database) -> None:
         self.db = db

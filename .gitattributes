@@ -1,2 +1,2 @@
-src/deliverytwin/data/delivery_intelligence/** text eol=lf
-src/deliverytwin/data/databricks_ddl.sql text eol=lf
+src/data/delivery_intelligence/** text eol=lf
+scripts/databricks_ddl.sql text eol=lf

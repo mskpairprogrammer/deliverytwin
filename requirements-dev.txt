@@ -1,0 +1,2 @@
+-r src/requirements.txt
+playwright>=1.50,<2

@@ -21,8 +21,8 @@ from deliverytwin.app import (
     simulate_sprints,
 )
 from deliverytwin.capacity import GUARDRAIL_MESSAGE, MIN_GROUP_SIZE, PHASES, role_family
-from deliverytwin.data import BaselineRepository, TrackSnapshotRepository
-from deliverytwin.data.connection import connect, resolve_dialect
+from deliverytwin.storage import BaselineRepository, TrackSnapshotRepository
+from deliverytwin.storage.connection import connect, resolve_dialect
 from deliverytwin.intake import approve_baseline, evaluate_intake
 from deliverytwin.provenance import attribute, normalize, verify_quote
 from deliverytwin.recovery import (
@@ -63,7 +63,7 @@ class WorkflowOnEveryDialectTests(unittest.TestCase):
                 # intake_sessions are recorded by the seeded activity
                 self.assertTrue(
                     connection.app_database().query("SELECT COUNT(*) AS n FROM "
-                                                    + connection.app_database().table("intake_sessions"))[0]["n"]
+                                                    + connection.app_database().table("dt_intake_sessions"))[0]["n"]
                 )
 
                 # TRACK: track_snapshots
@@ -115,7 +115,7 @@ class DuckDbThreadSafetyTests(unittest.TestCase):
         import tempfile
         from pathlib import Path
 
-        from deliverytwin.data import DuckDBDatabase, TrackSnapshotRepository
+        from deliverytwin.storage import DuckDBDatabase, TrackSnapshotRepository
 
         with tempfile.TemporaryDirectory() as directory:
             path = str(Path(directory) / "deliverytwin.duckdb")
@@ -263,7 +263,7 @@ class RolePhaseGuardrailTests(unittest.TestCase):
         self.assertTrue(guardrail["role_groups"])
         self.assertTrue(all(group["suppressed"] and group["workers"] is None for group in guardrail["role_groups"]))
         serialised = json.dumps(self.result["role_phase"])
-        for row in self.connection.execute("SELECT id, display_name FROM people"):
+        for row in self.connection.execute("SELECT id, display_name FROM dt_people"):
             self.assertNotIn(row["display_name"], serialised)
             self.assertNotIn(row["id"], serialised)
 
@@ -309,7 +309,7 @@ class DatabricksAppsConfigTests(unittest.TestCase):
     def test_app_yaml_declares_the_serve_command_and_databricks_environment(self) -> None:
         from pathlib import Path
 
-        text = (Path(__file__).resolve().parents[1] / "app.yaml").read_text(encoding="utf-8")
+        text = (Path(__file__).resolve().parents[1] / "src" / "app.yaml").read_text(encoding="utf-8")
         self.assertIn('command: ["python", "-m", "deliverytwin", "serve"]', text)
         for name in ("DATABRICKS_HOST", "DATABRICKS_HTTP_PATH", "DELIVERYTWIN_CATALOG", "DELIVERYTWIN_SCHEMA",
                      "DATABRICKS_SERVING_ENDPOINT", "DELIVERYTWIN_TRUSTED_AUTH"):

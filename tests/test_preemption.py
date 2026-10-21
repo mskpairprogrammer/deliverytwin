@@ -16,7 +16,7 @@ from deliverytwin.app import (
     trigger_preemption,
 )
 from deliverytwin.backlog import compare_plans, latest_backlog, plan_sprints
-from deliverytwin.data.connection import connect
+from deliverytwin.storage.connection import connect
 from deliverytwin.intake import approve_baseline
 from deliverytwin.portfolio import (
     PI_SPRINTS,
@@ -191,6 +191,19 @@ class PreemptionTests(unittest.TestCase):
         self.assertIn("Deferred scope: follow-on release", [f["title"] for f in plan["epic"]["features"]])
         with self.assertRaises(ValueError):
             predict_scenario(report, {"portfolio_option": "nope"}, [])
+
+    def test_track_uses_the_fte_committed_in_the_approved_baseline(self) -> None:
+        today = date.today()
+        approve_baseline(
+            self.connection, REQUEST, ANSWERS, today,
+            adjustments={"allocated_fte": 8.5, "target_date": today.replace(year=today.year + 1).isoformat(),
+                         "scope_change_pct": 0},
+        )
+        trigger_preemption(self.connection)
+        report = self.report()
+        self.assertEqual(report["signals"]["allocated_fte"], 8.5)
+        current = next(p for p in report["portfolio"]["projects"] if p["id"] == "CURRENT")
+        self.assertEqual([c["effective_fte"] for c in current["cells"]], [8.5, 8.5, 6.0, 6.0, 8.5, 8.5])
 
     def test_without_a_preemption_the_recovery_analysis_is_unchanged(self) -> None:
         analysis = analyze_intervention(self.report(), [])

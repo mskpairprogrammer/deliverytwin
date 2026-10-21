@@ -123,9 +123,9 @@ class ScenarioTests(Base):
         simulate_sprints(self.connection, 3, scenario="incident_spike")
         inject_event(self.connection, "p1_incident")
         reset_simulation(self.connection)
-        self.assertIsNone(self.connection.execute("SELECT 1 FROM simulation_state").fetchone())
-        self.assertEqual(self.connection.execute("SELECT COUNT(*) FROM simulation_events").fetchone()[0], 0)
-        self.assertEqual(self.connection.execute("SELECT COUNT(*) FROM ado_work_items WHERE external_id LIKE 'ADO-SIM-%'").fetchone()[0], 0)
+        self.assertIsNone(self.connection.execute("SELECT 1 FROM dt_simulation_state").fetchone())
+        self.assertEqual(self.connection.execute("SELECT COUNT(*) FROM dt_simulation_events").fetchone()[0], 0)
+        self.assertEqual(self.connection.execute("SELECT COUNT(*) FROM dt_ado_work_items WHERE external_id LIKE 'ADO-SIM-%'").fetchone()[0], 0)
 
 
 def csv_file(name, text):
@@ -310,7 +310,7 @@ class CalibrationTests(Base):
 
 class RecordedAiTests(Base):
     def test_recorded_mode_is_labeled_and_drives_every_ai_feature_without_a_key(self) -> None:
-        env = {"DELIVERYTWIN_AI_MODE": "recorded", "OPENAI_API_KEY": "", "AZURE_OPENAI_ENDPOINT": ""}
+        env = {"DELIVERYTWIN_AI_MODE": "recorded", "OPENAI_API_KEY": "", "FOUNDRY_ENDPOINT": ""}
         with patch.dict(os.environ, env):
             self.assertEqual(ai_status()["mode"], "recorded")
             self.assertTrue(openai_configured())
@@ -348,7 +348,7 @@ class RecordedAiTests(Base):
             self.assertEqual((brief["source"], brief["model"]), ("llm", "recorded-sample"))
             late = [dict(row) for row in self.connection.execute(
                 "SELECT project_name, planned_effort_hours, actual_effort_hours, planned_duration_weeks, "
-                "actual_duration_weeks, outcome, lessons_learned FROM historical_projects LIMIT 3")]
+                "actual_duration_weeks, outcome, lessons_learned FROM dt_historical_projects LIMIT 3")]
             analysis = analyze_intervention(report, late)
             self.assertEqual((analysis["source"], analysis["model"]), ("llm", "recorded-sample"))
             self.assertEqual(len(analysis["scenarios"]), 3)
@@ -359,15 +359,16 @@ class RecordedAiTests(Base):
                 complete([{"role": "system", "content": "something else"}, {"role": "user", "content": "{}"}])
 
     def test_off_when_nothing_is_configured(self) -> None:
-        env = {"DELIVERYTWIN_AI_MODE": "", "OPENAI_API_KEY": "", "AZURE_OPENAI_ENDPOINT": "", "AZURE_OPENAI_DEPLOYMENT": ""}
+        env = {"DELIVERYTWIN_AI_MODE": "", "OPENAI_API_KEY": "", "FOUNDRY_ENDPOINT": "", "FOUNDRY_MODEL": ""}
         with patch.dict(os.environ, env):
-            self.assertEqual(ai_status(), {"mode": "off", "model": None, "label": ai_status()["label"]})
+            self.assertEqual(ai_status(), {"mode": "off", "model": None, "label": ai_status()["label"],
+                                           "integrations": {"databricks": "auto", "foundry": "auto"}})
             self.assertFalse(openai_configured())
 
 
-class AzureOpenAiTests(unittest.TestCase):
-    ENV = {"DELIVERYTWIN_AI_MODE": "", "OPENAI_API_KEY": "sk-unused", "AZURE_OPENAI_ENDPOINT": "https://example.openai.azure.com/",
-           "AZURE_OPENAI_DEPLOYMENT": "gpt-4o-mini-dep", "AZURE_OPENAI_API_KEY": "azure-key"}
+class FoundryModelTests(unittest.TestCase):
+    ENV = {"DELIVERYTWIN_AI_MODE": "", "OPENAI_API_KEY": "sk-unused", "FOUNDRY_ENDPOINT": "https://example.openai.azure.com/",
+           "FOUNDRY_MODEL": "gpt-4o-mini-dep", "FOUNDRY_API_KEY": "azure-key"}
 
     class Response(io.BytesIO):
         def __enter__(self):
@@ -384,7 +385,9 @@ class AzureOpenAiTests(unittest.TestCase):
             return self.Response(json.dumps({"choices": [{"message": {"content": "{\"ok\": true}"}}]}).encode())
 
         with patch.dict(os.environ, self.ENV), patch("urllib.request.urlopen", fake_urlopen):
-            self.assertEqual(ai_status(), {"mode": "azure_openai", "model": "gpt-4o-mini-dep", "label": "Azure OpenAI"})
+            self.assertEqual(ai_status(), {"mode": "foundry", "model": "gpt-4o-mini-dep",
+                                           "label": "Microsoft Foundry",
+                                           "integrations": {"databricks": "auto", "foundry": "auto"}})
             self.assertEqual(complete([{"role": "user", "content": "hi"}], json_mode=True), "{\"ok\": true}")
         self.assertEqual(
             seen["url"], "https://example.openai.azure.com/openai/deployments/gpt-4o-mini-dep/chat/completions?api-version=2024-10-21")
@@ -393,7 +396,7 @@ class AzureOpenAiTests(unittest.TestCase):
         self.assertEqual(seen["body"]["response_format"], {"type": "json_object"})
 
     def test_an_insecure_endpoint_is_ignored_and_failures_become_llm_errors(self) -> None:
-        with patch.dict(os.environ, {**self.ENV, "AZURE_OPENAI_ENDPOINT": "http://example.com"}):
+        with patch.dict(os.environ, {**self.ENV, "FOUNDRY_ENDPOINT": "http://example.com"}):
             self.assertEqual(ai_status()["mode"], "openai")
         import urllib.error
 
@@ -450,7 +453,7 @@ class RouteGuardTests(unittest.TestCase):
         port = self.serve({"DELIVERYTWIN_DEMO_MODE": "1"})
         status, data = self.request(port, "GET", "/api/ai/status")
         self.assertEqual(status, 200)
-        self.assertIn(data["mode"], {"off", "openai", "azure_openai", "recorded"})
+        self.assertIn(data["mode"], {"off", "openai", "foundry", "recorded"})
         status, data = self.request(port, "GET", "/api/simulate/catalog")
         self.assertEqual((status, data["scenario"], [s["key"] for s in data["scenarios"]]), (200, None, list(SCENARIOS)))
         self.assertEqual(self.request(port, "GET", "/api/baselines")[1], {"baselines": []})

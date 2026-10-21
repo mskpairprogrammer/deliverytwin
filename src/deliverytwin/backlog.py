@@ -15,7 +15,7 @@ import re
 from datetime import date, datetime, timedelta
 from typing import Any
 
-from .data.connection import Connection
+from .storage.connection import Connection
 
 ADO_COLUMNS = (
     "Work Item Type", "Title 1", "Title 2", "Title 3", "Description", "Tags", "Effort", "Start Date", "Target Date",
@@ -398,11 +398,11 @@ def compare_plans(baseline: dict[str, Any], plan: dict[str, Any]) -> dict[str, A
 
 
 def _plan_inputs(connection: Connection, approved_at: str) -> tuple[list[dict[str, Any]], dict[str, Any] | None]:
-    from .data import RecoveryScenarioRepository
+    from .storage import RecoveryScenarioRepository
 
     allocations = [
         dict(row) for row in connection.execute(
-            "SELECT role_name, ROUND(SUM(allocated_fte), 1) AS allocated_fte FROM planview_resource_assignments "
+            "SELECT role_name, ROUND(SUM(allocated_fte), 1) AS allocated_fte FROM dt_planview_resource_assignments "
             "GROUP BY role_name ORDER BY role_name"
         )
     ]
@@ -418,7 +418,7 @@ def _plan_inputs(connection: Connection, approved_at: str) -> tuple[list[dict[st
 
 def latest_backlog(connection: Connection, as_of: date | None = None) -> dict[str, Any] | None:
     """The backlog for the latest approved baseline, plus a recovery-plan variant once a scenario is applied."""
-    from .data import BaselineRepository
+    from .storage import BaselineRepository
 
     baseline = BaselineRepository(connection.app_database()).latest_scope()
     if baseline is None:

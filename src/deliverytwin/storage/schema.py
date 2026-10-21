@@ -18,12 +18,22 @@ class Column:
     type: str
 
 
+# Every Delivery Twin table name starts with dt_, so the tables group together and never collide with
+# other tables in a shared catalog or schema. Column names are not prefixed.
+TABLE_PREFIX = "dt_"
+
+
 @dataclass(frozen=True)
 class Table:
     name: str
     columns: tuple[Column, ...]
     key: tuple[str, ...]
     comment: str = ""
+
+    @property
+    def dataset(self) -> str:
+        """Name of the checked-in CSV (and delivery_intel source table) the rows load from: the unprefixed name."""
+        return self.name.removeprefix(TABLE_PREFIX)
 
 
 def _cols(spec: str) -> tuple[Column, ...]:
@@ -34,7 +44,7 @@ TABLES: dict[str, Table] = {
     table.name: table
     for table in (
         Table(
-            "project_intakes",
+            "dt_project_intakes",
             _cols(
                 "project_id:string project_name:string problem_statement_and_desired_outcome:string "
                 "overall_scope:string affected_systems:string business_strategy:string "
@@ -46,7 +56,7 @@ TABLES: dict[str, Table] = {
             "Intake form fields; delivery_pattern is an extension used for 6D matching.",
         ),
         Table(
-            "project_estimate_summary",
+            "dt_project_estimate_summary",
             _cols(
                 "project_id:string project_name:string project_size:string p50_hours:int "
                 "p80_hours:int actual_hours:int duration_weeks:int actual_duration_weeks:int "
@@ -58,7 +68,7 @@ TABLES: dict[str, Table] = {
             "and outcome are extensions.",
         ),
         Table(
-            "project_role_estimates",
+            "dt_project_role_estimates",
             _cols(
                 "project_id:string role:string p50_hours:int p80_hours:int actual_hours:int "
                 "average_fte:double skill_level:string allocation_note:string"
@@ -67,7 +77,7 @@ TABLES: dict[str, Table] = {
             "Per-role effort breakdown.",
         ),
         Table(
-            "project_resource_assignments",
+            "dt_project_resource_assignments",
             _cols(
                 "project_id:string resource_name:string role:string planned_hours:int "
                 "allocation_percent:int availability_at_start:string capacity_conflict:string "
@@ -77,7 +87,7 @@ TABLES: dict[str, Table] = {
             "Named resource allocations.",
         ),
         Table(
-            "project_approval_dependencies",
+            "dt_project_approval_dependencies",
             _cols(
                 "project_id:string gate:string dependency:string owner:string status:string "
                 "blocking:string approved_date:date"
@@ -86,7 +96,7 @@ TABLES: dict[str, Table] = {
             "Approval gates; dependency is an extension that carries the 6D vocabulary term.",
         ),
         Table(
-            "devops_workitems_details",
+            "dt_devops_workitems_details",
             _cols(
                 "workitem_id:string prjnumber:string title:string workitemtype:string "
                 "state:string scheduling_effort:int tags:string"
@@ -95,7 +105,7 @@ TABLES: dict[str, Table] = {
             "Epics, features, and stories joined on prjnumber.",
         ),
         Table(
-            "project_lessons",
+            "dt_project_lessons",
             _cols("project_id:string category:string lesson:string suggested_option:string"),
             ("project_id", "category"),
             "Extension: lesson per clarification category and the option it supports.",
@@ -110,7 +120,7 @@ APP_TABLES: dict[str, Table] = {
     table.name: table
     for table in (
         Table(
-            "commitment_baselines",
+            "dt_commitment_baselines",
             _cols(
                 "baseline_id:string request_text:string answers_json:string fingerprint_json:string "
                 "p50_hours:double p80_hours:double integration_buffer_pct:double "
@@ -121,13 +131,13 @@ APP_TABLES: dict[str, Table] = {
             "Human-approved COMMIT baselines.",
         ),
         Table(
-            "intake_sessions",
+            "dt_intake_sessions",
             _cols("session_id:string started_at:timestamp first_rom_at:timestamp approved_at:timestamp"),
             ("session_id",),
             "Anonymous intake timing; no request text or document content.",
         ),
         Table(
-            "recovery_scenarios",
+            "dt_recovery_scenarios",
             _cols(
                 "scenario_id:int initiative_id:string recommended_option:string allocated_fte:double "
                 "scope_defer_pct:int target_date:date incremental_cost_k:double "
@@ -137,13 +147,13 @@ APP_TABLES: dict[str, Table] = {
             "INTERVENE scenarios saved after a what-if preview.",
         ),
         Table(
-            "recovery_target_updates",
+            "dt_recovery_target_updates",
             _cols("scenario_id:int source_key:string payload_json:string"),
             ("scenario_id", "source_key"),
             "Simulated per-system update records of a saved recovery scenario.",
         ),
         Table(
-            "track_snapshots",
+            "dt_track_snapshots",
             _cols(
                 "snapshot_id:string initiative_id:string sprint_number:int as_of:date "
                 "on_time_pct:double projected_slip_days:int unplanned_story_points:int "

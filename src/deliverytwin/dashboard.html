@@ -67,6 +67,13 @@
     .ring-value small { display: block; color: var(--muted); font-size: 9px; font-weight: 600; letter-spacing: .04em; text-align: center; }
     .confidence-copy strong { font-size: 13px; display: block; margin-bottom: 5px; }
     .confidence-copy span { color: var(--muted); font-size: 11px; line-height: 1.5; display: block; }
+    .confidence-copy .confidence-delta { margin-top: 8px; font-size: 13px; font-weight: 750; color: var(--ink); }
+    .confidence-copy .confidence-delta.down { color: var(--red); }
+    .confidence-copy .confidence-delta.up { color: var(--teal); }
+    .confidence-copy .confidence-delta[hidden] { display: none; }
+    .ring.changed { animation: ring-pulse 1.2s ease-out; }
+    @keyframes ring-pulse { 0% { box-shadow: 0 0 0 0 rgb(189 76 75 / 45%); } 100% { box-shadow: 0 0 0 16px rgb(189 76 75 / 0%); } }
+    @media (prefers-reduced-motion: reduce) { .ring.changed { animation: none; } }
     .metric-stack { display: grid; grid-template-columns: 1fr 1fr; gap: 11px; }
     .mini-metric { border-left: 2px solid #e5eaf0; padding: 2px 0 2px 11px; }
     .mini-metric strong { display: block; font-size: 18px; letter-spacing: -.03em; }
@@ -309,6 +316,14 @@
     .act-target-updates { margin-top: 10px; }
     .act-target-updates strong { display: block; overflow-wrap: anywhere; font-size: 10px; }
     .act-scenario-status { min-height: 1.4em; margin-top: 8px; font-size: 11px; color: var(--muted); }
+    .act-tune { margin: 14px 0 4px; }
+    .act-tune .step-help { margin: 0; }
+    .act-tune-target { display: flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 700; white-space: nowrap; }
+    .act-tune-target input { width: 52px; padding: 7px 6px; border: 1px solid var(--line); border-radius: 7px; font: inherit; }
+    .tune-summary { font-size: 11px; line-height: 1.55; margin: 0 0 10px; }
+    .tune-summary strong.ok { color: var(--teal); }
+    .tune-summary strong.miss { color: var(--amber); }
+    @media (max-width: 640px) { .act-tune .ask-row { flex-wrap: wrap; } }
     .q-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
     .q-card { border: 1px solid var(--line); border-radius: 9px; background: white; padding: 12px; margin: 0; min-width: 0; }
     .q-card legend { padding: 0 4px; font-size: 9px; font-weight: 800; letter-spacing: .1em; color: var(--teal); text-transform: uppercase; }
@@ -712,6 +727,29 @@
         <button id="sim-preempt" class="intake-btn" type="button" title="Inject a synthetic P0 project that preempts 2.5 FTE in Sprints 3-4">⚡ Simulate P0 Project Preemption (PI Conflict)</button>
         <span id="sim-status" class="sim-status" role="status"></span>
       </div>
+      <div class="grid">
+        <section class="card overview">
+          <div class="card-head"><div><h3 class="card-title" id="forecast-title">Sprint delivery outlook</h3><div class="card-kicker" id="forecast-kicker">Estimate from current simulated signals</div></div><span class="badge">CURRENT OUTLOOK</span></div>
+          <div class="overview-content">
+            <div class="confidence"><div class="ring" id="confidence-ring"><div class="ring-value"><span id="confidence">—</span>%<small>ON-TIME</small></div></div><div class="confidence-copy"><strong>Rules-based on-time estimate</strong><span>Recomputed from this sprint's seeded source signals.</span><span class="confidence-delta" id="confidence-delta" role="status" hidden></span></div></div>
+            <div class="metric-stack">
+              <div class="mini-metric warn"><strong id="forecast-slip">—</strong><span>Estimated completion shift</span></div>
+              <div class="mini-metric"><strong id="forecast-p50">—</strong><span>Baseline P50 effort</span></div>
+              <div class="mini-metric warn"><strong id="forecast-scope">—</strong><span>Unplanned scope in current sprint</span></div>
+              <div class="mini-metric"><strong id="forecast-capacity">—</strong><span>Allocated / available FTE</span></div>
+            </div>
+          </div>
+          <div class="forecast-callout"><strong>Portfolio ripple · Customer profile delivery</strong><p id="forecast-ripple">The projected slip is reflected in the Customer 360 delivery outlook.</p></div>
+        </section>
+        <section class="card narrow">
+          <div class="card-head"><div><h3 class="card-title">Explainable drivers</h3><div class="card-kicker">Signals propagated into outlook</div></div></div>
+          <div class="risk-list">
+            <div class="risk-row"><span class="risk-dot"></span><div><strong>Workforce drain</strong><span>Support load and approved time off reduce effective capacity.</span></div></div>
+            <div class="risk-row"><span class="risk-dot"></span><div><strong>Scope growth</strong><span>Unplanned customer profile integrations consume sprint capacity.</span></div></div>
+            <div class="risk-row"><span class="risk-dot"></span><div><strong>Change approval delay</strong><span>Customer identity-matching rules are awaiting CAB review.</span></div></div>
+          </div>
+        </section>
+      </div>
       <section class="card pi-swimlane" id="pi-swimlane" aria-labelledby="pi-swimlane-title" hidden>
         <div class="card-head"><div><h3 class="step-title" id="pi-swimlane-title">Quarterly PI portfolio swimlane · Sprints 1–6</h3><div class="card-kicker" id="pi-swimlane-kicker"></div></div><span class="badge" id="pi-swimlane-badge">PI CONFLICT</span></div>
         <div id="pi-swimlane-table" class="pi-table-wrap"></div>
@@ -755,29 +793,6 @@
           <div class="brief-watch" id="brief-watch"></div>
           <div class="intake-actions"><button id="brief-rerun" class="intake-btn" type="button">Re-run briefing</button></div>
           <p class="approval-note">Confidence points and days are computed from the forecast formula; the AI only explains them.</p>
-        </section>
-      </div>
-      <div class="grid">
-        <section class="card overview">
-          <div class="card-head"><div><h3 class="card-title" id="forecast-title">Sprint delivery outlook</h3><div class="card-kicker" id="forecast-kicker">Estimate from current simulated signals</div></div><span class="badge">CURRENT OUTLOOK</span></div>
-          <div class="overview-content">
-            <div class="confidence"><div class="ring" id="confidence-ring"><div class="ring-value"><span id="confidence">—</span>%<small>ON-TIME</small></div></div><div class="confidence-copy"><strong>Rules-based on-time estimate</strong><span>Recomputed from this sprint's seeded source signals.</span></div></div>
-            <div class="metric-stack">
-              <div class="mini-metric warn"><strong id="forecast-slip">—</strong><span>Estimated completion shift</span></div>
-              <div class="mini-metric"><strong id="forecast-p50">—</strong><span>Baseline P50 effort</span></div>
-              <div class="mini-metric warn"><strong id="forecast-scope">—</strong><span>Unplanned scope in current sprint</span></div>
-              <div class="mini-metric"><strong id="forecast-capacity">—</strong><span>Allocated / available FTE</span></div>
-            </div>
-          </div>
-          <div class="forecast-callout"><strong>Portfolio ripple · Customer profile delivery</strong><p id="forecast-ripple">The projected slip is reflected in the Customer 360 delivery outlook.</p></div>
-        </section>
-        <section class="card narrow">
-          <div class="card-head"><div><h3 class="card-title">Explainable drivers</h3><div class="card-kicker">Signals propagated into outlook</div></div></div>
-          <div class="risk-list">
-            <div class="risk-row"><span class="risk-dot"></span><div><strong>Workforce drain</strong><span>Support load and approved time off reduce effective capacity.</span></div></div>
-            <div class="risk-row"><span class="risk-dot"></span><div><strong>Scope growth</strong><span>Unplanned customer profile integrations consume sprint capacity.</span></div></div>
-            <div class="risk-row"><span class="risk-dot"></span><div><strong>Change approval delay</strong><span>Customer identity-matching rules are awaiting CAB review.</span></div></div>
-          </div>
         </section>
       </div>
       <div class="grid">
@@ -850,6 +865,16 @@
             <label for="act-target-date"><span>Target date</span><input id="act-target-date" type="date"></label>
             <label for="act-cost"><span>Incremental budget (USD $K)</span><input id="act-cost" type="number" min="0" max="100000" step="0.5" value="0"></label>
             <label for="act-scope-defer"><span>Scope to defer <output id="act-scope-defer-value" for="act-scope-defer">0%</output></span><input id="act-scope-defer" type="range" min="0" max="100" step="5" value="0"></label>
+          </div>
+          <div class="ask-box act-tune">
+            <label class="ask-label" for="act-tune-input">Tune this scenario with AI</label>
+            <div class="ask-row">
+              <input id="act-tune-input" type="text" maxlength="400" autocomplete="off" placeholder="e.g. No extra budget and keep the target date">
+              <label class="act-tune-target" for="act-tune-target">Target <input id="act-tune-target" type="number" min="50" max="95" step="1" value="70">%</label>
+              <button id="act-tune" class="intake-btn primary" type="button">Tune with AI</button>
+            </div>
+            <div class="ask-chips" id="act-tune-chips"></div>
+            <p class="step-help">The AI proposes new lever values from your instruction; the on-time % of every try is computed by the planning model, never by the AI, and fed back until the target is met.</p>
           </div>
           <div class="intake-actions">
             <button id="act-preview" class="intake-btn" type="button">Predict with AI</button>
@@ -961,7 +986,28 @@
         metric(`$${scenario.incremental_cost_k.toLocaleString()}K`, "Incremental budget"),
         ...(scenario.cost_impact ? [metric(scenario.cost_impact.label, "Estimated cost impact")] : []),
       );
-      if (prediction) {
+      const tuning = scenario.tuning || null;
+      if (prediction && tuning) {
+        const generated = prediction.source === "llm";
+        const modelName = tuning.mode === "portfolio" ? "portfolio planning model" : "capacity-versus-load model";
+        const header = el("div", "prediction-source");
+        header.append(
+          el("span", `source-pill ${generated ? "llm" : "fallback"}`, generated ? `AI-TUNED SCENARIO · ${prediction.model || "model"}` : "LEVER SEARCH · AI UNAVAILABLE"),
+          el("span", "", generated
+            ? `The AI chose the levers; the on-time % is computed by the ${modelName}.`
+            : aiUnavailableText(prediction.fallback_reason, `a deterministic search scored by the ${modelName}`)),
+        );
+        const summary = el("p", "tune-summary");
+        summary.append(
+          document.createTextNode(`“${tuning.instruction}” · ${tuning.start_pct}% → `),
+          el("strong", tuning.reached ? "ok" : "miss", `${tuning.final_pct}%`),
+          document.createTextNode(` · target ${tuning.target_pct}% ${tuning.reached ? "reached" : "not reached"}` +
+            (generated ? ` in ${tuning.rounds} AI ${tuning.rounds === 1 ? "try" : "tries"}` : "") +
+            (tuning.feasible === false ? " · the AI judged the target unreachable within your instruction" : "") +
+            (tuning.changes.length ? `. Changes: ${tuning.changes.join("; ")}.` : ". No lever changes were needed.")),
+        );
+        rootElement.append(header, summary);
+      } else if (prediction) {
         const portfolioModel = prediction.source === "portfolio_rules";
         const generated = prediction.source === "llm";
         const header = el("div", "prediction-source");
@@ -1075,7 +1121,7 @@
       if (!force) {
         try {
           const saved = JSON.parse(sessionStorage.getItem(ACT_STORE) || "null");
-          if (saved && saved.key === key && saved.source === "llm") { actAnalysis = saved; renderActAnalysis(); return; }
+          if (saved && saved.key === key && saved.source === "llm") { actAnalysis = saved; actTunedPlan = null; renderActAnalysis(); return; }
         } catch (error) { /* fall through to a fresh analysis */ }
       }
       actLoading = true;
@@ -1086,6 +1132,7 @@
       try {
         const data = await intakePost("/api/act/analyze", {});
         actAnalysis = { ...data, key };
+        actTunedPlan = null;
         sessionStorage.setItem(ACT_STORE, JSON.stringify(actAnalysis));
         renderActAnalysis();
       } catch (error) {
@@ -1097,6 +1144,8 @@
       }
     }
     let actPortfolioOption = null;
+    let actPortfolioLevers = null;  // the defer / borrow / backfill mix of a tuned ("custom") portfolio plan
+    let actTunedPlan = null;  // its PI sprint plan, offered in the re-plan matrix
     const PI_STATUS_TEXT = {
       shifted: (row) => `Shifts S${row.baseline_span[1]} → S${row.end_sprint}`,
       pulled_in: (row) => `Pulled in S${row.baseline_span[1]} → S${row.end_sprint}`,
@@ -1152,12 +1201,14 @@
         ["baseline", "Original plan (no preemption)", bundle.pi_plans.baseline],
         ["preempted", "No action · preempted", bundle.pi_plans.preempted],
         ...analysis.scenarios.map((scenario) => [scenario.id, scenario.title + (scenario.id === analysis.recommended ? " · recommended" : ""), scenario.pi_plan]),
+        ...(actTunedPlan ? [["custom", "Tuned re-plan · from your instruction", actTunedPlan]] : []),
       ];
       const select = byId("pi-replan-select");
-      if (!select.dataset.ready || select.dataset.for !== String(analysis.scenarios.map((s) => s.id))) {
+      const choiceKey = String(choices.map(([id]) => id));
+      if (!select.dataset.ready || select.dataset.for !== choiceKey) {
         select.replaceChildren(...choices.map(([id, label]) => { const option = el("option", "", label); option.value = id; return option; }));
         select.dataset.ready = "1";
-        select.dataset.for = String(analysis.scenarios.map((s) => s.id));
+        select.dataset.for = choiceKey;
       }
       const chosen = choices.find(([id]) => id === planId) || choices.find(([id]) => id === analysis.recommended);
       select.value = chosen[0];
@@ -1197,6 +1248,7 @@
     }
     function selectActScenario(scenario, button) {
       actPortfolioOption = scenario.portfolio_option || null;
+      actPortfolioLevers = null;
       if (actAnalysis) renderPiPlan(actAnalysis, scenario.id);
       byId("act-fte").value = scenario.allocated_fte;
       byId("act-target-date").value = scenario.target_date;
@@ -1228,6 +1280,7 @@
         incremental_cost_k: Number(byId("act-cost").value),
       };
       if (actPortfolioOption) body.portfolio_option = actPortfolioOption;
+      if (actPortfolioOption === "custom") body.portfolio_levers = actPortfolioLevers;
       const echoed = reuse || (path === "/api/act/apply" ? actLastPrediction : null);
       if (echoed) body.prediction = echoed;
       byId("act-scenario-status").textContent = echoed ? "Applying…" : "Asking the AI to predict this scenario…";
@@ -1243,6 +1296,44 @@
         byId("act-scenario-status").textContent = `Recovery scenario failed: ${error.message}`;
       } finally {
         button.disabled = persisted;
+      }
+    }
+
+    async function tuneActScenario(button) {
+      const status = byId("act-scenario-status");
+      const instruction = byId("act-tune-input").value.trim();
+      if (!instruction) { status.textContent = "Type how to tweak the scenario first, e.g. “No extra budget”."; return; }
+      if (!byId("act-fte").value || !byId("act-target-date").value || !byId("act-cost").value) {
+        status.textContent = "Pick a scenario or enter FTE, a target date, and a budget before tuning.";
+        return;
+      }
+      const body = {
+        instruction, target_pct: Number(byId("act-tune-target").value) || 70,
+        allocated_fte: Number(byId("act-fte").value), target_date: byId("act-target-date").value,
+        scope_defer_pct: Number(byId("act-scope-defer").value), incremental_cost_k: Number(byId("act-cost").value),
+      };
+      if (actPortfolioOption) body.portfolio_option = actPortfolioOption;
+      if (actPortfolioOption === "custom") body.portfolio_levers = actPortfolioLevers;
+      button.disabled = true;
+      byId("act-apply").disabled = true;
+      status.textContent = "Tuning… the AI proposes levers and the planning model scores each try.";
+      try {
+        const data = await intakePost("/api/act/tune", body);
+        byId("act-fte").value = data.allocated_fte;
+        byId("act-target-date").value = data.target_date;
+        byId("act-cost").value = data.incremental_cost_k;
+        byId("act-scope-defer").value = data.scope_defer_pct;
+        byId("act-scope-defer-value").textContent = `${data.scope_defer_pct}%`;
+        actPortfolioOption = data.portfolio_option || null;
+        actPortfolioLevers = data.portfolio_levers || null;
+        actTunedPlan = data.pi_plan || null;
+        if (actAnalysis && actTunedPlan) renderPiPlan(actAnalysis, "custom");
+        renderActScenario(data);
+        byId("act-what-if-results").scrollIntoView({ behavior: "smooth", block: "nearest" });
+      } catch (error) {
+        status.textContent = `Tuning failed: ${error.message}`;
+      } finally {
+        button.disabled = false;
       }
     }
 
@@ -1366,6 +1457,7 @@
         byId("forecast-kicker").textContent = `Sprint ${sprintNumber} of the simulated delivery timeline`;
         byId("confidence").textContent = forecast.on_time_pct;
         byId("confidence-ring").style.setProperty("--value", `${forecast.on_time_pct}%`);
+        showConfidenceChange(sprintNumber, forecast.on_time_pct, report.portfolio && report.portfolio.active);
         byId("forecast-slip").textContent = `+${forecast.projected_slip_days} days`;
         byId("forecast-ripple").textContent = forecast.projected_slip_days
           ? `The current estimate puts the Customer 360 delivery target about ${forecast.projected_slip_days} days at risk.`
@@ -1445,6 +1537,7 @@
     ["act-fte", "act-target-date", "act-cost"].forEach((id) => {
       byId(id).addEventListener("input", () => {
         actPortfolioOption = null;
+        actPortfolioLevers = null;
         byId("act-apply").disabled = true;
         byId("act-what-if-results").hidden = true;
         byId("act-scenario-status").textContent = "Inputs changed — preview the scenario again.";
@@ -1455,6 +1548,39 @@
       submitActScenario("/api/act/what-if", event.currentTarget));
     byId("act-apply").addEventListener("click", (event) =>
       submitActScenario("/api/act/apply", event.currentTarget));
+    byId("act-tune").addEventListener("click", (event) => tuneActScenario(event.currentTarget));
+    byId("act-tune-input").addEventListener("keydown", (event) => {
+      if (event.key === "Enter") { event.preventDefault(); tuneActScenario(byId("act-tune")); }
+    });
+    ["No extra budget", "Keep the target date", "Don't defer scope", "Cheapest plan that reaches the target"].forEach((text) => {
+      const chip = el("button", "ask-chip", text);
+      chip.type = "button";
+      chip.addEventListener("click", () => { byId("act-tune-input").value = text; byId("act-tune-input").focus(); });
+      byId("act-tune-chips").append(chip);
+    });
+
+    // The outlook shown before the last refresh, so a simulated sprint can show how far the forecast moved.
+    let lastOutlook = null;
+    function showConfidenceChange(sprintNumber, pct, preempted) {
+      const delta = byId("confidence-delta");
+      const previous = lastOutlook;
+      lastOutlook = { sprintNumber, pct, preempted: Boolean(preempted) };
+      if (!previous || (previous.sprintNumber === sprintNumber && previous.pct === pct && previous.preempted === Boolean(preempted))) return;
+      const change = pct - previous.pct;
+      const newlyPreempted = Boolean(preempted) && !previous.preempted;
+      const cause = !newlyPreempted ? ` since Sprint ${previous.sprintNumber}`
+        : previous.sprintNumber !== sprintNumber ? ` with the P0 preemption (Sprint ${previous.sprintNumber} → ${sprintNumber})`
+        : " after the P0 preemption";
+      delta.textContent = change === 0
+        ? `No change${cause} (${pct}%)`
+        : `${change < 0 ? "▼" : "▲"} ${Math.abs(change)} pts${cause} · ${previous.pct}% → ${pct}%`;
+      delta.className = `confidence-delta ${change < 0 ? "down" : change > 0 ? "up" : ""}`;
+      delta.hidden = false;
+      const ring = byId("confidence-ring");
+      ring.classList.remove("changed");
+      void ring.offsetWidth;  // restart the pulse
+      if (change < 0) ring.classList.add("changed");
+    }
 
     async function runSimulation(body, doneMessage) {
       const status = byId("sim-status");
@@ -1473,6 +1599,7 @@
         status.textContent = data.simulated
           ? `${doneMessage} sprint ${data.sprints_advanced}, ${data.started_on} → ${data.as_of}.`
           : doneMessage;
+        byId("forecast-title").closest("section").scrollIntoView({ behavior: "smooth", block: "nearest" });
       } catch (error) {
         status.textContent = `Simulation failed: ${error.message}`;
       } finally {
@@ -1484,6 +1611,7 @@
     byId("sim-preempt").addEventListener("click", async () => {
       await runSimulation({ preempt: true }, "P0 preemption injected:");
       actAnalysis = null;
+      actTunedPlan = null;
       sessionStorage.removeItem(ACT_STORE);
     });
     byId("pi-replan-select").addEventListener("change", (event) => {
@@ -2060,7 +2188,7 @@
       if (code === "invalid_response") {
         return `The AI answered, but its response did not pass validation. Showing ${fallback} instead.`;
       }
-      return `No AI model is configured (set DATABRICKS_SERVING_ENDPOINT, AZURE_OPENAI_*, or OPENAI_API_KEY and restart). Showing ${fallback} instead.`;
+      return `No AI model is configured (set FOUNDRY_PROJECT_ENDPOINT and FOUNDRY_MODEL, or OPENAI_API_KEY for local runs, and restart). Showing ${fallback} instead.`;
     }
     function sourceBadge(source) {
       const badge = el("span", `src-badge ${source.category}`, source.label);
@@ -2643,10 +2771,10 @@
       try {
         const status = await (await fetch("/api/ai/status", { cache: "no-store" })).json();
         const banner = byId("ai-banner");
-        banner.hidden = ["openai", "azure_openai", "databricks_serving"].includes(status.mode);
+        banner.hidden = ["openai", "foundry", "databricks_serving"].includes(status.mode);
         banner.textContent = status.mode === "recorded"
           ? "RECORDED SAMPLE AI · answers are replayed from a deterministic script, not produced by a live model."
-          : "NO AI MODEL CONFIGURED · rules-based fallbacks are shown. Set DATABRICKS_SERVING_ENDPOINT, AZURE_OPENAI_*, or OPENAI_API_KEY, or DELIVERYTWIN_AI_MODE=recorded for a recorded demo.";
+          : "NO AI MODEL CONFIGURED · rules-based fallbacks are shown. Set FOUNDRY_PROJECT_ENDPOINT and FOUNDRY_MODEL (OPENAI_API_KEY works for local runs), or DELIVERYTWIN_AI_MODE=recorded for a recorded demo.";
       } catch (error) {
         byId("ai-banner").hidden = true;
       }

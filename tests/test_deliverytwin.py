@@ -19,7 +19,7 @@ from deliverytwin.chat import (
     validate_chat_history,
 )
 from deliverytwin.analytics import build_impact_report, record_intake_activity
-from deliverytwin.data import IntegrityError
+from deliverytwin.storage import IntegrityError
 from deliverytwin.intake import (
     IntakeError,
     analyze_intake,
@@ -59,7 +59,7 @@ class DeliveryTwinTests(unittest.TestCase):
 
     def test_schema_registers_all_five_sources_as_simulated(self) -> None:
         sources = self.connection.execute(
-            "SELECT source_key, integration_mode, writeback_enabled FROM source_systems"
+            "SELECT source_key, integration_mode, writeback_enabled FROM dt_source_systems"
         ).fetchall()
         self.assertEqual(len(sources), 5)
         self.assertTrue(all(row["integration_mode"] == "simulated" for row in sources))
@@ -93,7 +93,7 @@ class DeliveryTwinTests(unittest.TestCase):
         self.assertEqual(metrics["rom_sample_count"], 9)
         self.assertEqual(metrics["median_seconds_to_first_rom"], 15 * 60)
         self.assertEqual(
-            self.connection.execute("SELECT COUNT(*) FROM intake_sessions").fetchone()[0],
+            self.connection.execute("SELECT COUNT(*) FROM dt_intake_sessions").fetchone()[0],
             12,
         )
 
@@ -118,7 +118,7 @@ class DeliveryTwinTests(unittest.TestCase):
         self.assertEqual(report["intake_metrics"]["median_seconds_to_first_rom"], 120)
         self.assertEqual(report["intake_metrics"]["intake_starts_last_7_days"], 1)
         session = self.connection.execute(
-            "SELECT started_at, first_rom_at, approved_at FROM intake_sessions"
+            "SELECT started_at, first_rom_at, approved_at FROM dt_intake_sessions"
         ).fetchone()
         self.assertEqual(session["first_rom_at"], (start + timedelta(minutes=2)).isoformat(timespec="seconds"))
         self.assertEqual(session["approved_at"], (start + timedelta(minutes=10)).isoformat(timespec="seconds"))
@@ -152,16 +152,16 @@ class DeliveryTwinTests(unittest.TestCase):
         )
         self.assertEqual(
             self.connection.execute(
-                "SELECT short_description FROM servicenow_change_requests"
+                "SELECT short_description FROM dt_servicenow_change_requests"
             ).fetchone()["short_description"],
             "Customer identity matching rules deployment",
         )
         self.assertEqual(
-            self.connection.execute("SELECT name FROM delivery_milestones").fetchone()["name"],
+            self.connection.execute("SELECT name FROM dt_delivery_milestones").fetchone()["name"],
             "Customer profile API v1",
         )
         self.assertEqual(
-            self.connection.execute("SELECT COUNT(*) FROM skills WHERE name = 'Kafka'").fetchone()[0],
+            self.connection.execute("SELECT COUNT(*) FROM dt_skills WHERE name = 'Kafka'").fetchone()[0],
             0,
         )
         self.assertTrue(report["collision_detected"])
@@ -174,9 +174,9 @@ class DeliveryTwinTests(unittest.TestCase):
         demo_day = date(2026, 2, 20)
         seed_demo(self.connection, demo_day)
         seed_demo(self.connection, demo_day)
-        item_count = self.connection.execute("SELECT COUNT(*) FROM ado_work_items").fetchone()[0]
+        item_count = self.connection.execute("SELECT COUNT(*) FROM dt_ado_work_items").fetchone()[0]
         self.assertEqual(item_count, 14)
-        run_count = self.connection.execute("SELECT COUNT(*) FROM ingestion_runs").fetchone()[0]
+        run_count = self.connection.execute("SELECT COUNT(*) FROM dt_ingestion_runs").fetchone()[0]
         self.assertEqual(run_count, 10)
 
     def test_report_requires_seeded_initiative(self) -> None:
@@ -226,7 +226,7 @@ class DeliveryTwinTests(unittest.TestCase):
         with self.assertRaises(IntegrityError):
             self.connection.execute(
                 """
-                INSERT INTO planview_projects
+                INSERT INTO dt_planview_projects
                     (external_id, initiative_id, project_status, capacity_fte, allocated_fte, planned_hours)
                 VALUES ('orphan', 'missing-initiative', 'draft', 1, 1, 100)
                 """
@@ -515,7 +515,7 @@ class DeliveryTwinTests(unittest.TestCase):
         )
         self.assertEqual(forecast["matching_source"], "similarity")
         self.assertEqual(
-            self.connection.execute("SELECT COUNT(*) FROM historical_project_lessons").fetchone()[0],
+            self.connection.execute("SELECT COUNT(*) FROM dt_historical_project_lessons").fetchone()[0],
             200,
         )
 
@@ -604,7 +604,7 @@ class DeliveryTwinTests(unittest.TestCase):
         self.assertEqual((baseline["p50_hours"], baseline["p80_hours"]), (4650, 5750))
         self.assertEqual(latest_baseline(self.connection)["id"], baseline["id"])
         source_writebacks = self.connection.execute(
-            "SELECT COUNT(*) FROM source_systems WHERE writeback_enabled = 1"
+            "SELECT COUNT(*) FROM dt_source_systems WHERE writeback_enabled = 1"
         ).fetchone()[0]
         self.assertEqual(source_writebacks, 0)
 
@@ -664,10 +664,10 @@ class DeliveryTwinTests(unittest.TestCase):
         simulate_sprints(self.connection, 5, start)
 
         sprint_count = self.connection.execute(
-            "SELECT COUNT(*) FROM ado_sprints WHERE external_id LIKE 'ADO-SIM-SPRINT-%'"
+            "SELECT COUNT(*) FROM dt_ado_sprints WHERE external_id LIKE 'ADO-SIM-SPRINT-%'"
         ).fetchone()[0]
         item_count = self.connection.execute(
-            "SELECT COUNT(*) FROM ado_work_items WHERE external_id LIKE 'ADO-SIM-WI-%'"
+            "SELECT COUNT(*) FROM dt_ado_work_items WHERE external_id LIKE 'ADO-SIM-WI-%'"
         ).fetchone()[0]
         self.assertEqual(sprint_count, 5)
         self.assertEqual(item_count, 60)
@@ -748,12 +748,12 @@ class DeliveryTwinTests(unittest.TestCase):
         self.assertEqual(saved["status"], "simulated_updates_persisted")
         self.assertEqual(len(saved["target_updates"]), 5)
         self.assertEqual(
-            self.connection.execute("SELECT COUNT(*) FROM recovery_target_updates").fetchone()[0],
+            self.connection.execute("SELECT COUNT(*) FROM dt_recovery_target_updates").fetchone()[0],
             5,
         )
         self.assertEqual(
             self.connection.execute(
-                "SELECT allocated_fte FROM planview_projects"
+                "SELECT allocated_fte FROM dt_planview_projects"
             ).fetchone()["allocated_fte"],
             7.0,
         )
@@ -783,33 +783,33 @@ class DeliveryTwinTests(unittest.TestCase):
         impact = build_impact_report(self.connection)
         self.assertEqual(impact["backtest"]["sample_count"], 0)
         self.assertEqual(
-            self.connection.execute("SELECT COUNT(*) FROM historical_projects").fetchone()[0],
+            self.connection.execute("SELECT COUNT(*) FROM dt_historical_projects").fetchone()[0],
             0,
         )
         for table in (
-            "source_systems",
-            "delivery_initiatives",
-            "planview_projects",
-            "ado_work_items",
-            "servicenow_incidents",
-            "oracle_workers",
-            "ukg_time_entries",
-            "historical_lessons",
-            "historical_projects",
-            "commitment_baselines",
-            "intake_sessions",
+            "dt_source_systems",
+            "dt_delivery_initiatives",
+            "dt_planview_projects",
+            "dt_ado_work_items",
+            "dt_servicenow_incidents",
+            "dt_oracle_workers",
+            "dt_ukg_time_entries",
+            "dt_historical_lessons",
+            "dt_historical_projects",
+            "dt_commitment_baselines",
+            "dt_intake_sessions",
         ):
             with self.subTest(table=table):
                 count = self.connection.execute(f'SELECT COUNT(*) FROM "{table}"').fetchone()[0]
                 self.assertEqual(count, 0)
         schema_tables = self.connection.execute(
-            "SELECT COUNT(*) FROM information_schema.tables WHERE table_name = 'source_systems'"
+            "SELECT COUNT(*) FROM information_schema.tables WHERE table_name = 'dt_source_systems'"
         ).fetchone()[0]
         self.assertEqual(schema_tables, 1)
         loaded = simulate_sprints(self.connection, 5, start)
         self.assertFalse(loaded["used_approved_baseline"])
         self.assertEqual(
-            self.connection.execute("SELECT COUNT(*) FROM source_systems").fetchone()[0], 5
+            self.connection.execute("SELECT COUNT(*) FROM dt_source_systems").fetchone()[0], 5
         )
 
 

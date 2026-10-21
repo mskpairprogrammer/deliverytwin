@@ -1,19 +1,24 @@
 """Smoke test for a data backend: create tables, load the dataset, read it back, write app rows.
 
-``python -m deliverytwin databricks-smoke`` runs it against a Databricks SQL warehouse in a
-throwaway schema (dropped afterwards), so someone with workspace access can verify the
-adapter in about a minute. The same checks run locally against DuckDB in the unit tests.
+``python scripts/databricks_smoke.py`` (or ``python -m deliverytwin databricks-smoke``) runs it against a
+Databricks SQL warehouse in a throwaway schema (dropped afterwards), so someone with workspace access can
+verify the adapter in about a minute. The same checks run locally against DuckDB in the unit tests.
 """
 from __future__ import annotations
 
+import sys
 import uuid
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Callable
 
-from .app_repository import BaselineRepository, IntakeSessionRepository
-from .database import Database, DatabricksDatabase, DatabricksSettings
-from .repository import HistoryRepository, load_dataset
-from .schema import TABLES
+if not __package__:  # run as `python scripts/databricks_smoke.py`: make the package in src/ importable
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+
+from deliverytwin.storage.app_repository import BaselineRepository, IntakeSessionRepository
+from deliverytwin.storage.database import Database, DatabricksDatabase, DatabricksSettings
+from deliverytwin.storage.repository import HistoryRepository, load_dataset
+from deliverytwin.storage.schema import TABLES
 
 BASELINE = {
     "request_text": "smoke", "answers_json": "{}", "fingerprint_json": "{}", "p50_hours": 4650,
@@ -37,14 +42,14 @@ def run_checks(db: Database) -> list[tuple[str, bool, str]]:
             return None
 
     counts = check("create tables and load dataset", lambda: load_dataset(db),
-                   lambda value: value["project_estimate_summary"] == 50)
+                   lambda value: value["dt_project_estimate_summary"] == 50)
     check("read row counts back", lambda: {
         name: db.query(f"SELECT COUNT(*) AS n FROM {db.table(name)}")[0]["n"] for name in TABLES
     }, lambda value: counts is not None and all(value[name] == counts[name] for name in TABLES))
     check("derive history for 50 projects", lambda: HistoryRepository(db).list_projects(),
           lambda projects: len(projects) == 50 and all(p["lessons"] for p in projects))
     check("upsert is idempotent", lambda: (load_dataset(db), db.query(
-        f"SELECT COUNT(*) AS n FROM {db.table('project_estimate_summary')}")[0]["n"]),
+        f"SELECT COUNT(*) AS n FROM {db.table('dt_project_estimate_summary')}")[0]["n"]),
         lambda value: value[1] == 50)
     saved = check("save a baseline", lambda: BaselineRepository(db).save(BASELINE))
     check("read the latest baseline", lambda: BaselineRepository(db).latest(),
@@ -86,3 +91,10 @@ def run_databricks_smoke(settings: DatabricksSettings | None = None) -> int:
         admin.close()
     print(format_report(results))
     return 0 if all(ok for _, ok, _ in results) else 1
+
+
+if __name__ == "__main__":
+    try:
+        raise SystemExit(run_databricks_smoke())
+    except RuntimeError as error:
+        raise SystemExit(f"databricks-smoke: {error}") from error

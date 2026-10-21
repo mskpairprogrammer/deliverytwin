@@ -16,7 +16,7 @@ from typing import Any
 
 from .analytics import session_dependency_detection
 from .capacity import role_phase_breakdown
-from .data.connection import Connection, Row
+from .storage.connection import Connection, Row
 from .llm import LLMError, complete, openai_configured, openai_model
 from .provenance import (
     attribute as attribute_source, clean_findings, find_sentence, rules_attribution, rules_findings, source_counts,
@@ -169,18 +169,18 @@ _PROJECT_HISTORY_COLUMNS = {
 
 
 def _ensure_project_history_columns(connection: Connection) -> None:
-    columns = set(connection.table_columns("historical_projects"))
+    columns = set(connection.table_columns("dt_historical_projects"))
     if not columns:
         raise IntakeError("Historical projects are not loaded. Seed the demo data and try again.")
     for name, declaration in _PROJECT_HISTORY_COLUMNS.items():
         if name not in columns:
             kind = "DOUBLE" if declaration == "REAL" else declaration
-            connection.execute(f"ALTER TABLE historical_projects ADD COLUMN {name} {kind}")
+            connection.execute(f"ALTER TABLE dt_historical_projects ADD COLUMN {name} {kind}")
 
 
 def seed_historical_projects(connection: Connection) -> None:
     """Idempotently load the completed-project portfolio through the data layer."""
-    from .data import HistoryRepository, dataset_loaded, load_dataset
+    from .storage import HistoryRepository, dataset_loaded, load_dataset
 
     _ensure_project_history_columns(connection)
     database = connection.local
@@ -197,14 +197,14 @@ def seed_historical_projects(connection: Connection) -> None:
     updates = ", ".join(f"{name}=excluded.{name}" for name in columns[1:])
     with connection:
         connection.executemany(
-            f"INSERT INTO historical_projects ({', '.join(columns)}) "
+            f"INSERT INTO dt_historical_projects ({', '.join(columns)}) "
             f"VALUES ({', '.join('?' for _ in columns)}) "
             f"ON CONFLICT(project_id) DO UPDATE SET {updates}",
             [tuple(project[name] for name in columns) for project in projects],
         )
         connection.executemany(
             """
-            INSERT INTO historical_project_lessons
+            INSERT INTO dt_historical_project_lessons
                 (id, project_id, category, lesson, suggested_option)
             VALUES (?, ?, ?, ?, ?)
             ON CONFLICT(id) DO UPDATE SET
@@ -242,7 +242,7 @@ def _clean_text(text: object) -> str:
 
 
 def _historical_count(connection: Connection) -> int:
-    count = connection.execute("SELECT COUNT(*) FROM historical_projects").fetchone()[0]
+    count = connection.execute("SELECT COUNT(*) FROM dt_historical_projects").fetchone()[0]
     if not count:
         raise IntakeError("Completed historical projects are not loaded. Seed the demo data and try again.")
     return count
@@ -440,7 +440,7 @@ def _vocabulary(connection: Connection) -> dict[str, set[str]]:
     vocab = _template_vocabulary()
     for row in connection.execute(
         "SELECT structure, systems, roles, dependencies, delivery_pattern "
-        "FROM historical_projects WHERE structure IS NOT NULL"
+        "FROM dt_historical_projects WHERE structure IS NOT NULL"
     ):
         vocab["structure"].add(row["structure"])
         vocab["delivery_pattern"].add(row["delivery_pattern"])
@@ -519,7 +519,7 @@ def _resolve_questions(connection: Connection, raw: object) -> list[dict[str, An
 
 def _evidence_projects(connection: Connection, request_tokens: set[str]) -> list[Row]:
     scored = []
-    for row in connection.execute("SELECT * FROM historical_projects ORDER BY project_id"):
+    for row in connection.execute("SELECT * FROM dt_historical_projects ORDER BY project_id"):
         text = f"{row['project_name']} {row['description']} {row['lessons_learned']}"
         scored.append((len(request_tokens & _tokens(text)), row))
     scored.sort(key=lambda item: (-item[0], item[1]["project_id"]))
@@ -675,8 +675,8 @@ def _template_analysis(
             """
             SELECT l.id, l.lesson, l.suggested_option,
                    p.project_name AS name, p.description AS summary
-            FROM historical_project_lessons AS l
-            JOIN historical_projects AS p ON p.project_id = l.project_id
+            FROM dt_historical_project_lessons AS l
+            JOIN dt_historical_projects AS p ON p.project_id = l.project_id
             WHERE l.category = ?
             """,
             (question["id"],),
@@ -867,11 +867,11 @@ def match_analogs(
     _historical_count(connection)
     lessons: dict[str, str] = {}
     if doc_tokens:
-        for row in connection.execute("SELECT project_id, lesson FROM historical_project_lessons"):
+        for row in connection.execute("SELECT project_id, lesson FROM dt_historical_project_lessons"):
             lessons[row["project_id"]] = f"{lessons.get(row['project_id'], '')} {row['lesson']}"
     scored = []
     for row in connection.execute(
-        "SELECT * FROM historical_projects WHERE base_p50_hours IS NOT NULL ORDER BY project_id"
+        "SELECT * FROM dt_historical_projects WHERE base_p50_hours IS NOT NULL ORDER BY project_id"
     ):
         scores = _dimension_scores(fingerprint, row)
         similarity = sum(scores.values()) / len(scores)
@@ -1029,7 +1029,7 @@ def retrieve_similar_projects(
     technologies = set(fingerprint["systems"])
     integrations = len(technologies)
     team = max(1, round(team_size))
-    query = "SELECT * FROM historical_projects"
+    query = "SELECT * FROM dt_historical_projects"
     ordering = " ORDER BY ABS(integrations - ?) ASC, project_id ASC LIMIT 50"
     rows = connection.execute(
         f"{query} WHERE team_size BETWEEN ? AND ?{ordering}",
@@ -1435,7 +1435,7 @@ def _validate_basis(connection: Connection, basis: object) -> dict[str, Any] | N
             raise IntakeError("The prediction basis is invalid.")
         values.append(float(value))
     p50, p80, p90 = values
-    actuals = [row["actual_effort_hours"] for row in connection.execute("SELECT actual_effort_hours FROM historical_projects")]
+    actuals = [row["actual_effort_hours"] for row in connection.execute("SELECT actual_effort_hours FROM dt_historical_projects")]
     if not actuals or not 0 < p50 <= p80 <= p90 or p50 < min(actuals) * 0.5 or p90 > max(actuals) * 2:
         raise IntakeError("The prediction basis is outside the range of completed projects.")
     return {
@@ -1456,7 +1456,7 @@ def build_commitment(
     from .app import INITIATIVE_ID
 
     plan = connection.execute(
-        "SELECT capacity_fte, allocated_fte FROM planview_projects WHERE initiative_id = ?",
+        "SELECT capacity_fte, allocated_fte FROM dt_planview_projects WHERE initiative_id = ?",
         (INITIATIVE_ID,),
     ).fetchone()
     if plan is None:
@@ -1492,7 +1492,7 @@ def build_commitment(
             for row in connection.execute(
                 """
                 SELECT role_name, ROUND(SUM(allocated_fte), 1) AS allocated_fte
-                FROM planview_resource_assignments
+                FROM dt_planview_resource_assignments
                 WHERE initiative_id = ?
                 GROUP BY role_name
                 ORDER BY role_name
@@ -1577,7 +1577,7 @@ def approve_baseline(
     commitment, rom = result["commitment"], result["rom"]
     if not commitment["feasible"]:
         raise IntakeError("The commitment is not feasible with the current capacity; it cannot be approved.")
-    from .data import BaselineRepository
+    from .storage import BaselineRepository
 
     repository = BaselineRepository(connection.app_database())
     baseline_id = repository.save({
@@ -1623,6 +1623,6 @@ def estimate_intake(
 
 
 def latest_baseline(connection: Connection) -> dict[str, Any] | None:
-    from .data import BaselineRepository
+    from .storage import BaselineRepository
 
     return BaselineRepository(connection.app_database()).latest()

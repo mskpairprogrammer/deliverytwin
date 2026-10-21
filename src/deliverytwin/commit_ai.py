@@ -11,7 +11,7 @@ from datetime import date
 from typing import Any
 
 from .ai_common import INVALID_RESPONSE, llm_json, text, text_list
-from .data.connection import Connection
+from .storage.connection import Connection
 from .llm import openai_model
 
 VERDICTS = ("ready", "ready_with_conditions", "not_ready")
@@ -24,7 +24,7 @@ def _analog_context(connection: Connection, matches: list[dict[str, Any]]) -> li
     details = {
         row["project_id"]: dict(row) for row in connection.execute(
             "SELECT project_id, planned_duration_weeks, actual_duration_weeks, outcome, lessons_learned "
-            f"FROM historical_projects WHERE project_id IN ({','.join('?' * len(ids))})", ids,
+            f"FROM dt_historical_projects WHERE project_id IN ({','.join('?' * len(ids))})", ids,
         )
     } if ids else {}
     return [

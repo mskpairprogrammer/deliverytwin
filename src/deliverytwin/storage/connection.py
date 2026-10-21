@@ -33,11 +33,24 @@ __all__ = [
 
 
 def resolve_dialect(explicit: str | None = None, env: dict[str, str] | None = None) -> str:
-    """``--dialect`` wins, then ``DELIVERYTWIN_DB_DIALECT``, then Databricks when its host is set, else DuckDB."""
+    """``--dialect`` wins, then the Databricks switch, then ``DELIVERYTWIN_DB_DIALECT``, then Databricks when its
+    host is set, else DuckDB.
+
+    With ``DELIVERYTWIN_DATABRICKS_ENABLED=0`` the data stays on DuckDB whatever else is set; with ``=1`` it moves
+    to Databricks once the warehouse settings (host and ``DATABRICKS_HTTP_PATH``) are filled in.
+    """
+    from ..integrations import databricks_switch
+
     source = os.environ if env is None else env
-    chosen = (explicit or source.get("DELIVERYTWIN_DB_DIALECT", "")).strip().lower()
+    host = source.get("DATABRICKS_HOST") or source.get("DATABRICKS_SERVER_HOSTNAME")
+    enabled = databricks_switch(source)
+    chosen = (explicit or "").strip().lower()
+    if not chosen and enabled is not None:
+        chosen = "databricks" if enabled and host and source.get("DATABRICKS_HTTP_PATH") else "duckdb"
     if not chosen:
-        chosen = "databricks" if source.get("DATABRICKS_HOST") or source.get("DATABRICKS_SERVER_HOSTNAME") else "duckdb"
+        chosen = source.get("DELIVERYTWIN_DB_DIALECT", "").strip().lower()
+    if not chosen:
+        chosen = "databricks" if host else "duckdb"
     if chosen not in DIALECTS:
         raise ValueError(f"Unsupported database dialect {chosen!r}. Choose one of: {', '.join(DIALECTS)}.")
     return chosen

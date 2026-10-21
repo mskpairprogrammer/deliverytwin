@@ -7,12 +7,12 @@ from statistics import median
 from typing import Any
 
 from .database import Database
-from .generator import DATASET_DIR
+from .paths import DATASET_DIR
 from .schema import TABLES
 
 
-def read_csv_rows(table_name: str, directory: Path | str = DATASET_DIR) -> list[dict[str, str]]:
-    with (Path(directory) / f"{table_name}.csv").open(encoding="utf-8", newline="") as handle:
+def read_csv_rows(dataset: str, directory: Path | str = DATASET_DIR) -> list[dict[str, str]]:
+    with (Path(directory) / f"{dataset}.csv").open(encoding="utf-8", newline="") as handle:
         return list(csv.DictReader(handle))
 
 
@@ -20,12 +20,12 @@ def load_dataset(db: Database, directory: Path | str = DATASET_DIR) -> dict[str,
     """Create the portfolio tables if needed and idempotently upsert every CSV row."""
     db.create_tables(include_app=False)
     with db.batch():
-        return {name: db.upsert(name, read_csv_rows(name, directory)) for name in TABLES}
+        return {name: db.upsert(name, read_csv_rows(table.dataset, directory)) for name, table in TABLES.items()}
 
 
 def dataset_loaded(db: Database) -> bool:
     try:
-        rows = db.query(f"SELECT COUNT(*) AS n FROM {db.table('project_estimate_summary')}")
+        rows = db.query(f"SELECT COUNT(*) AS n FROM {db.table('dt_project_estimate_summary')}")
     except Exception:
         return False
     return bool(rows and rows[0]["n"])
@@ -47,13 +47,13 @@ class HistoryRepository:
         self.db = db
 
     def list_projects(self) -> list[dict[str, Any]]:
-        estimates = {row["project_id"]: row for row in _select(self.db, "project_estimate_summary")}
-        intakes = {row["project_id"]: row for row in _select(self.db, "project_intakes")}
+        estimates = {row["project_id"]: row for row in _select(self.db, "dt_project_estimate_summary")}
+        intakes = {row["project_id"]: row for row in _select(self.db, "dt_project_intakes")}
         roles: dict[str, list[dict[str, Any]]] = {}
-        for row in _select(self.db, "project_role_estimates"):
+        for row in _select(self.db, "dt_project_role_estimates"):
             roles.setdefault(row["project_id"], []).append(row)
         lessons: dict[str, list[dict[str, Any]]] = {}
-        for row in _select(self.db, "project_lessons"):
+        for row in _select(self.db, "dt_project_lessons"):
             lessons.setdefault(row["project_id"], []).append(row)
 
         projects = []
@@ -99,7 +99,7 @@ class HistoryRepository:
         return projects
 
     def portfolio_summary(self) -> dict[str, Any]:
-        rows = _select(self.db, "project_estimate_summary")
+        rows = _select(self.db, "dt_project_estimate_summary")
         if not rows:
             return {"projects": 0}
         overruns = [int(row["actual_hours"]) / int(row["p50_hours"]) for row in rows]

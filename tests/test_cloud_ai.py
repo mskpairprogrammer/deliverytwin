@@ -1,4 +1,4 @@
-"""AI routing: Databricks Model Serving, then Azure OpenAI, then OpenAI, with truthful failures."""
+"""AI routing: Databricks Model Serving, then Microsoft Foundry, then OpenAI, with truthful failures."""
 import io
 import json
 import os
@@ -10,14 +10,14 @@ from deliverytwin.ai_common import llm_json
 from deliverytwin.llm import LLMError, ai_status, complete, databricks_serving_settings, openai_configured, openai_model
 
 NONE = {
-    "DELIVERYTWIN_AI_MODE": "", "OPENAI_API_KEY": "", "AZURE_OPENAI_ENDPOINT": "", "AZURE_OPENAI_DEPLOYMENT": "",
-    "AZURE_OPENAI_API_KEY": "", "DATABRICKS_SERVING_ENDPOINT": "", "COPILOT_AI_ENDPOINT": "", "DATABRICKS_HOST": "",
+    "DELIVERYTWIN_AI_MODE": "", "OPENAI_API_KEY": "", "FOUNDRY_ENDPOINT": "", "FOUNDRY_MODEL": "",
+    "FOUNDRY_API_KEY": "", "DATABRICKS_SERVING_ENDPOINT": "", "COPILOT_AI_ENDPOINT": "", "DATABRICKS_HOST": "",
     "DATABRICKS_TOKEN": "", "DATABRICKS_CLIENT_ID": "", "DATABRICKS_CLIENT_SECRET": "",
 }
 DATABRICKS = {"DATABRICKS_SERVING_ENDPOINT": "chat-endpoint", "DATABRICKS_HOST": "https://adb-123.azuredatabricks.net/",
               "DATABRICKS_TOKEN": "dapi-secret"}
-AZURE = {"AZURE_OPENAI_ENDPOINT": "https://example.openai.azure.com", "AZURE_OPENAI_DEPLOYMENT": "dep",
-         "AZURE_OPENAI_API_KEY": "azure-key"}
+AZURE = {"FOUNDRY_ENDPOINT": "https://example.openai.azure.com", "FOUNDRY_MODEL": "dep",
+         "FOUNDRY_API_KEY": "azure-key"}
 
 
 class Response(io.BytesIO):
@@ -43,10 +43,11 @@ class RoutingTests(unittest.TestCase):
         with env(OPENAI_API_KEY="sk-x"):
             self.assertEqual(ai_status()["mode"], "openai")
         with env(OPENAI_API_KEY="sk-x", **AZURE):
-            self.assertEqual((ai_status()["mode"], openai_model()), ("azure_openai", "dep"))
+            self.assertEqual((ai_status()["mode"], openai_model()), ("foundry", "dep"))
         with env(OPENAI_API_KEY="sk-x", **AZURE, **DATABRICKS):
             self.assertEqual(ai_status(), {"mode": "databricks_serving", "model": "chat-endpoint",
-                                           "label": "Databricks Model Serving"})
+                                           "label": "Databricks Model Serving",
+                                           "integrations": {"databricks": "auto", "foundry": "auto"}})
 
     def test_the_copilot_endpoint_name_is_an_alias_and_recorded_mode_still_wins(self) -> None:
         values = {**DATABRICKS, "DATABRICKS_SERVING_ENDPOINT": "", "COPILOT_AI_ENDPOINT": "copilot-chat"}

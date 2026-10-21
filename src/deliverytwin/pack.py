@@ -9,7 +9,7 @@ from datetime import date
 from typing import Any
 
 from .backlog import _label, latest_backlog, to_ado_rest
-from .data.connection import Connection
+from .storage.connection import Connection
 
 MAX_REVIEW_TEXT = 500
 VERDICTS = {"ready": "Ready to approve", "ready_with_conditions": "Ready with conditions", "not_ready": "Not ready"}
@@ -49,7 +49,7 @@ def clean_review(review: object) -> dict[str, Any] | None:
 def _signal_origin(connection: Connection) -> str:
     from .scenarios import IMPORT_SCENARIO, SCENARIOS, scenario_key
 
-    if not connection.execute("SELECT 1 FROM simulation_state WHERE id = 1").fetchone():
+    if not connection.execute("SELECT 1 FROM dt_simulation_state WHERE id = 1").fetchone():
         return "No delivery signals have been simulated or imported yet."
     key = scenario_key(connection)
     if key == IMPORT_SCENARIO:
@@ -58,7 +58,7 @@ def _signal_origin(connection: Connection) -> str:
 
 
 def build_pack(connection: Connection, review: object = None, as_of: date | None = None) -> dict[str, Any] | None:
-    from .data import BaselineRepository
+    from .storage import BaselineRepository
 
     baseline = BaselineRepository(connection.app_database()).latest_scope()
     backlog = latest_backlog(connection, as_of)

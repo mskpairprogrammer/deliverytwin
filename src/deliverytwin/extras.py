@@ -7,12 +7,11 @@ from __future__ import annotations
 
 import re
 from datetime import date, timedelta
-from pathlib import Path
 from typing import Any
 
-from .data.connection import Connection
+from .storage.connection import Connection
+from .storage.paths import SAMPLES_DIR
 
-SAMPLES_DIR = Path(__file__).with_name("data") / "samples"
 SAMPLE_DOCUMENTS = (
     ("sample_rom_customer_360.md", "rom"),
     ("sample_meeting_notes_customer_360.md", "meeting_notes"),
@@ -28,7 +27,7 @@ class BaselineRequired(Exception):
 
 
 def baseline_history(connection: Connection) -> dict[str, Any]:
-    from .data import BaselineRepository
+    from .storage import BaselineRepository
 
     history = BaselineRepository(connection.app_database()).history()
     result = []

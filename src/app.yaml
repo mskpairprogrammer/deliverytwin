@@ -21,7 +21,7 @@ env:
     value: "mlops"
 
   # Databricks Model Serving chat endpoint that SHAPE, COMMIT, TRACK and INTERVENE call first.
-  # Without it the app falls back to Azure OpenAI, then OpenAI, then the labeled rules-based mode.
+  # Without it the app falls back to Microsoft Foundry (FOUNDRY_*), then OpenAI, then the labeled rules-based mode.
   - name: DATABRICKS_SERVING_ENDPOINT
     value: "<model-serving-endpoint-name>"
 

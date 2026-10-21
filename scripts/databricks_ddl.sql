@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS dpm_dev.mlops.project_intakes (
+CREATE TABLE IF NOT EXISTS dpm_dev.mlops.dt_project_intakes (
   project_id STRING NOT NULL,
   project_name STRING,
   problem_statement_and_desired_outcome STRING,
@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS dpm_dev.mlops.project_intakes (
 USING DELTA
 COMMENT 'Intake form fields; delivery_pattern is an extension used for 6D matching.';
 
-CREATE TABLE IF NOT EXISTS dpm_dev.mlops.project_estimate_summary (
+CREATE TABLE IF NOT EXISTS dpm_dev.mlops.dt_project_estimate_summary (
   project_id STRING NOT NULL,
   project_name STRING,
   project_size STRING,
@@ -37,7 +37,7 @@ CREATE TABLE IF NOT EXISTS dpm_dev.mlops.project_estimate_summary (
 USING DELTA
 COMMENT 'P50/P80 estimate (including contingency) versus actuals; actual_duration_weeks and outcome are extensions.';
 
-CREATE TABLE IF NOT EXISTS dpm_dev.mlops.project_role_estimates (
+CREATE TABLE IF NOT EXISTS dpm_dev.mlops.dt_project_role_estimates (
   project_id STRING NOT NULL,
   role STRING NOT NULL,
   p50_hours BIGINT,
@@ -51,7 +51,7 @@ CREATE TABLE IF NOT EXISTS dpm_dev.mlops.project_role_estimates (
 USING DELTA
 COMMENT 'Per-role effort breakdown.';
 
-CREATE TABLE IF NOT EXISTS dpm_dev.mlops.project_resource_assignments (
+CREATE TABLE IF NOT EXISTS dpm_dev.mlops.dt_project_resource_assignments (
   project_id STRING NOT NULL,
   resource_name STRING NOT NULL,
   role STRING NOT NULL,
@@ -65,7 +65,7 @@ CREATE TABLE IF NOT EXISTS dpm_dev.mlops.project_resource_assignments (
 USING DELTA
 COMMENT 'Named resource allocations.';
 
-CREATE TABLE IF NOT EXISTS dpm_dev.mlops.project_approval_dependencies (
+CREATE TABLE IF NOT EXISTS dpm_dev.mlops.dt_project_approval_dependencies (
   project_id STRING NOT NULL,
   gate STRING NOT NULL,
   dependency STRING,
@@ -78,7 +78,7 @@ CREATE TABLE IF NOT EXISTS dpm_dev.mlops.project_approval_dependencies (
 USING DELTA
 COMMENT 'Approval gates; dependency is an extension that carries the 6D vocabulary term.';
 
-CREATE TABLE IF NOT EXISTS dpm_dev.mlops.devops_workitems_details (
+CREATE TABLE IF NOT EXISTS dpm_dev.mlops.dt_devops_workitems_details (
   workitem_id STRING NOT NULL,
   prjnumber STRING,
   title STRING,
@@ -91,7 +91,7 @@ CREATE TABLE IF NOT EXISTS dpm_dev.mlops.devops_workitems_details (
 USING DELTA
 COMMENT 'Epics, features, and stories joined on prjnumber.';
 
-CREATE TABLE IF NOT EXISTS dpm_dev.mlops.project_lessons (
+CREATE TABLE IF NOT EXISTS dpm_dev.mlops.dt_project_lessons (
   project_id STRING NOT NULL,
   category STRING NOT NULL,
   lesson STRING,
@@ -101,7 +101,7 @@ CREATE TABLE IF NOT EXISTS dpm_dev.mlops.project_lessons (
 USING DELTA
 COMMENT 'Extension: lesson per clarification category and the option it supports.';
 
-CREATE TABLE IF NOT EXISTS dpm_dev.mlops.commitment_baselines (
+CREATE TABLE IF NOT EXISTS dpm_dev.mlops.dt_commitment_baselines (
   baseline_id STRING NOT NULL,
   request_text STRING,
   answers_json STRING,
@@ -119,7 +119,7 @@ CREATE TABLE IF NOT EXISTS dpm_dev.mlops.commitment_baselines (
 USING DELTA
 COMMENT 'Human-approved COMMIT baselines.';
 
-CREATE TABLE IF NOT EXISTS dpm_dev.mlops.intake_sessions (
+CREATE TABLE IF NOT EXISTS dpm_dev.mlops.dt_intake_sessions (
   session_id STRING NOT NULL,
   started_at TIMESTAMP,
   first_rom_at TIMESTAMP,
@@ -129,7 +129,7 @@ CREATE TABLE IF NOT EXISTS dpm_dev.mlops.intake_sessions (
 USING DELTA
 COMMENT 'Anonymous intake timing; no request text or document content.';
 
-CREATE TABLE IF NOT EXISTS dpm_dev.mlops.recovery_scenarios (
+CREATE TABLE IF NOT EXISTS dpm_dev.mlops.dt_recovery_scenarios (
   scenario_id BIGINT NOT NULL,
   initiative_id STRING,
   recommended_option STRING,
@@ -144,7 +144,7 @@ CREATE TABLE IF NOT EXISTS dpm_dev.mlops.recovery_scenarios (
 USING DELTA
 COMMENT 'INTERVENE scenarios saved after a what-if preview.';
 
-CREATE TABLE IF NOT EXISTS dpm_dev.mlops.recovery_target_updates (
+CREATE TABLE IF NOT EXISTS dpm_dev.mlops.dt_recovery_target_updates (
   scenario_id BIGINT NOT NULL,
   source_key STRING NOT NULL,
   payload_json STRING,
@@ -153,7 +153,7 @@ CREATE TABLE IF NOT EXISTS dpm_dev.mlops.recovery_target_updates (
 USING DELTA
 COMMENT 'Simulated per-system update records of a saved recovery scenario.';
 
-CREATE TABLE IF NOT EXISTS dpm_dev.mlops.track_snapshots (
+CREATE TABLE IF NOT EXISTS dpm_dev.mlops.dt_track_snapshots (
   snapshot_id STRING NOT NULL,
   initiative_id STRING,
   sprint_number BIGINT,

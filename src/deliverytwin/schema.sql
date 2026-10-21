@@ -1,6 +1,6 @@
 PRAGMA foreign_keys = ON;
 
-CREATE TABLE IF NOT EXISTS source_systems (
+CREATE TABLE IF NOT EXISTS dt_source_systems (
     source_key TEXT PRIMARY KEY,
     display_name TEXT NOT NULL,
     integration_mode TEXT NOT NULL DEFAULT 'simulated'
@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS source_systems (
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS simulation_state (
+CREATE TABLE IF NOT EXISTS dt_simulation_state (
     id INTEGER PRIMARY KEY CHECK (id = 1),
     started_on TEXT NOT NULL,
     as_of TEXT NOT NULL,
@@ -19,21 +19,21 @@ CREATE TABLE IF NOT EXISTS simulation_state (
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS simulation_settings (
+CREATE TABLE IF NOT EXISTS dt_simulation_settings (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS simulation_events (
+CREATE TABLE IF NOT EXISTS dt_simulation_events (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     sprint_number INTEGER NOT NULL CHECK (sprint_number >= 1),
     kind TEXT NOT NULL,
     injected_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS ingestion_runs (
+CREATE TABLE IF NOT EXISTS dt_ingestion_runs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    source_key TEXT NOT NULL REFERENCES source_systems(source_key),
+    source_key TEXT NOT NULL REFERENCES dt_source_systems(source_key),
     started_at TEXT NOT NULL,
     completed_at TEXT,
     status TEXT NOT NULL CHECK (status IN ('running', 'succeeded', 'failed')),
@@ -41,7 +41,7 @@ CREATE TABLE IF NOT EXISTS ingestion_runs (
     error_message TEXT
 );
 
-CREATE TABLE IF NOT EXISTS delivery_initiatives (
+CREATE TABLE IF NOT EXISTS dt_delivery_initiatives (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
     portfolio TEXT NOT NULL,
@@ -53,83 +53,83 @@ CREATE TABLE IF NOT EXISTS delivery_initiatives (
     initial_confidence_pct REAL NOT NULL CHECK (initial_confidence_pct BETWEEN 0 AND 100)
 );
 
-CREATE TABLE IF NOT EXISTS delivery_milestones (
+CREATE TABLE IF NOT EXISTS dt_delivery_milestones (
     id TEXT PRIMARY KEY,
-    initiative_id TEXT NOT NULL REFERENCES delivery_initiatives(id),
+    initiative_id TEXT NOT NULL REFERENCES dt_delivery_initiatives(id),
     name TEXT NOT NULL,
     target_date TEXT NOT NULL,
     status TEXT NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS people (
+CREATE TABLE IF NOT EXISTS dt_people (
     id TEXT PRIMARY KEY,
     display_name TEXT NOT NULL,
     active INTEGER NOT NULL CHECK (active IN (0, 1))
 );
 
-CREATE TABLE IF NOT EXISTS skills (
+CREATE TABLE IF NOT EXISTS dt_skills (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL UNIQUE
 );
 
-CREATE TABLE IF NOT EXISTS person_skills (
-    person_id TEXT NOT NULL REFERENCES people(id),
-    skill_id TEXT NOT NULL REFERENCES skills(id),
+CREATE TABLE IF NOT EXISTS dt_person_skills (
+    person_id TEXT NOT NULL REFERENCES dt_people(id),
+    skill_id TEXT NOT NULL REFERENCES dt_skills(id),
     proficiency TEXT NOT NULL,
     PRIMARY KEY (person_id, skill_id)
 );
 
-CREATE TABLE IF NOT EXISTS source_entity_map (
-    source_key TEXT NOT NULL REFERENCES source_systems(source_key),
+CREATE TABLE IF NOT EXISTS dt_source_entity_map (
+    source_key TEXT NOT NULL REFERENCES dt_source_systems(source_key),
     entity_type TEXT NOT NULL,
     external_id TEXT NOT NULL,
     twin_entity_id TEXT NOT NULL,
     PRIMARY KEY (source_key, entity_type, external_id)
 );
 
-CREATE TABLE IF NOT EXISTS planview_projects (
+CREATE TABLE IF NOT EXISTS dt_planview_projects (
     external_id TEXT PRIMARY KEY,
-    initiative_id TEXT NOT NULL REFERENCES delivery_initiatives(id),
+    initiative_id TEXT NOT NULL REFERENCES dt_delivery_initiatives(id),
     project_status TEXT NOT NULL,
     capacity_fte REAL NOT NULL CHECK (capacity_fte >= 0),
     allocated_fte REAL NOT NULL CHECK (allocated_fte >= 0),
     planned_hours REAL NOT NULL CHECK (planned_hours >= 0)
 );
 
-CREATE TABLE IF NOT EXISTS planview_milestones (
+CREATE TABLE IF NOT EXISTS dt_planview_milestones (
     external_id TEXT PRIMARY KEY,
-    initiative_id TEXT NOT NULL REFERENCES delivery_initiatives(id),
+    initiative_id TEXT NOT NULL REFERENCES dt_delivery_initiatives(id),
     name TEXT NOT NULL,
     baseline_date TEXT NOT NULL,
     status TEXT NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS planview_resource_assignments (
+CREATE TABLE IF NOT EXISTS dt_planview_resource_assignments (
     external_id TEXT PRIMARY KEY,
-    initiative_id TEXT NOT NULL REFERENCES delivery_initiatives(id),
-    person_id TEXT NOT NULL REFERENCES people(id),
+    initiative_id TEXT NOT NULL REFERENCES dt_delivery_initiatives(id),
+    person_id TEXT NOT NULL REFERENCES dt_people(id),
     role_name TEXT NOT NULL,
     allocated_fte REAL NOT NULL CHECK (allocated_fte >= 0)
 );
 
-CREATE TABLE IF NOT EXISTS ado_projects (
+CREATE TABLE IF NOT EXISTS dt_ado_projects (
     external_id TEXT PRIMARY KEY,
-    initiative_id TEXT NOT NULL REFERENCES delivery_initiatives(id),
+    initiative_id TEXT NOT NULL REFERENCES dt_delivery_initiatives(id),
     name TEXT NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS ado_sprints (
+CREATE TABLE IF NOT EXISTS dt_ado_sprints (
     external_id TEXT PRIMARY KEY,
-    project_external_id TEXT NOT NULL REFERENCES ado_projects(external_id),
+    project_external_id TEXT NOT NULL REFERENCES dt_ado_projects(external_id),
     name TEXT NOT NULL,
     start_date TEXT NOT NULL,
     end_date TEXT NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS ado_work_items (
+CREATE TABLE IF NOT EXISTS dt_ado_work_items (
     external_id TEXT PRIMARY KEY,
-    project_external_id TEXT NOT NULL REFERENCES ado_projects(external_id),
-    sprint_external_id TEXT REFERENCES ado_sprints(external_id),
+    project_external_id TEXT NOT NULL REFERENCES dt_ado_projects(external_id),
+    sprint_external_id TEXT REFERENCES dt_ado_sprints(external_id),
     title TEXT NOT NULL,
     work_item_type TEXT NOT NULL,
     state TEXT NOT NULL,
@@ -137,19 +137,19 @@ CREATE TABLE IF NOT EXISTS ado_work_items (
     is_unplanned INTEGER NOT NULL DEFAULT 0 CHECK (is_unplanned IN (0, 1))
 );
 
-CREATE TABLE IF NOT EXISTS servicenow_incidents (
+CREATE TABLE IF NOT EXISTS dt_servicenow_incidents (
     external_id TEXT PRIMARY KEY,
-    initiative_id TEXT NOT NULL REFERENCES delivery_initiatives(id),
-    assignee_person_id TEXT REFERENCES people(id),
+    initiative_id TEXT NOT NULL REFERENCES dt_delivery_initiatives(id),
+    assignee_person_id TEXT REFERENCES dt_people(id),
     priority INTEGER NOT NULL CHECK (priority BETWEEN 1 AND 5),
     state TEXT NOT NULL,
     short_description TEXT NOT NULL,
     opened_at TEXT NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS servicenow_change_requests (
+CREATE TABLE IF NOT EXISTS dt_servicenow_change_requests (
     external_id TEXT PRIMARY KEY,
-    initiative_id TEXT NOT NULL REFERENCES delivery_initiatives(id),
+    initiative_id TEXT NOT NULL REFERENCES dt_delivery_initiatives(id),
     short_description TEXT NOT NULL,
     state TEXT NOT NULL,
     opened_at TEXT NOT NULL,
@@ -157,49 +157,49 @@ CREATE TABLE IF NOT EXISTS servicenow_change_requests (
     is_blocking INTEGER NOT NULL DEFAULT 0 CHECK (is_blocking IN (0, 1))
 );
 
-CREATE TABLE IF NOT EXISTS oracle_workers (
+CREATE TABLE IF NOT EXISTS dt_oracle_workers (
     external_id TEXT PRIMARY KEY,
-    person_id TEXT NOT NULL UNIQUE REFERENCES people(id),
+    person_id TEXT NOT NULL UNIQUE REFERENCES dt_people(id),
     department TEXT NOT NULL,
     job_title TEXT NOT NULL,
     worker_status TEXT NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS oracle_worker_skills (
-    worker_external_id TEXT NOT NULL REFERENCES oracle_workers(external_id),
-    skill_id TEXT NOT NULL REFERENCES skills(id),
+CREATE TABLE IF NOT EXISTS dt_oracle_worker_skills (
+    worker_external_id TEXT NOT NULL REFERENCES dt_oracle_workers(external_id),
+    skill_id TEXT NOT NULL REFERENCES dt_skills(id),
     proficiency TEXT NOT NULL,
     PRIMARY KEY (worker_external_id, skill_id)
 );
 
-CREATE TABLE IF NOT EXISTS ukg_shifts (
+CREATE TABLE IF NOT EXISTS dt_ukg_shifts (
     external_id TEXT PRIMARY KEY,
-    person_id TEXT NOT NULL REFERENCES people(id),
+    person_id TEXT NOT NULL REFERENCES dt_people(id),
     shift_date TEXT NOT NULL,
     start_time TEXT NOT NULL,
     end_time TEXT NOT NULL,
     shift_type TEXT NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS ukg_time_entries (
+CREATE TABLE IF NOT EXISTS dt_ukg_time_entries (
     external_id TEXT PRIMARY KEY,
-    person_id TEXT NOT NULL REFERENCES people(id),
-    initiative_id TEXT REFERENCES delivery_initiatives(id),
+    person_id TEXT NOT NULL REFERENCES dt_people(id),
+    initiative_id TEXT REFERENCES dt_delivery_initiatives(id),
     work_date TEXT NOT NULL,
     work_type TEXT NOT NULL,
     hours REAL NOT NULL CHECK (hours >= 0)
 );
 
-CREATE TABLE IF NOT EXISTS ukg_pto_requests (
+CREATE TABLE IF NOT EXISTS dt_ukg_pto_requests (
     external_id TEXT PRIMARY KEY,
-    person_id TEXT NOT NULL REFERENCES people(id),
+    person_id TEXT NOT NULL REFERENCES dt_people(id),
     start_date TEXT NOT NULL,
     end_date TEXT NOT NULL,
     hours REAL NOT NULL CHECK (hours >= 0),
     status TEXT NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS historical_initiatives (
+CREATE TABLE IF NOT EXISTS dt_historical_initiatives (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
     summary TEXT NOT NULL,
@@ -215,15 +215,15 @@ CREATE TABLE IF NOT EXISTS historical_initiatives (
     on_time_confidence_pct REAL NOT NULL CHECK (on_time_confidence_pct BETWEEN 0 AND 100)
 );
 
-CREATE TABLE IF NOT EXISTS historical_lessons (
+CREATE TABLE IF NOT EXISTS dt_historical_lessons (
     id TEXT PRIMARY KEY,
-    initiative_id TEXT NOT NULL REFERENCES historical_initiatives(id),
+    initiative_id TEXT NOT NULL REFERENCES dt_historical_initiatives(id),
     category TEXT NOT NULL CHECK (category IN ('architecture', 'data', 'security', 'reuse')),
     lesson TEXT NOT NULL,
     suggested_option TEXT NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS historical_projects (
+CREATE TABLE IF NOT EXISTS dt_historical_projects (
     project_id TEXT PRIMARY KEY,
     project_name TEXT NOT NULL,
     description TEXT NOT NULL,
@@ -250,19 +250,19 @@ CREATE TABLE IF NOT EXISTS historical_projects (
     )
 );
 
-CREATE TABLE IF NOT EXISTS historical_project_lessons (
+CREATE TABLE IF NOT EXISTS dt_historical_project_lessons (
     id TEXT PRIMARY KEY,
-    project_id TEXT NOT NULL REFERENCES historical_projects(project_id),
+    project_id TEXT NOT NULL REFERENCES dt_historical_projects(project_id),
     category TEXT NOT NULL CHECK (category IN ('architecture', 'data', 'security', 'reuse')),
     lesson TEXT NOT NULL,
     suggested_option TEXT NOT NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_ingestion_runs_source_time
-    ON ingestion_runs(source_key, started_at);
+    ON dt_ingestion_runs(source_key, started_at);
 CREATE INDEX IF NOT EXISTS idx_ado_items_project_unplanned
-    ON ado_work_items(project_external_id, is_unplanned);
+    ON dt_ado_work_items(project_external_id, is_unplanned);
 CREATE INDEX IF NOT EXISTS idx_snow_changes_initiative_state
-    ON servicenow_change_requests(initiative_id, state);
+    ON dt_servicenow_change_requests(initiative_id, state);
 CREATE INDEX IF NOT EXISTS idx_ukg_entries_initiative_type_date
-    ON ukg_time_entries(initiative_id, work_type, work_date);
+    ON dt_ukg_time_entries(initiative_id, work_type, work_date);

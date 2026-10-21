@@ -15,14 +15,14 @@ from .app_repository import (
     TrackSnapshotRepository,
 )
 from .connection import Connection, connect, default_database_path, resolve_dialect
-from .generator import DATASET_DIR, generate_dataset, write_dataset
+from .paths import DATA_ROOT, DATASET_DIR, SAMPLES_DIR
 from .repository import HistoryRepository, dataset_loaded, load_dataset
-from .schema import ALL_TABLES, APP_TABLES, TABLES, render_ddl
+from .schema import ALL_TABLES, APP_TABLES, TABLE_PREFIX, TABLES, render_ddl
 
 __all__ = [
     "BaselineRepository", "Connection", "IntakeSessionRepository", "RecoveryScenarioRepository",
-    "TrackSnapshotRepository", "ALL_TABLES", "APP_TABLES", "DATASET_DIR", "Database", "DatabaseError",
+    "TrackSnapshotRepository", "ALL_TABLES", "APP_TABLES", "DATA_ROOT", "DATASET_DIR", "Database", "DatabaseError",
     "DatabricksDatabase", "DatabricksSettings", "DuckDBDatabase", "HistoryRepository", "IntegrityError",
-    "TABLES", "connect", "dataset_loaded", "default_database_path", "generate_dataset",
-    "load_dataset", "open_database", "render_ddl", "resolve_dialect", "write_dataset",
+    "SAMPLES_DIR", "TABLE_PREFIX", "TABLES", "connect", "dataset_loaded", "default_database_path",
+    "load_dataset", "open_database", "render_ddl", "resolve_dialect",
 ]

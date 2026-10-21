@@ -132,13 +132,13 @@ class BacklogTests(unittest.TestCase):
             "allocated_fte": 5, "scope_defer_pct": 40, "target_date": "2027-05-01", "incremental_cost_k": 0,
             "confidence_pct": 70, "saved_at": "2999-01-01T00:00:00+00:00",
         }
-        scenarios.upsert("recovery_scenarios", [record])
+        scenarios.upsert("dt_recovery_scenarios", [record])
         followed = latest_backlog(connection, DAY)
         self.assertEqual(followed["plan"]["scenario"]["scope_defer_pct"], 40)
         self.assertEqual(followed["plan"]["epic"]["target_date"], "2027-05-01")
         self.assertTrue(followed["diff"])
         # A scenario saved before the current baseline was approved is not applied to it.
-        scenarios.upsert("recovery_scenarios", [{**record, "saved_at": "2000-01-01T00:00:00+00:00"}])
+        scenarios.upsert("dt_recovery_scenarios", [{**record, "saved_at": "2000-01-01T00:00:00+00:00"}])
         self.assertIsNone(latest_backlog(connection, DAY)["plan"])
 
 

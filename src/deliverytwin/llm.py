@@ -1,7 +1,8 @@
 """Chat-completion client for the AI features (standard library only).
 
-Backends, in order of precedence: recorded sample (explicit demo mode), Databricks Model Serving, Azure
-OpenAI, then OpenAI (OPENAI_API_KEY). With none configured, callers fall back to rules-based results.
+Backends, in order of precedence: recorded sample (explicit demo mode), Databricks Model Serving, Microsoft
+Foundry, then OpenAI (OPENAI_API_KEY). On Azure App Service only Foundry (and the recorded demo) is used: the
+OpenAI key and Model Serving are for local runs. With none configured, callers fall back to rules-based results.
 """
 from __future__ import annotations
 
@@ -12,6 +13,8 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 from typing import Any
+
+from .integrations import azure_app_service, databricks_switch, foundry_switch
 
 OPENAI_URL = "https://api.openai.com/v1/chat/completions"
 DEFAULT_MODEL = "gpt-4o-mini"
@@ -39,7 +42,12 @@ def load_env_file(path: Path | None = None) -> None:
             if not line or line.startswith("#") or "=" not in line:
                 continue
             name, _, value = line.partition("=")
-            name, value = name.strip(), value.strip().strip('"').strip("'")
+            name, value = name.strip(), value.strip()
+            if value[:1] in ('"', "'") and value[0] in value[1:]:
+                value = value[1:value.index(value[0], 1)]  # quoted: keep everything inside, including '#'
+            else:
+                value = re.split(r"\s#", value, maxsplit=1)[0].strip()  # unquoted: ' # ...' starts a comment
+                value = "" if value.startswith("#") else value
             if name and name not in os.environ:
                 os.environ[name] = value
 
@@ -50,15 +58,18 @@ load_env_file()
 def ai_mode() -> str:
     """Which backend answers AI requests.
 
-    Priority: recorded (explicit demo override), Databricks Model Serving, Azure OpenAI, OpenAI, else off.
+    Priority: recorded (explicit demo override), Databricks Model Serving, Microsoft Foundry, OpenAI, else off.
+    DELIVERYTWIN_DATABRICKS_ENABLED=0 and DELIVERYTWIN_FOUNDRY_ENABLED=0 skip their backends (see integrations.py).
+    On Azure App Service only Foundry models run: OPENAI_API_KEY and Databricks Model Serving are ignored there.
     """
     if os.environ.get("DELIVERYTWIN_AI_MODE", "").strip().lower() == "recorded":
         return "recorded"
-    if databricks_serving_settings():
+    cloud = azure_app_service()
+    if not cloud and databricks_serving_settings():
         return "databricks_serving"
-    if azure_settings():
-        return "azure_openai"
-    return "openai" if os.environ.get("OPENAI_API_KEY", "").strip() else "off"
+    if foundry_settings():
+        return "foundry"
+    return "openai" if not cloud and os.environ.get("OPENAI_API_KEY", "").strip() else "off"
 
 
 SERVING_ENDPOINT_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
@@ -69,6 +80,8 @@ def databricks_serving_settings() -> dict[str, str] | None:
 
     Needs the workspace host and either a token or OAuth client credentials (as Databricks Apps provide).
     """
+    if databricks_switch() is False:
+        return None
     endpoint = (os.environ.get("DATABRICKS_SERVING_ENDPOINT") or os.environ.get("COPILOT_AI_ENDPOINT") or "").strip()
     host = os.environ.get("DATABRICKS_HOST", "").strip().replace("https://", "").rstrip("/")
     token = os.environ.get("DATABRICKS_TOKEN", "").strip()
@@ -78,15 +91,31 @@ def databricks_serving_settings() -> dict[str, str] | None:
     return {"endpoint": endpoint, "host": host, "token": token}
 
 
-def azure_settings() -> dict[str, str] | None:
-    endpoint = os.environ.get("AZURE_OPENAI_ENDPOINT", "").strip().rstrip("/")
-    deployment = os.environ.get("AZURE_OPENAI_DEPLOYMENT", "").strip()
+FOUNDRY_PROJECT = re.compile(r"^https://([a-z0-9][a-z0-9-]{0,62})\.services\.ai\.azure\.com/api/projects/[^/]+/?$", re.I)
+
+
+def foundry_endpoint() -> str:
+    """The Foundry resource's model endpoint: FOUNDRY_ENDPOINT, else derived from FOUNDRY_PROJECT_ENDPOINT
+    (https://<resource>.services.ai.azure.com/api/projects/<p> -> https://<resource>.openai.azure.com)."""
+    explicit = os.environ.get("FOUNDRY_ENDPOINT", "").strip().rstrip("/")
+    if explicit:
+        return explicit
+    project = FOUNDRY_PROJECT.match(os.environ.get("FOUNDRY_PROJECT_ENDPOINT", "").strip())
+    return f"https://{project.group(1)}.openai.azure.com" if project else ""
+
+
+def foundry_settings() -> dict[str, str] | None:
+    """The Microsoft Foundry model deployment (FOUNDRY_MODEL); off when DELIVERYTWIN_FOUNDRY_ENABLED=0."""
+    if foundry_switch() is False:
+        return None
+    endpoint = foundry_endpoint()
+    deployment = os.environ.get("FOUNDRY_MODEL", "").strip()
     if not endpoint or not deployment or not endpoint.startswith("https://"):
         return None
     return {
         "endpoint": endpoint, "deployment": deployment,
-        "api_version": os.environ.get("AZURE_OPENAI_API_VERSION", "").strip() or "2024-10-21",
-        "api_key": os.environ.get("AZURE_OPENAI_API_KEY", "").strip(),
+        "api_version": os.environ.get("FOUNDRY_API_VERSION", "").strip() or "2024-10-21",
+        "api_key": os.environ.get("FOUNDRY_API_KEY", "").strip(),
     }
 
 
@@ -100,8 +129,8 @@ def openai_model() -> str:
         return "recorded-sample"
     if mode == "databricks_serving":
         return databricks_serving_settings()["endpoint"]
-    if mode == "azure_openai":
-        return azure_settings()["deployment"]
+    if mode == "foundry":
+        return foundry_settings()["deployment"]
     return os.environ.get("OPENAI_MODEL", "").strip() or DEFAULT_MODEL
 
 
@@ -128,16 +157,16 @@ def _complete_openai(messages: list[dict[str, str]], *, json_mode: bool = False)
         raise LLMError("OpenAI request failed.") from error
 
 
-def _azure_token() -> str:
+def _foundry_token() -> str:
     try:
         from azure.identity import DefaultAzureCredential
 
         return DefaultAzureCredential().get_token("https://cognitiveservices.azure.com/.default").token
     except Exception as error:  # any credential failure is reported as a request failure
-        raise LLMError("Azure OpenAI sign-in failed.") from error
+        raise LLMError("Microsoft Foundry sign-in failed.") from error
 
 
-def _complete_azure(settings: dict[str, str], messages: list[dict[str, str]], *, json_mode: bool = False) -> str:
+def _complete_foundry(settings: dict[str, str], messages: list[dict[str, str]], *, json_mode: bool = False) -> str:
     payload: dict[str, Any] = {"messages": messages, "temperature": 0}
     if json_mode:
         payload["response_format"] = {"type": "json_object"}
@@ -145,7 +174,7 @@ def _complete_azure(settings: dict[str, str], messages: list[dict[str, str]], *,
     if settings["api_key"]:
         headers["api-key"] = settings["api_key"]
     else:
-        headers["Authorization"] = "Bearer " + _azure_token()
+        headers["Authorization"] = "Bearer " + _foundry_token()
     url = (
         f"{settings['endpoint']}/openai/deployments/{settings['deployment']}/chat/completions"
         f"?api-version={settings['api_version']}"
@@ -156,9 +185,9 @@ def _complete_azure(settings: dict[str, str], messages: list[dict[str, str]], *,
             body = json.load(response)
         return str(body["choices"][0]["message"]["content"] or "").strip()
     except urllib.error.HTTPError as error:
-        raise LLMError(f"Azure OpenAI request failed with HTTP {error.code}.") from error
+        raise LLMError(f"Microsoft Foundry request failed with HTTP {error.code}.") from error
     except (urllib.error.URLError, TimeoutError, KeyError, IndexError, ValueError) as error:
-        raise LLMError("Azure OpenAI request failed.") from error
+        raise LLMError("Microsoft Foundry request failed.") from error
 
 
 def _databricks_headers(settings: dict[str, str]) -> dict[str, str]:
@@ -202,7 +231,7 @@ def _complete_databricks(settings: dict[str, str], messages: list[dict[str, str]
 
 
 def complete(messages: list[dict[str, str]], *, json_mode: bool = False) -> str:
-    """Answer with the recorded sample, Databricks Model Serving, Azure OpenAI, or OpenAI, in that order."""
+    """Answer with the backend ai_mode() picks: recorded, Databricks Model Serving, Foundry or OpenAI."""
     mode = ai_mode()
     if mode == "recorded":
         from .recorded_ai import RecordedError, recorded_complete
@@ -211,13 +240,13 @@ def complete(messages: list[dict[str, str]], *, json_mode: bool = False) -> str:
             return recorded_complete(messages, json_mode=json_mode)
         except RecordedError as error:
             raise LLMError(str(error)) from error
-    serving = databricks_serving_settings()
-    if serving:
-        return _complete_databricks(serving, messages, json_mode=json_mode)
-    settings = azure_settings()
-    if settings:
-        return _complete_azure(settings, messages, json_mode=json_mode)
-    return _complete_openai(messages, json_mode=json_mode)
+    if mode == "databricks_serving":
+        return _complete_databricks(databricks_serving_settings(), messages, json_mode=json_mode)
+    if mode == "foundry":
+        return _complete_foundry(foundry_settings(), messages, json_mode=json_mode)
+    if mode == "openai":
+        return _complete_openai(messages, json_mode=json_mode)
+    raise LLMError("No AI model is configured." + (" On Azure App Service only Foundry models are used." if azure_app_service() else ""))
 
 
 def ai_status() -> dict[str, Any]:
@@ -225,8 +254,11 @@ def ai_status() -> dict[str, Any]:
     labels = {
         "recorded": "Recorded sample answers: no live model is being called.",
         "databricks_serving": "Databricks Model Serving",
-        "azure_openai": "Azure OpenAI",
+        "foundry": "Microsoft Foundry",
         "openai": "OpenAI",
         "off": "No AI model configured: rules-based fallbacks are shown.",
     }
-    return {"mode": mode, "model": openai_model() if mode != "off" else None, "label": labels[mode]}
+    from .integrations import describe
+
+    return {"mode": mode, "model": openai_model() if mode != "off" else None, "label": labels[mode],
+            "integrations": describe()}

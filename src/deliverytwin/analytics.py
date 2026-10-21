@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, timezone
 from statistics import mean, median, pstdev
 from typing import Any
 
-from .data.connection import Connection, Row
+from .storage.connection import Connection, Row
 
 
 def seed_synthetic_intake_activity(connection: Connection) -> None:
@@ -37,7 +37,7 @@ def seed_synthetic_intake_activity(connection: Connection) -> None:
                 approved.isoformat(timespec="seconds") if approved else None,
             )
         )
-    from .data import IntakeSessionRepository
+    from .storage import IntakeSessionRepository
 
     IntakeSessionRepository(connection.app_database()).replace_all([
         {"session_id": sid, "started_at": started, "first_rom_at": first_rom, "approved_at": approved}
@@ -63,7 +63,7 @@ def record_intake_activity(
     if event not in {"started", "rom_ready", "approved"}:
         raise ValueError(f"Unsupported intake activity event: {event}.")
 
-    from .data import IntakeSessionRepository
+    from .storage import IntakeSessionRepository
 
     IntakeSessionRepository(connection.app_database()).record(
         normalized_id, event, occurred_at or datetime.now(timezone.utc)
@@ -99,7 +99,7 @@ def _backtest(connection: Connection) -> dict[str, Any]:
         """
         SELECT project_id, project_name, technologies, integrations, team_size,
                planned_effort_hours, actual_effort_hours
-        FROM historical_projects
+        FROM dt_historical_projects
         WHERE planned_effort_hours > 0 AND actual_effort_hours > 0
         ORDER BY project_id
         """
@@ -155,7 +155,7 @@ def _calibration(connection: Connection) -> dict[str, Any]:
         """
         SELECT project_id, technologies, integrations, team_size, planned_effort_hours, actual_effort_hours,
                planned_duration_weeks, actual_duration_weeks
-        FROM historical_projects
+        FROM dt_historical_projects
         WHERE planned_effort_hours > 0 AND actual_effort_hours > 0
         ORDER BY project_id
         """
@@ -216,7 +216,7 @@ def build_impact_report(
 ) -> dict[str, Any]:
     """Build portfolio estimator metrics from completed history and instrumented UI sessions."""
     current_time = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
-    from .data import IntakeSessionRepository
+    from .storage import IntakeSessionRepository
 
     sessions = IntakeSessionRepository(connection.app_database()).sessions()
     elapsed_seconds = [
@@ -270,7 +270,7 @@ def _dependency_recall(connection: Connection) -> dict[str, Any]:
     rows = connection.execute(
         """
         SELECT project_id, project_name, technologies, integrations, team_size, dependencies
-        FROM historical_projects ORDER BY project_id
+        FROM dt_historical_projects ORDER BY project_id
         """
     ).fetchall()
     caught = actual = flagged_total = 0

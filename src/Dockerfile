@@ -15,6 +15,8 @@ RUN python -m pip install --no-cache-dir -r requirements.txt \
     && useradd --create-home --uid 10001 appuser
 
 COPY deliverytwin ./deliverytwin
+# The historical dataset and demo samples the app reads at runtime (see deliverytwin/storage/paths.py).
+COPY data ./data
 
 USER appuser
 EXPOSE 8000
