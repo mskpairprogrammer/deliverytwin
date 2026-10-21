@@ -2254,7 +2254,7 @@
       const explain = byId("intake-commit-explain");
       explain.replaceChildren(
         document.createTextNode(`${c.basis ? `${c.basis.source === "llm" ? "AI forecast" : "Statistical estimate"} baseline. ` : ""}P80 of ${hours(c.p80_hours)}${c.scope_change_pct ? ` (including ${c.scope_change_pct}% scope change)` : ""} over ${c.weeks_to_target} weeks at ${c.hours_per_fte_week} h/FTE-week needs ${c.required_fte_p80} FTE; ${c.allocated_fte.toFixed(1)} FTE are allocated. ` +
-          `Confidence is ${c.historical_confidence_pct}% historical confidence multiplied by the ${c.fit_probability_pct}% modeled chance of fitting ${hours(c.capacity_hours)} of capacity = ${percent(c.confidence_pct)}%. `),
+          `Confidence is ${100 - c.history_weight_pct}% of the ${c.fit_probability_pct}% modeled chance of fitting ${hours(c.capacity_hours)} of capacity plus ${c.history_weight_pct}% of the ${c.historical_confidence_pct}% historical confidence = ${percent(c.confidence_pct)}%. `),
         el("span", c.feasible ? "gate-ok" : "gate-bad", c.feasible ? "Feasible — ready for approval." : "Not feasible with current capacity."),
       );
       byId("intake-approve").disabled = !c.feasible;

@@ -14,7 +14,7 @@ from urllib.parse import urlsplit
 from .data.connection import Connection, default_database_path, resolve_dialect
 from .data.connection import connect as open_connection
 from .data.database import DatabaseError
-from .portfolio import PREEMPT_SPRINTS, portfolio_view, preempted_hours_so_far, preemption_active, set_preemption
+from .portfolio import PREEMPT_SPRINTS, planned_loss_hours, portfolio_view, preemption_active, set_preemption
 from .extras import (
     EXTRA_GET_ROUTES, EXTRA_POST_ROUTES, SIMULATION_ROUTES, BaselineRequired, handle_get, handle_post,
 )
@@ -740,7 +740,8 @@ def build_report(connection: Connection, as_of: date | None = None) -> dict[str,
             }
     portfolio_active = bool(simulation) and preemption_active(connection)
     if portfolio_active:
-        signals["portfolio_preempted_hours"] = preempted_hours_so_far(simulation["sprints_advanced"])
+        # A forecast prices the whole announced preemption, not only the sprints already lost to it.
+        signals["portfolio_preempted_hours"] = planned_loss_hours()
     collision_detected = (
         signals["lead_production_support_hours_per_week"] >= 8
         and signals["unplanned_story_points"] >= 32

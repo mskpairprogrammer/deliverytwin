@@ -360,7 +360,7 @@ def _portfolio_scenarios(report: dict[str, Any]) -> tuple[list[dict[str, Any]], 
         option["commentary"] = (
             f"Covers {lever['reclaimed_hours']} of the {loss} h the P0 project takes in Sprints "
             f"{PREEMPT_SPRINTS[0]}-{PREEMPT_SPRINTS[1]}; {lever['residual_hours']} h stay uncovered. Confidence is the "
-            "no-preemption forecast minus 0.05 points per uncovered hour and 0.02 per hour deferred to the next PI."
+            "no-preemption forecast minus 0.12 points per uncovered hour and 0.02 per hour deferred to the next PI."
         )
         option["actions"] = actions
         if backlog:

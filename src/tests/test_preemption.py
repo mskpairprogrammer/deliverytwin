@@ -65,12 +65,15 @@ class PreemptionTests(unittest.TestCase):
         self.assertTrue(preemption_active(self.connection))
         after = self.report()
         self.assertEqual(after["simulation"]["sprints_advanced"], PREEMPT_SPRINTS[0])
-        self.assertEqual(after["signals"]["portfolio_preempted_hours"], 200)
-        # 200 preempted hours at 0.05 points each: exactly 10 points against the same sprint without it.
+        # The forecast prices the whole announced loss: 400 planned hours at 0.12 points each = 48 points.
+        self.assertEqual(after["signals"]["portfolio_preempted_hours"], 400)
         trigger_preemption(self.connection, False)
         without = self.report()["workflow"]["stages"]["track"]["on_time_pct"]
         trigger_preemption(self.connection)
-        self.assertEqual(without - self.report()["workflow"]["stages"]["track"]["on_time_pct"], 10)
+        preempted = self.report()["workflow"]["stages"]["track"]["on_time_pct"]
+        self.assertEqual(without - preempted, 48)
+        self.assertGreater(without, 80)
+        self.assertLess(preempted, 50)
         self.assertEqual([preempted_hours_so_far(n) for n in (2, 3, 4, 6)], [0, 200, 400, 400])
 
     def test_the_preemption_is_cleared_by_reset_and_by_switching_scenario(self) -> None:
@@ -118,7 +121,12 @@ class PreemptionTests(unittest.TestCase):
         self.assertEqual(analysis["scenarios"][0]["id"], "hybrid_replan")
         self.assertGreater(by_id["hybrid_replan"]["predicted_on_time_pct"], by_id["cross_portfolio"]["predicted_on_time_pct"])
         self.assertEqual(by_id["cross_portfolio"]["predicted_on_time_pct"], by_id["backfill"]["predicted_on_time_pct"])
-        self.assertLess(by_id["resequence"]["predicted_on_time_pct"], by_id["backfill"]["predicted_on_time_pct"])
+        # Deferring non-critical scope costs less confidence than leaving critical preempted hours uncovered.
+        self.assertGreater(by_id["resequence"]["predicted_on_time_pct"], by_id["backfill"]["predicted_on_time_pct"])
+        # Every portfolio recovery option brings the forecast back above 70%; the composed plan to about 80%.
+        self.assertTrue(all(s["predicted_on_time_pct"] > 70 for s in analysis["scenarios"]))
+        self.assertGreaterEqual(by_id["hybrid_replan"]["predicted_on_time_pct"], 78)
+        self.assertLess(analysis["portfolio"]["unmanaged_confidence_pct"], 50)
         self.assertEqual(analysis, analyze_intervention(self.report(), []))
 
     def test_borrowing_from_the_p3_project_shows_its_trade_off_and_respects_its_floor(self) -> None:

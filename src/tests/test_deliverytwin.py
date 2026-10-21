@@ -278,7 +278,8 @@ class DeliveryTwinTests(unittest.TestCase):
         commitment = result["commitment"]
         self.assertEqual((commitment["allocated_fte"], commitment["capacity_fte"]), (7.0, 8.5))
         self.assertEqual(commitment["target_date"], "2027-03-31")
-        self.assertEqual(commitment["confidence_pct"], 62.5)
+        self.assertEqual(commitment["confidence_pct"], 85.2)
+        self.assertGreater(commitment["confidence_pct"], 80)
         self.assertTrue(commitment["feasible"])
 
     def test_intake_uses_uploaded_documents_to_rank_analogs(self) -> None:
@@ -370,7 +371,7 @@ class DeliveryTwinTests(unittest.TestCase):
         seed_demo(self.connection, demo_day)
         default = evaluate_intake(self.connection, VAGUE_REQUEST, self._intake_answers(), demo_day)["commitment"]
         self.assertFalse(default["adjusted"])
-        self.assertEqual(default["confidence_pct"], 62.5)
+        self.assertEqual(default["confidence_pct"], 85.2)
 
         reduced_capacity = evaluate_intake(
             self.connection,
@@ -384,9 +385,8 @@ class DeliveryTwinTests(unittest.TestCase):
         self.assertEqual(
             reduced_capacity["confidence_pct"],
             round(
-                reduced_capacity["historical_confidence_pct"]
-                * reduced_capacity["fit_probability_pct"]
-                / 100,
+                0.75 * reduced_capacity["fit_probability_pct"]
+                + 0.25 * reduced_capacity["historical_confidence_pct"],
                 1,
             ),
         )

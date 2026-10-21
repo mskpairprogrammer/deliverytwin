@@ -69,8 +69,8 @@ def _rules_challenge(evaluation: dict[str, Any], reason: dict[str, str] | None) 
     if confidence < 70:
         risks.append({
             "title": "Low on-time confidence", "severity": "high" if confidence < 50 else "medium",
-            "detail": f"Confidence is {confidence:g}% ({commitment['historical_confidence_pct']}% historical × "
-                      f"{commitment['fit_probability_pct']}% chance of fitting capacity).",
+            "detail": f"Confidence is {confidence:g}% (a blend of the {commitment['fit_probability_pct']}% chance of "
+                      f"fitting capacity and {commitment['historical_confidence_pct']}% historical confidence).",
             "evidence": f"{confidence:g}% on-time confidence",
         })
     if commitment["weeks_to_target"] < 8:

@@ -31,7 +31,7 @@ SIBLINGS = (
 )
 DONOR = "PRJ-024"
 BORROW_FTE = 2.0
-POINTS_PER_PREEMPTED_HOUR = 0.05
+POINTS_PER_PREEMPTED_HOUR = 0.12  # matches the TRACK forecast weight in workflow.FORECAST_PENALTIES
 POINTS_PER_DEFERRED_HOUR = 0.02
 HYBRID_DEFER_HOURS = 120  # the composed plan defers only a prudent share, then fills the rest with capacity
 BACKFILL_PRODUCTIVITY = 0.8

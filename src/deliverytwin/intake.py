@@ -35,6 +35,10 @@ DOCUMENT_WEIGHT = 0.25
 MIN_INTAKE_TEXT_LENGTH = 10
 ANALOG_COUNT = 3
 HOURS_PER_FTE_WEEK = 40
+# Commitment confidence blends the capacity-fit probability with the analogs' historical confidence.
+# The fit model already prices estimate risk through the analogs' P50/P80 spread, so multiplying the
+# two would count that risk twice; the historical figure only pulls the result toward past outcomes.
+HISTORY_WEIGHT = 0.25
 TARGET_MONTH, TARGET_DAY = 3, 31
 EVIDENCE_PER_QUESTION = 2
 SUGGESTION_VOTERS = 7
@@ -1504,7 +1508,10 @@ def build_commitment(
         "capacity_hours": round(capacity_hours),
         "historical_confidence_pct": historical_confidence,
         "fit_probability_pct": fit_pct,
-        "confidence_pct": round(historical_confidence * fit_probability, 1),
+        "history_weight_pct": round(HISTORY_WEIGHT * 100),
+        "confidence_pct": round(
+            (1 - HISTORY_WEIGHT) * fit_probability * 100 + HISTORY_WEIGHT * historical_confidence, 1
+        ),
         "defaults": {
             "allocated_fte": plan["allocated_fte"],
             "target_date": default_target.isoformat(),

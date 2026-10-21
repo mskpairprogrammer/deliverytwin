@@ -24,7 +24,7 @@ FORECAST_PENALTIES = (
     ("change_blocker", "Blocked change approval", "oldest_blocking_change_age_days", 0.6, "days open", "servicenow"),
     ("approved_pto", "Approved time off", "lead_approved_pto_hours", 0.1, "hours", "ukg_wfm"),
     ("p1_incidents", "Priority-1 incidents", "active_priority_1_incidents", 2, "open", "servicenow"),
-    ("portfolio_preemption", "P0 portfolio preemption", "portfolio_preempted_hours", 0.05, "hours", "planview"),
+    ("portfolio_preemption", "P0 portfolio preemption", "portfolio_preempted_hours", 0.12, "hours", "planview"),
 )
 SLIP_DAYS_PER_POINT = 0.45
 
