@@ -45,7 +45,10 @@ param(
     [string] $DatabricksHttpPath = "",
     [string] $DatabricksCatalog = "dpm_dev",
     [string] $DatabricksSchema = "mlops",
-    [string] $DatabricksToken = ""
+    [string] $DatabricksToken = "",
+
+    # Private PyPI index (e.g. Artifactory) for the deploy-time pip install when the app has no internet access.
+    [string] $PipIndexUrl = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -79,6 +82,7 @@ if (-not $SkipInfra) {
         enableDatabricks = [bool]$EnableDatabricks; databricksHost = $DatabricksHost
         databricksHttpPath = $DatabricksHttpPath; databricksCatalog = $DatabricksCatalog
         databricksSchema = $DatabricksSchema; databricksToken = $DatabricksToken
+        pipIndexUrl = $PipIndexUrl
     }
     $parameters = [ordered]@{
         '$schema' = "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#"

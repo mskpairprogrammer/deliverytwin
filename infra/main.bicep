@@ -75,6 +75,11 @@ param databricksSchema string = 'mlops'
 @secure()
 param databricksToken string = ''
 
+// --- Package index (optional) ----------------------------------------------------------------------------
+@description('Private PyPI index for the deploy-time pip install when the app has no internet access, e.g. https://<user>:<token>@<artifactory>/artifactory/api/pypi/<repo>/simple. Stored as an app setting; prefer a Key Vault reference.')
+@secure()
+param pipIndexUrl string = ''
+
 var authSecretSettingName = 'MICROSOFT_PROVIDER_AUTHENTICATION_SECRET'
 
 var baseSettings = [
@@ -101,6 +106,7 @@ var optionalSettings = filter([
   { name: 'DATABRICKS_HOST', value: databricksHost }
   { name: 'DATABRICKS_HTTP_PATH', value: databricksHttpPath }
   { name: 'DATABRICKS_TOKEN', value: databricksToken }
+  { name: 'PIP_INDEX_URL', value: pipIndexUrl }
 ], setting => !empty(setting.value))
 
 resource plan 'Microsoft.Web/serverfarms@2023-12-01' = {

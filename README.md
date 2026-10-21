@@ -95,31 +95,47 @@ python -m deliverytwin serve        # http://127.0.0.1:8765/
   python -m unittest discover -s tests -t .
   ```
 
-## Deploy to Azure
+## Install on Azure
 
-Azure App Service (Linux, Python), with Microsoft Entra ID sign-in required:
+Delivery Twin runs on **Azure App Service** (Linux, Python 3.13) as a code deployment. You don't need a
+container. Microsoft Entra ID sign-in protects every page, and the database is a DuckDB file on the app's
+persistent `/home` storage.
+
+### What you need
+
+- An Azure subscription where you can create resource groups and app registrations.
+- The Azure CLI (`az login`) and Python on the machine you deploy from.
+- Outbound access from App Service to PyPI during deployment, or a private package index (see
+  [Packages from Artifactory](#packages-from-artifactory-no-internet-access)).
+
+### Option A: scripted install
 
 ```powershell
-./infra/deploy.ps1 -ResourceGroup <rg> -AppName <app>
+./infra/deploy.ps1 -ResourceGroup rg-deliverytwin -AppName deliverytwin-demo -Location eastus
 ```
 
-The script provisions the plan and web app ([`infra/main.bicep`](infra/main.bicep)), creates the sign-in app
-registration, zips `src/` and deploys it. See [docs/deploy-azure-app-service.md](docs/deploy-azure-app-service.md).
+The script:
+1. creates the Entra ID app registration for sign-in;
+2. deploys [`infra/main.bicep`](infra/main.bicep): the plan, web app, settings, health check and managed identity;
+3. zips `src/` and pushes it.
 
-### Deploy to Azure manually (portal)
+Re-run it with `-SkipInfra` to push code only. Every option is in
+[docs/deploy-azure-app-service.md](docs/deploy-azure-app-service.md).
+
+### Option B: manual install (portal)
 
 Turn on sign-in **before** the app goes live. The app has no login of its own.
 
-1. **Create the web app.** In the portal: **Create a resource → Web App**.
+1. **Create the web app.** Go to **Create a resource → Web App**.
    - **Resource group:** new, for example `rg-deliverytwin`.
    - **Name:** for example `deliverytwin-demo`.
    - **Publish:** Code. **Runtime:** Python 3.13. **OS:** Linux.
    - **Plan:** Basic B1 or higher.
-2. **Turn on sign-in.** **Settings → Authentication → Add identity provider**.
+2. **Turn on sign-in.** Go to **Settings → Authentication → Add identity provider**.
    - **Provider:** Microsoft, and create a new app registration.
    - **Account types:** current tenant only.
    - **Access:** require authentication, and redirect unauthenticated requests (HTTP 302).
-3. **Add the app settings.** **Settings → Environment variables**:
+3. **Add the app settings.** Go to **Settings → Environment variables**:
 
    | Name | Value |
    |---|---|
@@ -130,7 +146,7 @@ Turn on sign-in **before** the app goes live. The app has no login of its own.
    | `DELIVERYTWIN_DEMO_MODE` | `1` |
    | `DELIVERYTWIN_FOUNDRY_ENABLED` / `DELIVERYTWIN_DATABRICKS_ENABLED` | `0` / `0` |
 
-   Do not add `OPENAI_API_KEY`; the app ignores it on App Service.
+   Don't add `OPENAI_API_KEY`; the app ignores it on App Service.
 4. **Set startup, health check and identity.**
    - **Configuration → General settings:**
      - **Startup Command:** `python -m deliverytwin serve`
@@ -147,20 +163,51 @@ Turn on sign-in **before** the app goes live. The app has no login of its own.
 
    App Service installs `requirements.txt` during the deploy, which takes a few minutes the first time.
    Without the CLI, use **Advanced Tools (Kudu) → Tools → Zip Push Deploy** and drag the zip in.
-6. **Check it.**
-   - The **log stream** shows `Data: duckdb · AI: off · Databricks: off · Foundry: off`.
-   - `https://<app>.azurewebsites.net` asks you to sign in, then opens the dashboard.
-   - If the health check reports unhealthy because sign-in blocks it, run
-     `az webapp auth update -g <rg> -n <app> --excluded-paths "[\"/healthz\"]"`.
-7. **Turn on Foundry models (later).**
-   - **Settings:** set `FOUNDRY_PROJECT_ENDPOINT` (`https://<resource>.services.ai.azure.com/api/projects/<project>`),
-     set `FOUNDRY_MODEL` (your deployment name), then change `DELIVERYTWIN_FOUNDRY_ENABLED` to `1`.
-   - **Access:** give the web app's managed identity **Cognitive Services OpenAI User** on the Foundry resource,
-     and **Azure AI User** on the project for the chat.
-   - **Restart:** restart the app. The log stream then shows `AI: foundry`.
 
-Keep the plan at one instance, because DuckDB is a single-writer file. The database on `/home` survives restarts and
-starts empty, so load demo data from the dashboard. Code updates repeat step 5.
+### Packages from Artifactory (no internet access)
+
+When App Service can't reach the internet, point the deploy-time `pip install` at your Artifactory PyPI
+repository. pip reads its index from the `PIP_INDEX_URL` app setting.
+
+1. **Find the index URL.** Use a PyPI *virtual* repository in Artifactory that proxies PyPI:
+   `https://<artifactory-host>/artifactory/api/pypi/<pypi-virtual-repo>/simple`.
+   If it needs credentials, include them in the URL:
+   `https://<user>:<token>@<artifactory-host>/artifactory/api/pypi/<pypi-virtual-repo>/simple`.
+2. **Set it before the first code push.**
+   - **Scripted:** `./infra/deploy.ps1 … -PipIndexUrl "https://<user>:<token>@<artifactory-host>/artifactory/api/pypi/<repo>/simple"`.
+   - **Manual:** add `PIP_INDEX_URL` under **Settings → Environment variables**.
+   - **Private certificate authority:** if Artifactory's certificate comes from a private CA that App Service doesn't
+     trust, also add `PIP_TRUSTED_HOST=<artifactory-host>`. Trusting your CA is the better fix if your platform team can do it.
+3. **Keep the token out of plain settings.** Store the full URL as a Key Vault secret and set the app setting to
+   `@Microsoft.KeyVault(SecretUri=https://<vault>.vault.azure.net/secrets/<name>/)`. Grant the web app's managed
+   identity **Key Vault Secrets User** on the vault.
+4. **Make sure the network allows it.** App Service needs a route to Artifactory, usually VNet integration plus
+   DNS for a private host. The install runs in App Service's deployment container, so confirm with your network
+   team that deployment traffic also follows that route.
+5. **Push the code** (step 5 of option B, or re-run the script). The log stream should show pip downloading from
+   your Artifactory host. Check that Artifactory has cached every package in `src/requirements.txt` (and
+   `src/requirements-databricks.txt` if you use Databricks).
+
+### Turn on Foundry models
+
+1. **Settings:** set `FOUNDRY_PROJECT_ENDPOINT`
+   (`https://<resource>.services.ai.azure.com/api/projects/<project>`) and `FOUNDRY_MODEL` (your deployment name).
+   Then change `DELIVERYTWIN_FOUNDRY_ENABLED` to `1`. The scripted equivalent is `-EnableFoundry`
+   `-FoundryProjectEndpoint … -FoundryModel …`.
+2. **Access:** give the web app's managed identity **Cognitive Services OpenAI User** on the Foundry resource, and
+   **Azure AI User** on the project for the chat.
+3. **Restart:** restart the app. The log stream then shows `AI: foundry`.
+
+### Check and operate
+
+- **Log stream:** shows `Data: duckdb · AI: … · Databricks: off · Foundry: …` at startup.
+- **Sign-in:** `https://<app>.azurewebsites.net` asks you to sign in, then opens the dashboard.
+- **Health check:** if it reports unhealthy because sign-in blocks it, run
+  `az webapp auth update -g <rg> -n <app> --excluded-paths "[\"/healthz\"]"`.
+- **One instance:** keep the plan at one instance, because DuckDB is a single-writer file.
+- **Data:** the database on `/home` survives restarts and starts empty, so load demo data from the dashboard.
+- **Code updates:** repeat the code push (option B step 5, or `deploy.ps1 -SkipInfra`).
+- **Untested:** none of this has been run against a live subscription yet.
 
 ## Configuration
 

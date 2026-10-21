@@ -54,6 +54,11 @@ class DeploymentTests(unittest.TestCase):
         self.assertIn("{ name: 'DELIVERYTWIN_DATABRICKS_ENABLED', value: enableDatabricks ? '1' : '0' }", template)
         self.assertIn("@secure()\nparam databricksToken string = ''", template.replace("\r\n", "\n"))
 
+    def test_a_private_package_index_is_a_secret_optional_setting(self) -> None:
+        template = (ROOT / "infra" / "main.bicep").read_text(encoding="utf-8").replace("\r\n", "\n")
+        self.assertIn("@secure()\nparam pipIndexUrl string = ''", template)
+        self.assertIn("{ name: 'PIP_INDEX_URL', value: pipIndexUrl }", template)
+
     def test_the_cloud_gets_foundry_models_only(self) -> None:
         template = (ROOT / "infra" / "main.bicep").read_text(encoding="utf-8")
         for absent in ("name: 'OPENAI_API_KEY'", "AZURE_OPENAI", "DATABRICKS_SERVING_ENDPOINT", "FOUNDRY_API_KEY"):

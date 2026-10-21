@@ -55,6 +55,7 @@ To redeploy only the code after a change:
 | `-AuthClientId`, `-AuthClientSecret` | — | Use an existing app registration. Its redirect URI must be `https://<app>.azurewebsites.net/.auth/login/aad/callback`, and its Application ID URI `api://<client-id>`. |
 | `-EnableFoundry`, `-FoundryProjectEndpoint`, `-FoundryModel` | off | Foundry models for the AI features and chat (see below). |
 | `-NoDemoMode` | off | Hides the simulation lab and the data reset and reload routes. |
+| `-PipIndexUrl` | — | Private PyPI index, such as Artifactory, for the deploy-time `pip install` when App Service has no internet access. It is set as `PIP_INDEX_URL`; prefer a Key Vault reference (see the README). |
 
 ## Microsoft Foundry and Azure Databricks
 
