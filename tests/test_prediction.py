@@ -65,6 +65,19 @@ class PredictionTests(unittest.TestCase):
             self.assertEqual([c["id"] for c in analysis["clarifications"]],
                              ["architecture", "data", "security", "reuse"])
 
+    def test_kebab_case_ids_from_the_model_are_spelled_in_snake_case(self) -> None:
+        # Models copy the hyphenated vocabulary (big-bang-cutover) into ids; that alone must not discard the set.
+        kebab = llm_questions()
+        first = kebab["questions"][0]
+        first["id"], first["options"][1]["value"], first["suggested"] = "cut-over", "big-bang", "Big-Bang"
+        configured, complete = self.run_with(ScriptedLLM(questions=kebab))
+        with configured, complete:
+            analysis = analyze_intake(self.connection, REQUEST)
+        self.assertEqual(analysis["question_source"]["type"], "llm")
+        question = analysis["clarifications"][0]
+        self.assertEqual((question["id"], question["suggested"]), ("cut_over", "big_bang"))
+        self.assertEqual([option["value"] for option in question["options"]], ["phased", "big_bang"])
+
     def test_fallbacks_say_why_the_ai_was_not_used(self) -> None:
         def source(patches, llm=None):
             with patches[0], patches[1]:

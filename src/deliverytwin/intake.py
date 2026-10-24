@@ -461,6 +461,11 @@ def _clean_effects(raw: object, vocab: dict[str, set[str]]) -> dict[str, Any]:
     return effects
 
 
+def _identifier(value: object) -> object:
+    """Spell a question or option id in snake_case: models often copy the kebab-case vocabulary ("big-bang")."""
+    return re.sub(r"[\s-]+", "_", value.strip().lower()) if isinstance(value, str) else value
+
+
 def _validate_question_set(raw: object, vocab: dict[str, set[str]]) -> list[dict[str, Any]] | None:
     """Normalise a question set; effects are limited to known vocabulary so answers stay matchable."""
     if not isinstance(raw, list) or not MIN_GENERATED_QUESTIONS <= len(raw) <= MAX_GENERATED_QUESTIONS:
@@ -470,7 +475,7 @@ def _validate_question_set(raw: object, vocab: dict[str, set[str]]) -> list[dict
     for item in raw:
         if not isinstance(item, dict):
             return None
-        qid, category, text = item.get("id"), item.get("category"), item.get("question")
+        qid, category, text = _identifier(item.get("id")), item.get("category"), item.get("question")
         options = item.get("options")
         if not (
             isinstance(qid, str) and QUESTION_ID.match(qid) and qid not in seen
@@ -484,7 +489,7 @@ def _validate_question_set(raw: object, vocab: dict[str, set[str]]) -> list[dict
         for option in options:
             if not isinstance(option, dict):
                 return None
-            value, label = option.get("value"), option.get("label")
+            value, label = _identifier(option.get("value")), option.get("label")
             if not (
                 isinstance(value, str) and QUESTION_ID.match(value) and value not in values
                 and isinstance(label, str) and label.strip()
@@ -604,7 +609,7 @@ def _llm_questions(
         return None, invalid, None
     by_id = {row["project_id"]: row for row in evidence}
     for source, cleaned in zip(raw, questions):
-        suggested = source.get("suggested")
+        suggested = _identifier(source.get("suggested"))
         if suggested not in {option["value"] for option in cleaned["options"]}:
             return None, invalid, None
         cited = source.get("evidence_project_ids")
