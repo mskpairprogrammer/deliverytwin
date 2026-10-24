@@ -251,8 +251,11 @@ class JourneyUiTests(unittest.TestCase):
         page.locator("#intake-rom").get_by_text("Most likely effort (P50)").wait_for()
         self.assertRegex(page.locator("#prediction-source").inner_text(), r"AI FORECAST · .+\n?.*Model confidence 77%")
         hero = page.locator("#intake-rom").inner_text()
-        for value in ("4,900 h", "6,100 h", "6,900 h", "64%"):
+        for value in ("4,900 h", "6,100 h", "6,900 h"):
             self.assertIn(value, hero)
+        # SHAPE shows the computed commitment confidence, the figure COMMIT approves, not the model's own 64%.
+        self.assertNotIn("64%", hero)
+        shape_confidence = re.search(r"([\d.]+%)\s*On-time probability", hero).group(1)
         self.assertIn("Identity matching rules are shared", page.locator("#prediction-risks").inner_text())
         self.assertIn("Phase scope", page.locator("#prediction-recs").inner_text())
         self.assertGreaterEqual(page.locator("#prediction-projects .project-card").count(), 1)
@@ -270,6 +273,7 @@ class JourneyUiTests(unittest.TestCase):
         page.get_by_role("button", name="Approve baseline").click()
         page.locator("#intake-approved").wait_for(state="visible")
         self.assertIn("P50 4,900 h · P80 6,100 h", page.locator("#intake-approved").inner_text())
+        self.assertIn(f"{shape_confidence} confidence", page.locator("#intake-approved").inner_text())
         self.assertEqual(type(self).llm.calls.count("questions"), 1)
         self.assertEqual(type(self).llm.calls.count("forecast"), 1)
 

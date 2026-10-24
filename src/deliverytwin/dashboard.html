@@ -2428,12 +2428,13 @@
         metric(hours(f.p50_effort_hours), "Most likely effort (P50)", "The median outcome: about half of comparable projects finished within this effort."),
         metric(hours(f.p80_effort_hours), "Commit-to effort (P80)", "About four in five comparable projects finished within this effort."),
         metric(hours(f.p90_effort_hours), "Worst case (P90)", "Nine in ten comparable projects finished within this effort."),
-        metric(`${Math.round(f.on_time_probability * 100)}%`, "On-time probability", `Chance of finishing by ${prediction.target_date} with ${commitment.allocated_fte.toFixed(1)} FTE.`),
+        // The same computed confidence COMMIT shows, never the model's own on-time guess.
+        metric(`${percent(commitment.confidence_pct)}%`, "On-time probability", `Chance of finishing by ${prediction.target_date} with ${commitment.allocated_fte.toFixed(1)} FTE.`),
       );
       byId("prediction-headline").textContent =
         `Across ${prediction.similar_projects.length} similar completed projects, the most likely effort is ${hours(f.p50_effort_hours)}. ` +
         `Committing to ${hours(f.p80_effort_hours)} gives about four-in-five odds, and with ${commitment.allocated_fte.toFixed(1)} FTE ` +
-        `through ${prediction.target_date} the chance of finishing on time is ${Math.round(f.on_time_probability * 100)}%.`;
+        `through ${prediction.target_date} the chance of finishing on time is ${percent(commitment.confidence_pct)}%.`;
       const fill = (id, items, empty) => byId(id).replaceChildren(...(items && items.length ? items : [empty]).map((text) => el("li", "", text)));
       fill("prediction-risks", f.key_risks, "No specific risks were flagged.");
       fill("prediction-recs", f.recommendations, "No recommendations were produced.");
