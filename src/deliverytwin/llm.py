@@ -141,6 +141,37 @@ def openai_model() -> str:
     return os.environ.get("OPENAI_MODEL", "").strip() or DEFAULT_MODEL
 
 
+def _rejects_temperature(error: urllib.error.HTTPError) -> bool:
+    """Reasoning models (the GPT-5 family and later) accept only the default temperature and answer HTTP 400."""
+    if error.code != 400:
+        return False
+    try:
+        detail = error.read().decode("utf-8", "replace")
+    except Exception:  # no readable body
+        return False
+    return "temperature" in detail.lower()
+
+
+def _post_chat(url: str, headers: dict[str, str], payload: dict[str, Any]) -> str:
+    """POST a chat-completion request and return the reply text.
+
+    A model that rejects ``temperature`` is asked once more without it, so the deterministic setting is used
+    wherever the model allows it.
+    """
+    def post(body: dict[str, Any]) -> str:
+        request = urllib.request.Request(url, data=json.dumps(body).encode("utf-8"), headers=headers, method="POST")
+        with urllib.request.urlopen(request, timeout=TIMEOUT_SECONDS) as response:
+            reply = json.load(response)
+        return str(reply["choices"][0]["message"]["content"] or "").strip()
+
+    try:
+        return post(payload)
+    except urllib.error.HTTPError as error:
+        if "temperature" not in payload or not _rejects_temperature(error):
+            raise
+    return post({name: value for name, value in payload.items() if name != "temperature"})
+
+
 def _complete_openai(messages: list[dict[str, str]], *, json_mode: bool = False) -> str:
     key = os.environ.get("OPENAI_API_KEY", "").strip()
     if not key:
@@ -148,16 +179,9 @@ def _complete_openai(messages: list[dict[str, str]], *, json_mode: bool = False)
     payload: dict[str, Any] = {"model": openai_model(), "messages": messages, "temperature": 0}
     if json_mode:
         payload["response_format"] = {"type": "json_object"}
-    request = urllib.request.Request(
-        OPENAI_URL,
-        data=json.dumps(payload).encode("utf-8"),
-        headers={"Content-Type": "application/json", "Authorization": f"Bearer {key}"},
-        method="POST",
-    )
+    headers = {"Content-Type": "application/json", "Authorization": f"Bearer {key}"}
     try:
-        with urllib.request.urlopen(request, timeout=TIMEOUT_SECONDS) as response:
-            body = json.load(response)
-        return str(body["choices"][0]["message"]["content"] or "").strip()
+        return _post_chat(OPENAI_URL, headers, payload)
     except urllib.error.HTTPError as error:
         raise LLMError(f"OpenAI request failed with HTTP {error.code}.") from error
     except (urllib.error.URLError, TimeoutError, KeyError, IndexError, ValueError) as error:
@@ -194,11 +218,8 @@ def _complete_foundry(settings: dict[str, str], messages: list[dict[str, str]], 
             f"{settings['endpoint']}/openai/deployments/{settings['deployment']}/chat/completions"
             f"?api-version={settings['api_version']}"
         )
-    request = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), headers=headers, method="POST")
     try:
-        with urllib.request.urlopen(request, timeout=TIMEOUT_SECONDS) as response:
-            body = json.load(response)
-        return str(body["choices"][0]["message"]["content"] or "").strip()
+        return _post_chat(url, headers, payload)
     except urllib.error.HTTPError as error:
         raise LLMError(f"Microsoft Foundry request failed with HTTP {error.code}.") from error
     except (urllib.error.URLError, TimeoutError, KeyError, IndexError, ValueError) as error:
@@ -223,22 +244,15 @@ def _complete_databricks(settings: dict[str, str], messages: list[dict[str, str]
     """Call a Databricks Model Serving chat endpoint (OpenAI-compatible request and response)."""
     url = f"https://{settings['host']}/serving-endpoints/{settings['endpoint']}/invocations"
     headers = _databricks_headers(settings)
-
-    def post(payload: dict[str, Any]) -> str:
-        request = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), headers=headers, method="POST")
-        with urllib.request.urlopen(request, timeout=TIMEOUT_SECONDS) as response:
-            body = json.load(response)
-        return str(body["choices"][0]["message"]["content"] or "").strip()
-
     payload: dict[str, Any] = {"messages": messages, "temperature": 0}
     try:
         if json_mode:
             try:
-                return post({**payload, "response_format": {"type": "json_object"}})
+                return _post_chat(url, headers, {**payload, "response_format": {"type": "json_object"}})
             except urllib.error.HTTPError as error:
                 if error.code != 400:  # some serving endpoints reject response_format; the prompts still ask for JSON
                     raise
-        return post(payload)
+        return _post_chat(url, headers, payload)
     except urllib.error.HTTPError as error:
         raise LLMError(f"Databricks Model Serving request failed with HTTP {error.code}.") from error
     except (urllib.error.URLError, TimeoutError, KeyError, IndexError, ValueError) as error:
