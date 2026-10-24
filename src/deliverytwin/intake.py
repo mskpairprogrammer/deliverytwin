@@ -1565,12 +1565,14 @@ def approve_baseline(
     adjustments: object = None,
     questions: object = None,
     basis: object = None,
+    approver: dict[str, str] | None = None,
 ) -> dict[str, Any]:
-    """Decision gate: recompute server-side and lock the result as the approved baseline."""
+    """Decision gate: recompute server-side and lock the result as the approved baseline, recording who approved it."""
     result = evaluate_intake(connection, text, answers, as_of, documents, adjustments, questions, basis)
     commitment, rom = result["commitment"], result["rom"]
     if not commitment["feasible"]:
         raise IntakeError("The commitment is not feasible with the current capacity; it cannot be approved.")
+    from .approvals import record_approval, with_approvers
     from .storage import BaselineRepository
 
     repository = BaselineRepository(connection.app_database())
@@ -1586,7 +1588,11 @@ def approve_baseline(
         "target_date": commitment["target_date"],
         "confidence_pct": commitment["confidence_pct"],
     })
-    return {**result, "baseline": repository.get(baseline_id)}
+    baseline = repository.get(baseline_id)
+    record_approval(connection, "commit", baseline_id, approver, {
+        key: baseline[key] for key in ("p50_hours", "p80_hours", "allocated_fte", "target_date", "confidence_pct")
+    })
+    return {**result, "baseline": with_approvers(connection, "commit", [baseline])[0]}
 
 
 def estimate_intake(
@@ -1617,6 +1623,8 @@ def estimate_intake(
 
 
 def latest_baseline(connection: Connection) -> dict[str, Any] | None:
+    from .approvals import with_approvers
     from .storage import BaselineRepository
 
-    return BaselineRepository(connection.app_database()).latest()
+    baseline = BaselineRepository(connection.app_database()).latest()
+    return with_approvers(connection, "commit", [baseline])[0] if baseline else None

@@ -115,7 +115,7 @@ TABLES: dict[str, Table] = {
 }
 
 
-# Tables the application itself writes (not loaded from the CSV dataset). All four go through the portable
+# Tables the application itself writes (not loaded from the CSV dataset). All of them go through the portable
 # repositories in app_repository.py, so they run unchanged on DuckDB and Databricks (Delta).
 APP_TABLES: dict[str, Table] = {
     table.name: table
@@ -162,6 +162,15 @@ APP_TABLES: dict[str, Table] = {
             ),
             ("snapshot_id",),
             "One TRACK outlook per sprint, kept for trend history.",
+        ),
+        Table(
+            "dt_approvals",
+            _cols(
+                "approval_id:string stage:string record_id:string approver:string approver_source:string "
+                "summary_json:string approved_at:timestamp"
+            ),
+            ("approval_id",),
+            "Who approved each COMMIT baseline and applied each INTERVENE plan, and what they approved.",
         ),
     )
 }

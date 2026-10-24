@@ -15,6 +15,7 @@ from .database import Database
 from .schema import ALL_TABLES
 
 INTAKE_EVENTS = ("started", "rom_ready", "approved")
+APPROVAL_STAGES = ("commit", "intervene")
 
 
 def _text(value: Any) -> Any:
@@ -202,6 +203,55 @@ class RecoveryScenarioRepository:
     def clear(self) -> None:
         for name in (self.UPDATES, self.TABLE):
             self.db.clear_table(name)
+
+
+class ApprovalRepository:
+    """Who approved each COMMIT baseline and applied each INTERVENE plan, with the figures they approved."""
+
+    TABLE = "dt_approvals"
+
+    def __init__(self, db: Database) -> None:
+        self.db = db
+        db.create_tables(names=(self.TABLE,))
+
+    def record(self, stage: str, record_id: object, approver: dict[str, str], summary: dict[str, Any]) -> dict[str, Any]:
+        if stage not in APPROVAL_STAGES:
+            raise ValueError(f"Unsupported approval stage: {stage}.")
+        row = {
+            "approval_id": str(uuid.uuid4()), "stage": stage, "record_id": str(record_id),
+            "approver": approver["name"], "approver_source": approver["source"],
+            "summary_json": json.dumps(summary, default=str),
+            "approved_at": datetime.now(timezone.utc).isoformat(timespec="microseconds"),
+        }
+        self.db.upsert(self.TABLE, [row])
+        return self._entry(row)
+
+    def by_record(self, stage: str) -> dict[str, dict[str, Any]]:
+        """The approval of every record of a stage, keyed by record id (the latest one if recorded twice)."""
+        rows = self.db.query(
+            f"SELECT {', '.join(_columns(self.TABLE))} FROM {self.db.table(self.TABLE)} "
+            "WHERE stage = ? ORDER BY approved_at ASC, approval_id ASC", [stage],
+        )
+        return {row["record_id"]: self._entry(row) for row in rows}
+
+    def history(self) -> list[dict[str, Any]]:
+        """Every approval, newest first."""
+        rows = self.db.query(
+            f"SELECT {', '.join(_columns(self.TABLE))} FROM {self.db.table(self.TABLE)} "
+            "ORDER BY approved_at DESC, approval_id DESC"
+        )
+        return [self._entry(row) for row in rows]
+
+    def clear(self) -> None:
+        self.db.clear_table(self.TABLE)
+
+    @staticmethod
+    def _entry(row: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "id": row["approval_id"], "stage": row["stage"], "record_id": row["record_id"],
+            "approver": row["approver"], "approver_source": row["approver_source"],
+            "summary": json.loads(row["summary_json"] or "{}"), "approved_at": _text(row["approved_at"]),
+        }
 
 
 class TrackSnapshotRepository:

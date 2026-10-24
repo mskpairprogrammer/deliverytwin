@@ -168,6 +168,19 @@ CREATE TABLE IF NOT EXISTS dpm_dev.mlops.dt_track_snapshots (
 USING DELTA
 COMMENT 'One TRACK outlook per sprint, kept for trend history.';
 
+CREATE TABLE IF NOT EXISTS dpm_dev.mlops.dt_approvals (
+  approval_id STRING NOT NULL,
+  stage STRING,
+  record_id STRING,
+  approver STRING,
+  approver_source STRING,
+  summary_json STRING,
+  approved_at TIMESTAMP,
+  PRIMARY KEY (approval_id)
+)
+USING DELTA
+COMMENT 'Who approved each COMMIT baseline and applied each INTERVENE plan, and what they approved.';
+
 CREATE TABLE IF NOT EXISTS dpm_dev.mlops.dt_source_systems (
     source_key STRING PRIMARY KEY,
     display_name STRING NOT NULL,

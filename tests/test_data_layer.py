@@ -188,6 +188,11 @@ class AppTableTests(unittest.TestCase):
             "on_time_pct": 53, "projected_slip_days": 21, "unplanned_story_points": 16,
             "support_hours_per_week": 4, "captured_at": "2026-11-01T09:00:00+00:00",
         },
+        "dt_approvals": {
+            "approval_id": "a-1", "stage": "commit", "record_id": "b-1", "approver": "pat@example.com",
+            "approver_source": "entra_id", "summary_json": "{\"confidence_pct\": 84}",
+            "approved_at": "2026-10-19T02:29:25+00:00",
+        },
     }
 
     def test_every_app_table_round_trips_on_the_local_backends(self) -> None:

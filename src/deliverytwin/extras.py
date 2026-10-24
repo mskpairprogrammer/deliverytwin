@@ -27,9 +27,10 @@ class BaselineRequired(Exception):
 
 
 def baseline_history(connection: Connection) -> dict[str, Any]:
+    from .approvals import with_approvers
     from .storage import BaselineRepository
 
-    history = BaselineRepository(connection.app_database()).history()
+    history = with_approvers(connection, "commit", BaselineRepository(connection.app_database()).history())
     result = []
     previous = None
     for baseline in history:

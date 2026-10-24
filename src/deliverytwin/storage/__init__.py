@@ -9,6 +9,7 @@ from .database import (
     open_database,
 )
 from .app_repository import (
+    ApprovalRepository,
     BaselineRepository,
     IntakeSessionRepository,
     RecoveryScenarioRepository,
@@ -20,7 +21,7 @@ from .repository import HistoryRepository, dataset_loaded, load_dataset
 from .schema import ALL_TABLES, APP_TABLES, TABLE_PREFIX, TABLES, render_ddl
 
 __all__ = [
-    "BaselineRepository", "Connection", "IntakeSessionRepository", "RecoveryScenarioRepository",
+    "ApprovalRepository", "BaselineRepository", "Connection", "IntakeSessionRepository", "RecoveryScenarioRepository",
     "TrackSnapshotRepository", "ALL_TABLES", "APP_TABLES", "DATA_ROOT", "DATASET_DIR", "Database", "DatabaseError",
     "DatabricksDatabase", "DatabricksSettings", "DuckDBDatabase", "HistoryRepository", "IntegrityError",
     "SAMPLES_DIR", "TABLE_PREFIX", "TABLES", "connect", "dataset_loaded", "default_database_path",

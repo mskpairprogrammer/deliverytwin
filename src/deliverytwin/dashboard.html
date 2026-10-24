@@ -1070,7 +1070,7 @@
       root.hidden = false;
       byId("act-apply").disabled = persisted;
       byId("act-scenario-status").textContent = persisted
-        ? `Scenario #${scenario.id} saved ${scenario.saved_at}. Simulated update records are stored locally; real external systems are unchanged.`
+        ? `Scenario #${scenario.id} saved ${scenario.saved_at}${approvedByText(scenario.approved_by)}. Simulated update records are stored locally; real external systems are unchanged.`
         : "Preview only — no records have changed. Apply to persist these simulated updates in the local database.";
     }
     function actRecommended() {
@@ -2285,6 +2285,9 @@
       document.querySelectorAll("#intake-questions input:checked").forEach((input) => { answers[input.name] = input.value; });
       return answers;
     }
+    function approvedByText(approvedBy) {
+      return approvedBy ? ` by ${approvedBy.name}` : "";
+    }
     function aiUnavailableText(reason, fallback) {
       const code = reason ? reason.code : "not_configured";
       if (code === "request_failed") {
@@ -2666,7 +2669,7 @@
       updateJourney();
       byId("shape-stage-status").textContent = "BASELINE APPROVED";
       byId("intake-approved").textContent =
-        `Baseline ${String(baseline.id).slice(0, 8)} approved ${baseline.approved_at}: P50 ${hours(baseline.p50_hours)} · P80 ${hours(baseline.p80_hours)} · ` +
+        `Baseline ${String(baseline.id).slice(0, 8)} approved ${baseline.approved_at}${approvedByText(baseline.approved_by)}: P50 ${hours(baseline.p50_hours)} · P80 ${hours(baseline.p80_hours)} · ` +
         `${baseline.allocated_fte.toFixed(1)}/${baseline.capacity_fte.toFixed(1)} FTE · ${baseline.target_date} · ${percent(baseline.confidence_pct)}% confidence.`;
       byId("intake-approved").hidden = false;
       byId("intake-approve").hidden = true;
@@ -2790,7 +2793,7 @@
         };
         const table = el("table");
         const head = el("tr");
-        ["Approved", "P50", "P80", "FTE", "Target date", "Confidence"].forEach((label) => head.append(el("th", "", label)));
+        ["Approved", "By", "P50", "P80", "FTE", "Target date", "Confidence"].forEach((label) => head.append(el("th", "", label)));
         table.append(head);
         list.forEach((baseline) => {
           const row = el("tr");
@@ -2798,6 +2801,7 @@
           const cell = (text, change) => { const td = el("td", "", text); if (change) td.append(document.createTextNode(" "), change); return td; };
           row.append(
             el("td", "", baseline.approved_at.replace("T", " ").slice(0, 16)),
+            el("td", "", baseline.approved_by ? baseline.approved_by.name : "Not recorded"),
             cell(hours(baseline.p50_hours), delta && signed(delta.p50_hours, " h", true)),
             cell(hours(baseline.p80_hours), delta && signed(delta.p80_hours, " h", true)),
             cell(baseline.allocated_fte.toFixed(1), delta && signed(delta.allocated_fte, "", false)),

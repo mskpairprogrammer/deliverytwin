@@ -15,6 +15,7 @@ from urllib.parse import urlsplit
 from .storage.connection import Connection, default_database_path, resolve_dialect
 from .storage.connection import connect as open_connection
 from .storage.database import DatabaseError
+from .approvals import approver_from_headers
 from .portfolio import PREEMPT_SPRINTS, planned_loss_hours, portfolio_view, preemption_active, set_preemption
 from .extras import (
     EXTRA_GET_ROUTES, EXTRA_POST_ROUTES, SIMULATION_ROUTES, BaselineRequired, handle_get, handle_post,
@@ -836,22 +837,24 @@ def _latest_recovery_scenario(connection: Connection) -> dict[str, Any] | None:
     )
     scenario["status"] = "simulated_updates_persisted"
     scenario["writeback_performed"] = False
-    return scenario
+    from .approvals import with_approvers
+
+    return with_approvers(connection, "intervene", [scenario])[0]
 
 
 def save_recovery_scenario(
-    connection: Connection, scenario: dict[str, Any]
+    connection: Connection, scenario: dict[str, Any], approver: dict[str, str] | None = None
 ) -> dict[str, Any]:
-    """Persist a recovery what-if and its simulated per-system update records through the portable layer."""
+    """Persist a recovery what-if and its simulated per-system update records, recording who applied it."""
+    from .approvals import record_approval
     from .storage import RecoveryScenarioRepository
 
-    RecoveryScenarioRepository(connection.app_database()).save(
-        {key: scenario[key] for key in (
-            "initiative_id", "recommended_option", "allocated_fte", "scope_defer_pct", "target_date",
-            "incremental_cost_k", "confidence_pct",
-        )},
-        scenario["target_updates"],
-    )
+    saved = {key: scenario[key] for key in (
+        "initiative_id", "recommended_option", "allocated_fte", "scope_defer_pct", "target_date",
+        "incremental_cost_k", "confidence_pct",
+    )}
+    scenario_id = RecoveryScenarioRepository(connection.app_database()).save(saved, scenario["target_updates"])
+    record_approval(connection, "intervene", scenario_id, approver, saved)
     return _latest_recovery_scenario(connection) or {}
 
 
@@ -1125,6 +1128,7 @@ def serve_dashboard(
                             documents=payload.get("documents"),
                             adjustments=payload.get("adjustments"),
                             questions=payload.get("questions"), basis=payload.get("basis"),
+                            approver=approver_from_headers(self.headers),
                         )
                     event = {
                         "/api/intake/analyze": "started",
@@ -1331,7 +1335,9 @@ def serve_dashboard(
                         else:
                             result = predict_scenario(report, payload, late)
                             if route == "/api/act/apply":
-                                result = save_recovery_scenario(connection, result)
+                                result = save_recovery_scenario(
+                                    connection, result, approver_from_headers(self.headers),
+                                )
                 except BaselineRequiredError as error:
                     self.send_json(409, {"error": str(error)})
                     return
