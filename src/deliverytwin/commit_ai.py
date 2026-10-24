@@ -10,7 +10,7 @@ import json
 from datetime import date
 from typing import Any
 
-from .ai_common import INVALID_RESPONSE, llm_json, text, text_list
+from .ai_common import INVALID_RESPONSE, llm_json, number_check_failure, text, text_list, unsupported_numbers
 from .storage.connection import Connection
 from .llm import openai_model
 
@@ -159,6 +159,10 @@ def challenge_commitment(connection: Connection, evaluation: dict[str, Any]) -> 
         or (not commitment["feasible"] and verdict == "ready")
     ):
         return _rules_challenge(evaluation, INVALID_RESPONSE)
+    written = [summary, *conditions, *(risk[key] for risk in risks for key in ("title", "detail", "evidence"))]
+    unmatched = unsupported_numbers(written, context)
+    if unmatched:
+        return _rules_challenge(evaluation, number_check_failure(unmatched))
     return {
         "source": "llm", "model": openai_model(), "fallback_reason": None, "verdict": verdict,
         "summary": summary, "risks": risks, "conditions": conditions,
@@ -251,6 +255,11 @@ def ask_whatif(
     ):
         return {**base, "source": "llm", "model": openai_model(), "fallback_reason": None, "answerable": False,
                 "reading": reading, "reason": "That question did not change capacity, date, or scope."}
+    changes = [result[key] - now[key] for key in ("allocated_fte", "scope_change_pct")]  # "drops by 1"
+    unmatched = unsupported_numbers([reading, *caveats], question, today.isoformat(), base["current"], result, changes)
+    if unmatched:
+        return {**base, "source": "rules", "model": None, "fallback_reason": number_check_failure(unmatched),
+                "answerable": False, "reason": "The AI answer did not pass the number check. Try rephrasing or use the sliders."}
     return {
         **base, "source": "llm", "model": openai_model(), "fallback_reason": None, "answerable": True,
         "reading": reading, "caveats": caveats, "scenario": result,

@@ -7,6 +7,7 @@ import os
 import re
 from typing import Any
 
+from .ai_common import number_check_failure, unsupported_numbers
 from .llm import LLMError, complete, openai_configured, openai_model
 
 
@@ -267,6 +268,17 @@ def validate_prediction(raw: object) -> dict[str, Any] | None:
         "predicted_on_time_pct": on_time, "predicted_slip_days": slip, "commentary": commentary,
         "trade_offs": trade_offs, "risks": risks, "actions": actions,
     }
+
+
+def _prediction_texts(prediction: dict[str, Any], *extra: str | None) -> list[str | None]:
+    """The free text of a validated prediction, for the number check."""
+    return [*extra, prediction["commentary"], *prediction["trade_offs"], *prediction["risks"],
+            *prediction["actions"].values()]
+
+
+def _predicted_figures(prediction: dict[str, Any]) -> tuple[int, int]:
+    """The prediction's own numbers, which its text may quote (never its text, which is what is checked)."""
+    return prediction["predicted_on_time_pct"], prediction["predicted_slip_days"]
 
 
 def _context(report: dict[str, Any], late_projects: list[dict[str, Any]]) -> dict[str, Any]:
@@ -544,6 +556,7 @@ def analyze_intervention(report: dict[str, Any], late_projects: list[dict[str, A
     if (report.get("portfolio") or {}).get("active") and \
             report["workflow"]["stages"]["track"]["sprint_number"] <= PREEMPT_SPRINTS[-1]:
         return _portfolio_analysis(report)
+    context = _context(report, late_projects)
     data, reason = _llm_json([
         {
             "role": "system",
@@ -561,7 +574,7 @@ def analyze_intervention(report: dict[str, Any], late_projects: list[dict[str, A
                 "\"scenarios\": [...]}."
             ),
         },
-        {"role": "user", "content": json.dumps(_context(report, late_projects))},
+        {"role": "user", "content": json.dumps(context)},
     ])
     if reason:
         return _rules_analysis(report, reason)
@@ -570,6 +583,9 @@ def analyze_intervention(report: dict[str, Any], late_projects: list[dict[str, A
     diagnosis = _text(data.get("diagnosis"), 500) if isinstance(data, dict) else None
     if not isinstance(raw, list) or not MIN_SCENARIOS <= len(raw) <= MAX_SCENARIOS or not diagnosis:
         return _rules_analysis(report, invalid)
+    unmatched = unsupported_numbers([diagnosis], context)
+    if unmatched:
+        return _rules_analysis(report, number_check_failure(unmatched))
     scenarios, seen, dropped = [], set(), 0
     for item in raw:
         if not isinstance(item, dict):
@@ -580,8 +596,11 @@ def analyze_intervention(report: dict[str, Any], late_projects: list[dict[str, A
         if not (
             isinstance(identifier, str) and RECOVERY_ID.match(identifier) and identifier not in seen
             and title and summary and params and prediction
+            and not unsupported_numbers(_prediction_texts(prediction, title, summary), context, params,
+                                        _predicted_figures(prediction))
         ):
-            # A scenario outside capacity, date, scope, or budget limits is removed, never repaired.
+            # A scenario outside capacity, date, scope, or budget limits, or whose text quotes numbers that are
+            # neither in the data nor in its own levers and prediction, is removed, never repaired.
             dropped += 1
             continue
         seen.add(identifier)
@@ -640,6 +659,7 @@ def predict_scenario(report: dict[str, Any], payload: object, late_projects: lis
         model = _text(echoed.get("model"), 60) if source == "llm" else None
         return _overlay(base, prediction, source, model, None)
     params = {key: base[key] for key in ("allocated_fte", "target_date", "scope_defer_pct", "incremental_cost_k")}
+    context = _context(report, late_projects)
     data, reason = _llm_json([
         {
             "role": "system",
@@ -653,11 +673,15 @@ def predict_scenario(report: dict[str, Any], payload: object, late_projects: lis
             ),
         },
         {"role": "user", "content": json.dumps({
-            "context": _context(report, late_projects), "scenario": params,
-            "rules_check_pct": base["confidence_pct"],
+            "context": context, "scenario": params, "rules_check_pct": base["confidence_pct"],
         })},
     ])
     prediction = validate_prediction(data) if not reason else None
+    if prediction is not None:
+        unmatched = unsupported_numbers(_prediction_texts(prediction), context, params, base["confidence_pct"],
+                                        _predicted_figures(prediction))
+        if unmatched:
+            prediction, reason = None, number_check_failure(unmatched)
     if prediction is None:
         reason = reason or {"code": "invalid_response", "detail": "The prediction did not pass validation."}
         return _overlay(base, _rules_prediction(base, report), "rules", None, reason)
@@ -805,6 +829,7 @@ def _ai_tune(report: dict[str, Any], space: dict[str, Any], instruction: str, ta
              late_projects: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], dict[str, str] | None]:
     """Let the AI propose levers, score each proposal in code, and feed the score back until the target is met."""
     keys = ", ".join(space["keys"])
+    context = _context(report, late_projects)
     messages = [
         {
             "role": "system",
@@ -823,7 +848,7 @@ def _ai_tune(report: dict[str, Any], space: dict[str, Any], instruction: str, ta
         {"role": "user", "content": json.dumps({
             "instruction": instruction, "target_pct": target, "current_levers": space["start"],
             "current_model_pct": space["score"](space["start"])[1], "model": space["model"],
-            "bounds": space["bounds"], "context": _context(report, late_projects),
+            "bounds": space["bounds"], "context": context,
         })},
     ]
     attempts: list[dict[str, Any]] = []
@@ -841,8 +866,15 @@ def _ai_tune(report: dict[str, Any], space: dict[str, Any], instruction: str, ta
                 **(data if isinstance(data, dict) else {}), "predicted_on_time_pct": pct,
                 "predicted_slip_days": 0, "commentary": data.get("rationale") if isinstance(data, dict) else None,
             })
+            unmatched = unsupported_numbers(
+                _prediction_texts(prediction), context, space["start"], levers, pct, target,
+            ) if prediction else []
             if prediction is None:
                 feedback = "Include a rationale, trade_offs and risks arrays, and all four actions."
+            elif unmatched:
+                reason = number_check_failure(unmatched)
+                feedback = (f"Your text uses numbers that are not in the data or your levers: {', '.join(unmatched[:4])}. "
+                            "Quote only supplied figures.")
             else:
                 attempts.append({"levers": levers, "model_pct": pct, "prediction": prediction,
                                  "feasible": data.get("feasible") is not False})

@@ -2293,6 +2293,9 @@
       if (code === "invalid_response") {
         return `The AI answered, but its response did not pass validation. Showing ${fallback} instead.`;
       }
+      if (code === "number_check") {
+        return `The AI answered, but it wrote numbers that are not in the computed results. Showing ${fallback} instead.`;
+      }
       return `No AI model is configured (set FOUNDRY_PROJECT_ENDPOINT and FOUNDRY_MODEL, or OPENAI_API_KEY for local runs, and restart). Showing ${fallback} instead.`;
     }
     function sourceBadge(source) {

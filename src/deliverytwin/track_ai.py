@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from .ai_common import INVALID_RESPONSE, llm_json, text, text_list
+from .ai_common import INVALID_RESPONSE, llm_json, number_check_failure, text, text_list, unsupported_numbers
 from .llm import openai_model
 from .recovery import SYSTEM_NAMES
 from .workflow import FORECAST_PENALTIES, SLIP_DAYS_PER_POINT
@@ -133,6 +133,10 @@ def build_brief(report: dict[str, Any], approved_baseline: dict[str, Any] | None
     known = {driver["key"] for driver in variance["drivers"]}
     if not (headline and narrative and watch_next is not None) or not known <= explanations.keys():
         return _rules_brief(report, variance, baseline, INVALID_RESPONSE)
+    slip_change = variance["current_slip_days"] - variance["baseline_slip_days"]  # "slip grew by 16 days"
+    unmatched = unsupported_numbers([headline, narrative, *watch_next, *explanations.values()], context, slip_change)
+    if unmatched:
+        return _rules_brief(report, variance, baseline, number_check_failure(unmatched))
     return {
         "source": "llm", "model": openai_model(), "fallback_reason": None, "baseline": baseline,
         "headline": headline, "narrative": narrative,
