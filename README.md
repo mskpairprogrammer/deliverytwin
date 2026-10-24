@@ -55,17 +55,26 @@ from the seeded demo data with no AI key, so they are reproducible.
 
 ```mermaid
 flowchart LR
-    SRC["Simulated sources<br/>Planview · Azure DevOps · ServiceNow · Oracle HCM · UKG"] --> DATA[("DuckDB<br/>dt_* tables")]
+    SRC["Simulated sources<br/>Planview · Azure DevOps · ServiceNow · Oracle HCM · UKG"] --> DATA
     HIST[("50 completed projects<br/>CSV dataset")] --> DATA
+    subgraph DATA["Data layer · every dt_* table · one switch"]
+        direction TB
+        DUCK[("DuckDB file<br/>default")]
+        DBX[("Azure Databricks<br/>Unity Catalog / Delta<br/>DELIVERYTWIN_DATABRICKS_ENABLED=1")]
+    end
     DATA --> CORE["Deterministic core<br/>estimate · confidence · capacity · cost · ranking"]
     CORE <--> AI["AI layer<br/>Microsoft Foundry models"]
     CORE --> UI["Dashboard<br/>SHAPE · COMMIT · TRACK · INTERVENE"]
-    DATA -. "optional, behind a switch" .-> DBX[("Azure Databricks<br/>Unity Catalog / Delta")]
 ```
 
 - **App:** one Python process serving the API and a single-page dashboard. Agent Framework drives the four-stage workflow.
-- **Data:** DuckDB, embedded in the app. Every table is prefixed `dt_`. Azure Databricks sits behind the same interface for later.
-- **AI:** Microsoft Foundry models in Azure. OpenAI is used only for local testing.
+- **Data:** every table is prefixed `dt_` and lives in one engine. DuckDB, embedded in the app, is the default.
+  With the Databricks switch on, all of it (historical dataset, simulated sources, simulation state, baselines,
+  intake sessions, scenarios, snapshots) lives in Unity Catalog / Delta instead. Writes are portable upserts
+  (`ON CONFLICT` on DuckDB, `MERGE INTO` on Databricks), and an empty schema is seeded from the checked-in samples
+  at startup.
+- **AI:** Microsoft Foundry models in Azure, through either a `*.services.ai.azure.com` models endpoint or an
+  Azure OpenAI deployment. Locally, Databricks Model Serving and OpenAI can also be used for testing.
 
 ## Impact (backtest on the synthetic portfolio)
 
@@ -87,8 +96,9 @@ cd src
 python -m deliverytwin serve        # http://127.0.0.1:8765/
 ```
 
-- **Optional AI:** copy [`.env.example`](.env.example) to `.env` and set `OPENAI_API_KEY`. That's for local
-  testing; without a key, the app runs on its labeled rules-based fallbacks.
+- **Optional AI and Databricks:** copy [`.env.example`](.env.example) to `.env` in `src/` or the repository root;
+  `python -m deliverytwin` loads it on start. Set `OPENAI_API_KEY` for local testing, or the Foundry and
+  Databricks settings. Without any key, the app runs on its labeled rules-based fallbacks.
 - **Tests:** run these from the repository root.
 
   ```powershell
@@ -153,12 +163,13 @@ docs/                App Service and Databricks guides, screenshots
 - **Prototype on synthetic data.** There are no live connectors; Azure DevOps output is a preview and a CSV.
 - **Not yet run against live cloud services:** Foundry, Databricks and the App Service template are covered by
   unit tests against fake endpoints only.
-- **Single instance:** the local DuckDB file has one writer. Shared or scaled-out data needs the Databricks layer.
+- **Single instance:** the local DuckDB file has one writer. Shared or scaled-out data needs the Databricks switch.
+- **Use a dedicated Databricks schema:** *Clear all demo data* deletes the rows of every `dt_` table in it.
 
 ## Roadmap
 
 1. Deploy to Azure App Service with Foundry models.
-2. Move the application tables to Azure Databricks.
+2. Validate the Databricks data layer (built, behind the switch) against a live workspace with the smoke test.
 3. Replace simulated sources with read-only connectors (Planview, Azure DevOps, ServiceNow, UKG).
 4. Calibrate the estimates on real completed projects.
 

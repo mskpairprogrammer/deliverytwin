@@ -4,6 +4,20 @@ When Databricks is enabled, all application tables use Unity Catalog / Delta: th
 simulated source-system records, simulation state, baselines, intake sessions, recovery scenarios and TRACK
 snapshots. DuckDB remains the default when Databricks is disabled. Models still come from Foundry.
 
+```mermaid
+flowchart TD
+    START["python -m deliverytwin serve<br/>loads .env"] --> SWITCH{"DELIVERYTWIN_DATABRICKS_ENABLED=1<br/>and DATABRICKS_HOST + DATABRICKS_HTTP_PATH set?"}
+    SWITCH -- no --> DUCK[("DuckDB file<br/>all dt_* tables")]
+    SWITCH -- yes --> CONNECT["Connect to the SQL warehouse<br/>USE CATALOG · USE SCHEMA"]
+    CONNECT --> DDL["CREATE TABLE IF NOT EXISTS … USING DELTA<br/>(schema.sql translated for Delta)"]
+    DDL --> EMPTY{"dt_delivery_initiatives and<br/>dt_historical_projects have rows?"}
+    EMPTY -- no --> SEED["Seed the historical CSV dataset<br/>and the demo scenario (MERGE INTO)"]
+    EMPTY -- yes --> UC
+    SEED --> UC[("Unity Catalog / Delta<br/>all dt_* tables")]
+```
+
+`--dialect` on the command line overrides the switch.
+
 ## 1. Prepare Databricks
 
 - **Workspace and warehouse:** a workspace with Unity Catalog, and a SQL warehouse. Note its HTTP path from
