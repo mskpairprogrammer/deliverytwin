@@ -29,12 +29,20 @@ def _analog_context(connection: Connection, matches: list[dict[str, Any]]) -> li
     } if ids else {}
     return [
         {
-            "project_name": match["name"], "similarity_pct": match["similarity_pct"],
-            "on_time_confidence_pct": match["on_time_confidence_pct"],
-            **{key: value for key, value in details.get(match["project_id"], {}).items() if key != "project_id"},
+            "project_id": match["project_id"], "project_name": match["name"],
+            "similarity_pct": match["similarity_pct"], "on_time_confidence_pct": match["on_time_confidence_pct"],
+            **_with_slip({key: value for key, value in details.get(match["project_id"], {}).items() if key != "project_id"}),
         }
         for match in matches
     ]
+
+
+def _with_slip(detail: dict[str, Any]) -> dict[str, Any]:
+    """Add how many weeks the project ran over its plan, so the reviewer can quote it rather than work it out."""
+    planned, actual = detail.get("planned_duration_weeks"), detail.get("actual_duration_weeks")
+    if isinstance(planned, (int, float)) and isinstance(actual, (int, float)):
+        return {**detail, "slip_weeks": actual - planned}
+    return detail
 
 
 def _commitment_summary(commitment: dict[str, Any]) -> dict[str, Any]:

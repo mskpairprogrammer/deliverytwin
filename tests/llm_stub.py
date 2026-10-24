@@ -92,11 +92,14 @@ class ScriptedLLM:
             raise LLMError("OpenAI request failed with HTTP 502.")
         severity = "catastrophic" if self.challenge == "invalid" else "high"
         verdict = "ready" if self.challenge == "ready" else "ready_with_conditions"
+        # Quote a supplied figure, as the number check requires: the closest project's slip against its plan.
+        analog = payload["similar_completed_projects"][0]
         return json.dumps({
             "verdict": verdict, "summary": "The date is tight and rests on one shared identity-matching service.",
             "risks": [
                 {"title": "Shared identity matching", "severity": severity,
-                 "detail": "Two similar projects slipped waiting on this service.", "evidence": "HIST-001 slipped 6 weeks"},
+                 "detail": "Two similar projects slipped waiting on this service.",
+                 "evidence": f"{analog['project_id']} slipped {analog['slip_weeks']} weeks"},
                 {"title": "Thin capacity headroom", "severity": "medium",
                  "detail": "Required FTE is close to allocated.", "evidence": "Required vs allocated FTE"},
             ],

@@ -44,7 +44,7 @@ class UnsupportedNumbersTests(unittest.TestCase):
                          ["97.3", "12"])
 
     def test_identifiers_with_letters_are_not_figures(self) -> None:
-        self.assertEqual(unsupported_numbers(["Use the P80 estimate and the Q4 plan for gpt4."], {}), [])
+        self.assertEqual(unsupported_numbers(["Use the P80 estimate, the Q4 plan and HIST-001 for gpt4."], {}), [])
 
 
 class CommitAndTrackTests(unittest.TestCase):

@@ -23,7 +23,8 @@ def llm_json(messages: list[dict[str, str]]) -> tuple[Any, dict[str, str] | None
 
 INVALID_RESPONSE = {"code": "invalid_response", "detail": "The AI response did not pass validation."}
 
-_NUMBER = re.compile(r"(?<![A-Za-z\d.])\d[\d,]*(?:\.\d+)?")
+# A figure stands alone: digits glued to letters or after an identifier's hyphen (P80, HIST-001) are not figures.
+_NUMBER = re.compile(r"(?<![A-Za-z\d.])(?<![A-Za-z\d]-)\d[\d,]*(?:\.\d+)?")
 _ISO_DATE = re.compile(r"\b(\d{4})-(\d{2})-(\d{2})\b")
 
 
