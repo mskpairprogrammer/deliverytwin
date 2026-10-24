@@ -76,6 +76,8 @@ flowchart LR
 - **AI:** Microsoft Foundry models in Azure, through either a `*.services.ai.azure.com` models endpoint or an
   Azure OpenAI deployment. Locally, Databricks Model Serving and OpenAI can also be used for testing.
 
+[docs/how-it-works.md](docs/how-it-works.md) walks the demo request through every formula, with the numbers.
+
 ## Impact (backtest on the synthetic portfolio)
 
 | Metric | Result |
