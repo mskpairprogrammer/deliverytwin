@@ -1576,7 +1576,10 @@ def approve_baseline(
     result = evaluate_intake(connection, text, answers, as_of, documents, adjustments, questions, basis)
     commitment, rom = result["commitment"], result["rom"]
     if not commitment["feasible"]:
-        raise IntakeError("The commitment is not feasible with the current capacity; it cannot be approved.")
+        raise IntakeError(
+            f"The commitment is below the P80 bar: capacity covers {commitment['capacity_hours']:,} of the "
+            f"{commitment['p80_hours']:,} h needed. Add capacity, move the target date out, or reduce scope to approve."
+        )
     from .approvals import record_approval, with_approvers
     from .storage import BaselineRepository
 

@@ -197,8 +197,10 @@ class JourneyUiTests(unittest.TestCase):
         page.locator("#tune-fte").fill("3")
         page.get_by_role("button", name="Recalculate confidence").click()
         page.wait_for_function("document.getElementById('intake-approve').disabled")
-        self.assertIn("Not feasible", page.locator(".scenario-table").inner_text())
-        self.assertIn("add capacity", page.locator("#intake-approve").get_attribute("title"))
+        self.assertIn("Below P80 bar", page.locator(".scenario-table").inner_text())
+        title = page.locator("#intake-approve").get_attribute("title")
+        self.assertRegex(title, r"^Below the P80 commitment bar: capacity covers [\d,]+ h of the [\d,]+ h needed \([\d,]+ h short\)\.")
+        self.assertRegex(title, r"add \d+\.\d FTE, move the target date .+ later or reduce scope\.$")
         page.wait_for_function("document.getElementById('review-source').textContent.includes('NOT READY')")
 
         page.get_by_role("button", name="Reset to defaults").click()

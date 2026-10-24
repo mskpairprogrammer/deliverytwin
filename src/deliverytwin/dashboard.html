@@ -2110,7 +2110,7 @@
         ["Target date", (v) => v.target_date, null],
         ["Scope change", (v) => `${v.scope_change_pct}%`, null],
         ["Confidence", (v) => `${percent(v.confidence_pct)}%`, (a, b) => b.confidence_pct < a.confidence_pct],
-        ["Feasibility", (v) => (v.feasible ? "Feasible" : "Not feasible"), (a, b) => a.feasible && !b.feasible],
+        ["Feasibility", (v) => (v.feasible ? "Feasible" : "Below P80 bar"), (a, b) => a.feasible && !b.feasible],
       ];
       const table = el("table", "analog-table scenario-table");
       const head = el("tr");
@@ -2284,6 +2284,22 @@
       const answers = {};
       document.querySelectorAll("#intake-questions input:checked").forEach((input) => { answers[input.name] = input.value; });
       return answers;
+    }
+    function belowP80Text(c) {
+      // Approval needs capacity for the P80 effort; say how far short the plan is and the smallest fix.
+      const perFte = c.hours_per_fte_week;
+      const weeks = c.capacity_hours / (c.allocated_fte * perFte);
+      const short = Math.max(1, Math.round(c.p80_hours - c.capacity_hours));
+      const fixes = [];
+      const extraFte = Math.ceil((c.p80_hours / (weeks * perFte) - c.allocated_fte) * 10 - 1e-9) / 10;
+      if (c.allocated_fte + extraFte <= c.capacity_fte + 1e-9) fixes.push(`add ${extraFte.toFixed(1)} FTE`);
+      // capacity_hours is rounded to whole hours, so allow a twentieth of a day before rounding up.
+      const extraDays = Math.max(1, Math.ceil((c.p80_hours / (c.allocated_fte * perFte) - weeks) * 7 - 0.05));
+      const extraWeeks = Math.ceil(extraDays / 7);
+      fixes.push(`move the target date ${extraDays < 28 ? `${extraDays} day${extraDays === 1 ? "" : "s"}` : `about ${extraWeeks} weeks`} later`);
+      fixes.push("reduce scope");
+      return `Below the P80 commitment bar: capacity covers ${hours(c.capacity_hours)} of the ${hours(c.p80_hours)} needed ` +
+        `(${short.toLocaleString()} h short). To approve, ${fixes.slice(0, -1).join(", ")} or ${fixes[fixes.length - 1]}.`;
     }
     function approvedByText(approvedBy) {
       return approvedBy ? ` by ${approvedBy.name}` : "";
@@ -2495,10 +2511,10 @@
       explain.replaceChildren(
         document.createTextNode(`${c.basis ? `${c.basis.source === "llm" ? "AI forecast" : "Statistical estimate"} baseline. ` : ""}P80 of ${hours(c.p80_hours)}${c.scope_change_pct ? ` (including ${c.scope_change_pct}% scope change)` : ""} over ${c.weeks_to_target} weeks at ${c.hours_per_fte_week} h/FTE-week needs ${c.required_fte_p80} FTE; ${c.allocated_fte.toFixed(1)} FTE are allocated. ` +
           `Confidence is ${100 - c.history_weight_pct}% of the ${c.fit_probability_pct}% modeled chance of fitting ${hours(c.capacity_hours)} of capacity plus ${c.history_weight_pct}% of the ${c.historical_confidence_pct}% historical confidence = ${percent(c.confidence_pct)}%. `),
-        el("span", c.feasible ? "gate-ok" : "gate-bad", c.feasible ? "Feasible — ready for approval." : "Not feasible with current capacity."),
+        el("span", c.feasible ? "gate-ok" : "gate-bad", c.feasible ? "Feasible — ready for approval." : belowP80Text(c)),
       );
       byId("intake-approve").disabled = !c.feasible;
-      byId("intake-approve").title = c.feasible ? "" : "Not feasible: add capacity, move the target date out, or reduce scope to approve.";
+      byId("intake-approve").title = c.feasible ? "" : belowP80Text(c);
       byId("commit-readiness").hidden = false;
       renderConfidenceBridge(c);
       renderAssignedRoles({ resource_allocations: c.resource_allocations });
@@ -2634,7 +2650,7 @@
         data.caveats.forEach((text) => items.append(el("li", "", text)));
         out.append(el("strong", "", "Assumptions"), items);
       }
-      if (!next.feasible) out.append(el("p", "gate-bad", "Not feasible at these values: approval stays disabled until capacity, date, or scope changes."));
+      if (!next.feasible) out.append(el("p", "gate-bad", belowP80Text(next)));
       const actions = el("div", "intake-actions");
       const apply = el("button", "intake-btn primary", "Use these values");
       apply.type = "button";

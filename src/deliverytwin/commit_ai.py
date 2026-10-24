@@ -181,6 +181,7 @@ def _lever_summary(commitment: dict[str, Any]) -> dict[str, Any]:
     keys = (
         "allocated_fte", "target_date", "scope_change_pct", "confidence_pct", "required_fte_p80",
         "fit_probability_pct", "p80_hours", "capacity_hours", "weeks_to_target", "feasible",
+        "capacity_fte", "hours_per_fte_week",
     )
     return {key: commitment[key] for key in keys}
 
