@@ -1,8 +1,8 @@
 # Switch to Azure Databricks
 
-Only the five application tables move to Unity Catalog / Delta: baselines, intake sessions, recovery scenarios
-and their target updates, and TRACK snapshots. The simulated source records and the historical dataset stay in a
-local DuckDB file, and models still come from Foundry. No code changes are needed.
+When Databricks is enabled, all application tables use Unity Catalog / Delta: the historical project dataset,
+simulated source-system records, simulation state, baselines, intake sessions, recovery scenarios and TRACK
+snapshots. DuckDB remains the default when Databricks is disabled. Models still come from Foundry.
 
 ## 1. Prepare Databricks
 
@@ -33,13 +33,18 @@ DELIVERYTWIN_CATALOG=dpm_dev
 DELIVERYTWIN_SCHEMA=mlops
 ```
 
-The data moves only when the switch is `1` and both the host and the HTTP path are set.
+All data uses Databricks only when the switch is `1` and both the host and the HTTP path are set. On startup,
+an empty configured schema is initialized from the checked-in synthetic dataset and demo scenario.
+The **Clear all demo data** action deletes rows from the app's `dt_` tables in that schema while preserving the
+tables themselves, so use a dedicated schema for the app.
 
 ## 3. Smoke test
 
 Run `python -m deliverytwin databricks-smoke` from `src/`.
 
-- It creates a throwaway schema, creates the tables, loads the dataset, reads it back and writes a baseline.
+- It creates a throwaway schema, creates the tables, loads the historical dataset, reads it back and writes a baseline.
+- It also initializes and seeds the simulated delivery scenario, exercising the app's source tables and MERGE-based
+  seed path.
 - It prints PASS or FAIL for each check, then drops the schema.
 
 The Databricks adapter has so far been tested only against a fake connection, so run the smoke test before
@@ -69,15 +74,18 @@ approve a baseline again in COMMIT.
 
 ## Table DDL
 
-The app creates each table the first time it uses it, with
+The app creates the source, historical, and operational tables in the configured schema with
 `CREATE TABLE IF NOT EXISTS <catalog>.<schema>.dt_<name> (…) USING DELTA`.
 
 - **Columns and keys:** `STRING`, `BIGINT`, `DOUBLE`, `DATE` and `TIMESTAMP` columns, with `NOT NULL` keys and an
   informational `PRIMARY KEY`.
 - **Writes:** `MERGE INTO`, so writes are upserts.
 - **Creating them in advance:** run [`scripts/databricks_ddl.sql`](../scripts/databricks_ddl.sql) in the SQL editor.
-  It has all 12 tables for `dpm_dev.mlops`; regenerate it for another schema with
+  It has the full app schema for `dpm_dev.mlops`; regenerate it for another schema with
   `python -m deliverytwin ddl --catalog <c> --schema <s>`.
+- **Loading samples:** `python -m deliverytwin seed-demo --dialect databricks` loads the checked-in historical
+  CSV dataset and the synthetic delivery scenario. The app performs this initialization automatically when the
+  Databricks schema has no sample project or initiative data.
 - **Schema changes:** existing tables are never altered, so a later column change needs a manual `ALTER TABLE`.
 
 ## Switch back

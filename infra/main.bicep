@@ -54,7 +54,7 @@ param foundryProjectEndpoint string = ''
 @description('Model deployment name used by the AI features and the chat agent, e.g. gpt-4o-mini.')
 param foundryModel string = ''
 
-@description('Optional model endpoint; by default derived from the project (https://<resource>.openai.azure.com).')
+@description('Optional model endpoint; by default derived from the project (https://<resource>.services.ai.azure.com).')
 param foundryEndpoint string = ''
 
 // --- Azure Databricks (off by default) -------------------------------------------------------------------
@@ -64,7 +64,7 @@ param enableDatabricks bool = false
 @description('Workspace URL (https://adb-<id>.<n>.azuredatabricks.net).')
 param databricksHost string = ''
 
-@description('SQL warehouse HTTP path; when set, the four application tables live in Unity Catalog / Delta.')
+@description('SQL warehouse HTTP path; when Databricks is enabled, all app tables live in Unity Catalog / Delta.')
 param databricksHttpPath string = ''
 
 @description('Unity Catalog catalog and schema for the application tables.')

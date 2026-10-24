@@ -1,16 +1,14 @@
 """A small, engine-neutral connection used for the app's relational tables.
 
 The simulated source-system tables (Planview, Azure DevOps, ServiceNow, UKG, Oracle HCM) and the
-historical reference projects are plain SQL; they run on the local DuckDB engine. The application tables
-(baselines, intake sessions, recovery scenarios, TRACK snapshots) go through portable repositories and can
-live in Databricks. Nothing outside ``data/`` imports ``duckdb``: callers use this class,
+historical reference projects use the configured database. Databricks stores all tables in Unity Catalog;
+DuckDB remains the local default. Nothing outside ``data/`` imports ``duckdb``: callers use this class,
 ``DatabaseError`` and ``IntegrityError``.
 """
 from __future__ import annotations
 
 import os
 import re
-import threading
 from typing import Any, Iterable, Iterator, Sequence
 
 from .database import (
@@ -22,6 +20,7 @@ from .database import (
     IntegrityError,
     Result,
 )
+from .schema import check_identifier
 
 DIALECTS = ("duckdb", "databricks")
 DEFAULT_PATHS = {"duckdb": "deliverytwin.duckdb", "databricks": "/tmp/deliverytwin.duckdb"}
@@ -110,19 +109,6 @@ class Cursor:
         return iter(self.fetchall())
 
 
-_DATABRICKS_APP_DB: DatabricksDatabase | None = None
-_DATABRICKS_LOCK = threading.Lock()
-
-
-def _databricks_app_database() -> Database:
-    """One shared warehouse connection for the portable app tables (needs a live workspace)."""
-    global _DATABRICKS_APP_DB
-    with _DATABRICKS_LOCK:
-        if _DATABRICKS_APP_DB is None:
-            _DATABRICKS_APP_DB = DatabricksDatabase(DatabricksSettings.from_env())
-        return _DATABRICKS_APP_DB
-
-
 _MULTI_INSERT = re.compile(r"^\s*(INSERT\s+INTO\s+\w+\s*\(([^)]*)\)\s*VALUES\s*)\(([?,\s]+)\)(.*)$", re.I | re.S)
 _CONFLICT_COLUMNS = re.compile(r"ON\s+CONFLICT\s*\(([^)]*)\)", re.I)
 _UPSERT_TAIL = re.compile(r"\s*DO\s+UPDATE\s+SET\s+((?:\w+\s*=\s*excluded\.\w+\s*,?\s*)+)$", re.I)
@@ -207,6 +193,76 @@ class Connection:
     def executescript(self, script: str) -> None:
         self.local.run_script(script)
 
+    def upsert_rows(
+        self,
+        table: str,
+        columns: Sequence[str],
+        keys: Sequence[str],
+        rows: Iterable[Sequence[Any]],
+        update_columns: Sequence[str] | None = None,
+    ) -> None:
+        """Idempotently insert rows using SQL portable across DuckDB and Databricks."""
+        table = check_identifier(table)
+        column_names = [check_identifier(name) for name in columns]
+        key_names = [check_identifier(name) for name in keys]
+        updates = [check_identifier(name) for name in (update_columns if update_columns is not None else column_names)]
+        updates = [name for name in updates if name not in key_names]
+        if not column_names or not key_names or not set(key_names) <= set(column_names):
+            raise ValueError("Upsert columns and keys must be non-empty, with every key included in columns.")
+        values = [tuple(row) for row in rows]
+        if any(len(row) != len(column_names) for row in values):
+            raise ValueError("Every upsert row must match the declared column count.")
+        if not values:
+            return
+        if self.dialect == "databricks":
+            key_positions = [column_names.index(name) for name in key_names]
+            for start in range(0, len(values), 50):
+                batch = values[start:start + 50]
+                if len(batch) > 1:
+                    batch = list({
+                        tuple(row[position] for position in key_positions): row
+                        for row in batch
+                    }.values())
+                source = ", ".join(f"? AS {name}" for name in column_names)
+                match = " AND ".join(f"t.{name} = s.{name}" for name in key_names)
+                update = f"WHEN MATCHED THEN UPDATE SET {', '.join(f't.{name} = s.{name}' for name in updates)} " if updates else ""
+                insert_columns = ", ".join(column_names)
+                insert_values = ", ".join(f"s.{name}" for name in column_names)
+                if len(batch) == 1:
+                    source_query = f"(SELECT {source})"
+                    params = batch[0]
+                else:
+                    selects = [
+                        "SELECT " + ", ".join(
+                            f"? AS {name}" for name in column_names
+                        )
+                    ]
+                    selects.extend(
+                        "SELECT " + ", ".join("?" for _ in column_names)
+                        for _ in batch[1:]
+                    )
+                    source_query = f"({' UNION ALL '.join(selects)}) AS s"
+                    params = [value for row in batch for value in row]
+                if len(batch) == 1:
+                    source_query += " AS s"
+                sql = (
+                    f"MERGE INTO {table} AS t USING {source_query} ON {match} "
+                    f"{update}WHEN NOT MATCHED THEN INSERT ({insert_columns}) VALUES ({insert_values})"
+                )
+                self.local.run(sql, params)
+            return
+        placeholders = ", ".join("?" for _ in column_names)
+        conflict = ", ".join(key_names)
+        action = (
+            "DO UPDATE SET " + ", ".join(f"{name} = excluded.{name}" for name in updates)
+            if updates else "DO NOTHING"
+        )
+        self.executemany(
+            f"INSERT INTO {table} ({', '.join(column_names)}) VALUES ({placeholders}) "
+            f"ON CONFLICT ({conflict}) {action}",
+            values,
+        )
+
     def __enter__(self) -> "Connection":
         if self._session and not self._session_open:
             self._session_open = True
@@ -239,15 +295,18 @@ class Connection:
         return self.local.table_columns(table)
 
     def app_database(self) -> Database:
-        """Where the portable application tables live: alongside everything else, or in Databricks."""
-        return _databricks_app_database() if self.dialect == "databricks" else self.local
+        """Where application tables live: with the rest of the configured database."""
+        return self.local
 
 
 def connect(
     database: str | os.PathLike[str] | None = None, dialect: str | None = None, session: bool = False
 ) -> Connection:
-    """Open the local engine for ``dialect`` (see :func:`resolve_dialect`); ``:memory:`` is private to this call."""
+    """Open the configured engine for ``dialect``; DuckDB remains a private local database when in memory."""
     chosen = resolve_dialect(dialect)
-    path = str(database) if database is not None else default_database_path(chosen)
-    local: Database = DuckDBDatabase(path)
+    if chosen == "databricks":
+        local: Database = DatabricksDatabase(DatabricksSettings.from_env())
+    else:
+        path = str(database) if database is not None else default_database_path(chosen)
+        local = DuckDBDatabase(path)
     return Connection(local, chosen, session)

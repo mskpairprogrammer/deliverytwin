@@ -74,11 +74,11 @@ class SwitchTests(unittest.TestCase):
         with environment():
             self.assertEqual(resolve_dialect(), "duckdb")
 
-
 class FoundryOnlyInTheCloudTests(unittest.TestCase):
     def test_the_model_endpoint_is_derived_from_the_project_unless_set(self) -> None:
         with environment(**FOUNDRY):
-            self.assertEqual(foundry_settings()["endpoint"], "https://foundry-res.openai.azure.com")
+            self.assertEqual(foundry_settings()["endpoint"], "https://foundry-res.services.ai.azure.com")
+            self.assertEqual(foundry_settings()["api_version"], "2024-05-01-preview")
         with environment(**FOUNDRY, FOUNDRY_ENDPOINT="https://custom.cognitiveservices.azure.com/"):
             self.assertEqual(foundry_settings()["endpoint"], "https://custom.cognitiveservices.azure.com")
         with environment(FOUNDRY_PROJECT_ENDPOINT="https://not-a-project.example.com", FOUNDRY_MODEL="m"):

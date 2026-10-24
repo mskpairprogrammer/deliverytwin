@@ -13,6 +13,7 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
 
 from .integrations import azure_app_service, databricks_switch, foundry_switch
 
@@ -94,14 +95,18 @@ def databricks_serving_settings() -> dict[str, str] | None:
 FOUNDRY_PROJECT = re.compile(r"^https://([a-z0-9][a-z0-9-]{0,62})\.services\.ai\.azure\.com/api/projects/[^/]+/?$", re.I)
 
 
+def _is_foundry_models_endpoint(endpoint: str) -> bool:
+    return (urlsplit(endpoint).hostname or "").lower().endswith(".services.ai.azure.com")
+
+
 def foundry_endpoint() -> str:
     """The Foundry resource's model endpoint: FOUNDRY_ENDPOINT, else derived from FOUNDRY_PROJECT_ENDPOINT
-    (https://<resource>.services.ai.azure.com/api/projects/<p> -> https://<resource>.openai.azure.com)."""
+    (https://<resource>.services.ai.azure.com/api/projects/<p> -> https://<resource>.services.ai.azure.com)."""
     explicit = os.environ.get("FOUNDRY_ENDPOINT", "").strip().rstrip("/")
     if explicit:
         return explicit
     project = FOUNDRY_PROJECT.match(os.environ.get("FOUNDRY_PROJECT_ENDPOINT", "").strip())
-    return f"https://{project.group(1)}.openai.azure.com" if project else ""
+    return f"https://{project.group(1)}.services.ai.azure.com" if project else ""
 
 
 def foundry_settings() -> dict[str, str] | None:
@@ -112,9 +117,11 @@ def foundry_settings() -> dict[str, str] | None:
     deployment = os.environ.get("FOUNDRY_MODEL", "").strip()
     if not endpoint or not deployment or not endpoint.startswith("https://"):
         return None
+    models_endpoint = _is_foundry_models_endpoint(endpoint)
     return {
         "endpoint": endpoint, "deployment": deployment,
-        "api_version": os.environ.get("FOUNDRY_API_VERSION", "").strip() or "2024-10-21",
+        "api_version": os.environ.get("FOUNDRY_API_VERSION", "").strip()
+        or ("2024-05-01-preview" if models_endpoint else "2024-10-21"),
         "api_key": os.environ.get("FOUNDRY_API_KEY", "").strip(),
     }
 
@@ -167,7 +174,12 @@ def _foundry_token() -> str:
 
 
 def _complete_foundry(settings: dict[str, str], messages: list[dict[str, str]], *, json_mode: bool = False) -> str:
-    payload: dict[str, Any] = {"messages": messages, "temperature": 0}
+    models_endpoint = _is_foundry_models_endpoint(settings["endpoint"])
+    payload: dict[str, Any] = {"messages": messages}
+    if models_endpoint:
+        payload["model"] = settings["deployment"]
+    else:
+        payload["temperature"] = 0
     if json_mode:
         payload["response_format"] = {"type": "json_object"}
     headers = {"Content-Type": "application/json"}
@@ -175,10 +187,13 @@ def _complete_foundry(settings: dict[str, str], messages: list[dict[str, str]], 
         headers["api-key"] = settings["api_key"]
     else:
         headers["Authorization"] = "Bearer " + _foundry_token()
-    url = (
-        f"{settings['endpoint']}/openai/deployments/{settings['deployment']}/chat/completions"
-        f"?api-version={settings['api_version']}"
-    )
+    if models_endpoint:
+        url = f"{settings['endpoint']}/models/chat/completions?api-version={settings['api_version']}"
+    else:
+        url = (
+            f"{settings['endpoint']}/openai/deployments/{settings['deployment']}/chat/completions"
+            f"?api-version={settings['api_version']}"
+        )
     request = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), headers=headers, method="POST")
     try:
         with urllib.request.urlopen(request, timeout=TIMEOUT_SECONDS) as response:

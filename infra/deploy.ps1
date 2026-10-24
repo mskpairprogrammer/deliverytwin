@@ -39,7 +39,7 @@ param(
     [string] $FoundryModel = "",
     [string] $FoundryEndpoint = "",   # optional; derived from the project endpoint when blank
 
-    # Azure Databricks: SQL warehouse for the application tables.
+    # Azure Databricks: SQL warehouse for all application data.
     [switch] $EnableDatabricks,
     [string] $DatabricksHost = "",
     [string] $DatabricksHttpPath = "",

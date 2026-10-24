@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from pathlib import Path
 
 IDENTIFIER = re.compile(r"^[a-z_][a-z0-9_]*$")
 
@@ -194,4 +195,88 @@ def render_ddl(dialect: str, catalog: str | None = None, schema: str | None = No
     for table in ALL_TABLES.values():
         target = f"{prefix}.{table.name}" if prefix else table.name
         statements.append(render_create_table(table, dialect, target) + ";")
+    if dialect == "databricks":
+        source = (Path(__file__).resolve().parents[1] / "schema.sql").read_text(encoding="utf-8")
+        statements.extend(
+            f"{statement};" for statement in translate_schema(source, dialect, catalog=catalog, schema=schema)
+        )
     return "\n\n".join(statements) + "\n"
+
+
+_AUTOINCREMENT = re.compile(r"INTEGER PRIMARY KEY AUTOINCREMENT", re.I)
+_CREATE_TABLE = re.compile(r"CREATE TABLE IF NOT EXISTS (\w+)", re.I)
+_REAL = re.compile(r"\bREAL\b", re.I)
+_INTEGER = re.compile(r"\bINTEGER\b", re.I)
+_TEXT = re.compile(r"\bTEXT\b", re.I)
+
+
+def _remove_parenthesized(sql: str, start: int) -> int:
+    depth = 0
+    quote: str | None = None
+    for index in range(start, len(sql)):
+        char = sql[index]
+        if quote:
+            if char == quote:
+                quote = None
+            continue
+        if char in ("'", '"'):
+            quote = char
+        elif char == "(":
+            depth += 1
+        elif char == ")":
+            depth -= 1
+            if depth == 0:
+                return index + 1
+    return len(sql)
+
+
+def _strip_databricks_constraints(statement: str) -> str:
+    for match in list(re.finditer(r"\bCHECK\s*\(", statement, re.I))[::-1]:
+        start = statement.find("(", match.start())
+        statement = statement[:match.start()] + statement[_remove_parenthesized(statement, start):]
+    statement = re.sub(r"\s+REFERENCES\s+\w+\s*\([^)]*\)", "", statement, flags=re.I)
+    statement = re.sub(r"\s+UNIQUE\b", "", statement, flags=re.I)
+    statement = re.sub(r"[ \t]+(?=[,)])", "", statement)
+    return re.sub(r"[ \t]+\n", "\n", statement)
+
+
+def translate_schema(
+    script: str, dialect: str, *, catalog: str | None = None, schema: str | None = None,
+) -> list[str]:
+    """Split the app schema and translate its SQLite types/constraints for the target engine."""
+    statements: list[str] = []
+    prefix = ".".join(check_identifier(part) for part in (catalog, schema) if part)
+    for raw in script.split(";"):
+        statement = raw.strip()
+        if not statement:
+            continue
+        upper = statement.upper()
+        if upper.startswith("PRAGMA") or (dialect == "databricks" and upper.startswith("CREATE INDEX")):
+            continue
+        if dialect == "duckdb":
+            created = _CREATE_TABLE.search(statement)
+            if created and _AUTOINCREMENT.search(statement):
+                name = created.group(1)
+                statements.append(f"CREATE SEQUENCE IF NOT EXISTS {name}_seq START 1")
+                statement = _AUTOINCREMENT.sub(f"BIGINT PRIMARY KEY DEFAULT nextval('{name}_seq')", statement)
+            statement = _REAL.sub("DOUBLE", statement)
+        elif dialect == "databricks":
+            statement = _AUTOINCREMENT.sub("BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY", statement)
+            statement = _strip_databricks_constraints(statement)
+            statement = _REAL.sub("DOUBLE", statement)
+            statement = _INTEGER.sub("BIGINT", statement)
+            statement = _TEXT.sub("STRING", statement)
+            created = _CREATE_TABLE.search(statement)
+            if created and prefix:
+                statement = (
+                    statement[:created.start(1)] + f"{prefix}.{created.group(1)}"
+                    + statement[created.end(1):]
+                )
+            if _CREATE_TABLE.search(statement):
+                statement += "\nUSING DELTA"
+                if re.search(r"\bDEFAULT\b", statement, re.I):
+                    statement += "\nTBLPROPERTIES ('delta.feature.allowColumnDefaults' = 'supported')"
+        else:
+            raise ValueError(f"Unsupported schema dialect: {dialect!r}")
+        statements.append(statement)
+    return statements

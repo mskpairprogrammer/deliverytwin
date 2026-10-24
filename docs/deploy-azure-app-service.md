@@ -136,7 +136,7 @@ portal. Re-running the infrastructure step replaces all application settings, so
 ### Foundry
 
 1. Deploy with the switch, the project endpoint and the model deployment. The AI features and the chat agent
-   share them, and the model endpoint (`https://<resource>.openai.azure.com`) is derived from the project.
+   share them, and the model endpoint (`https://<resource>.services.ai.azure.com`) is derived from the project.
    Pass `-FoundryEndpoint` only to override it.
 
    ```powershell

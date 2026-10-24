@@ -27,8 +27,10 @@ from deliverytwin.storage import (
     load_dataset,
     render_ddl,
 )
+from deliverytwin.storage.database import Result
 from deliverytwin.storage.repository import dataset_loaded, read_csv_rows
-from deliverytwin.storage.schema import check_identifier
+from deliverytwin.storage.schema import check_identifier, translate_schema
+from deliverytwin.storage.connection import Connection
 from scripts.generate_data import generate_dataset
 from deliverytwin.intake import evaluate_intake
 
@@ -336,6 +338,75 @@ class DatabricksAdapterTests(unittest.TestCase):
         self.assertTrue(all(sql.startswith("CREATE TABLE IF NOT EXISTS dpm_dev.mlops.") for sql in statements))
         self.assertTrue(any("submitted_date DATE" in sql for sql in statements))
 
+    def test_full_source_schema_translates_for_databricks(self) -> None:
+        script = (Path(__file__).parents[1] / "src" / "deliverytwin" / "schema.sql").read_text(encoding="utf-8")
+        statements = translate_schema(script, "databricks", catalog="dpm_dev", schema="mlops")
+        rendered = "\n".join(statements)
+        self.assertGreaterEqual(sum(statement.startswith("CREATE TABLE") for statement in statements), 25)
+        self.assertIn("CREATE TABLE IF NOT EXISTS dpm_dev.mlops.dt_source_systems", rendered)
+        self.assertIn("USING DELTA", rendered)
+        self.assertIn("BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY", rendered)
+        self.assertIn(
+            "TBLPROPERTIES ('delta.feature.allowColumnDefaults' = 'supported')",
+            rendered,
+        )
+        self.assertNotIn("PRAGMA", rendered)
+        self.assertNotIn("CREATE INDEX", rendered)
+        self.assertNotIn("REFERENCES", rendered)
+        self.assertNotIn("CHECK (", rendered)
+        self.assertNotIn("AUTOINCREMENT", rendered)
+
+    def test_connection_upserts_source_rows_with_merge_on_databricks(self) -> None:
+        connection = Connection(self.database, "databricks")
+        connection.upsert_rows(
+            "dt_person_skills",
+            ("person_id", "skill_id", "proficiency"),
+            ("person_id", "skill_id"),
+            [("data-engineer", "data-engineering", "senior")],
+            ("proficiency",),
+        )
+        sql, params = self.connection.log[-1]
+        self.assertTrue(sql.startswith("MERGE INTO dt_person_skills AS t USING (SELECT ? AS person_id"))
+        self.assertIn("t.person_id = s.person_id AND t.skill_id = s.skill_id", sql)
+        self.assertIn("WHEN MATCHED THEN UPDATE SET t.proficiency = s.proficiency", sql)
+        self.assertEqual(params, ["data-engineer", "data-engineering", "senior"])
+
+    def test_connection_batches_databricks_upserts_and_keeps_last_duplicate(self) -> None:
+        connection = Connection(self.database, "databricks")
+        connection.upsert_rows(
+            "dt_person_skills",
+            ("person_id", "skill_id", "proficiency"),
+            ("person_id", "skill_id"),
+            [
+                ("data-engineer", "data-engineering", "intermediate"),
+                ("lead-engineer", "azure", "senior"),
+                ("data-engineer", "data-engineering", "expert"),
+            ],
+            ("proficiency",),
+        )
+        sql, params = self.connection.log[-1]
+        self.assertIn("USING (SELECT ? AS person_id, ? AS skill_id, ? AS proficiency UNION ALL", sql)
+        self.assertIn("WHEN MATCHED THEN UPDATE SET t.proficiency = s.proficiency", sql)
+        self.assertEqual(
+            params,
+            ["data-engineer", "data-engineering", "expert", "lead-engineer", "azure", "senior"],
+        )
+
+    def test_clear_all_only_deletes_delivery_twin_tables(self) -> None:
+        with (
+            patch.object(self.database, "list_tables", return_value=["dt_people", "unrelated_table"]),
+            patch.object(
+                self.database,
+                "run",
+                side_effect=[Result(["row_count"], [(3,)]), Result([], [])],
+            ) as run,
+        ):
+            self.assertEqual(self.database.clear_all(), 3)
+        self.assertEqual([call.args[0] for call in run.call_args_list], [
+            "SELECT COUNT(*) AS row_count FROM dpm_dev.mlops.dt_people",
+            "DELETE FROM dpm_dev.mlops.dt_people",
+        ])
+
     def test_upsert_uses_merge_with_positional_parameters(self) -> None:
         self.database.upsert("dt_project_lessons", [{
             "project_id": "HIST-001", "category": "data", "lesson": "text", "suggested_option": "event_sync",
@@ -439,6 +510,20 @@ class SecurityGuardTests(unittest.TestCase):
         port = self._serve("0")
         self.assertEqual(self._post(port, "/api/reset-all"), 403)
         self.assertEqual(self._post(port, "/api/simulate"), 403)
+
+    def test_reset_all_returns_backend_failures_as_json(self) -> None:
+        port = self._serve("1")
+        connection = http.client.HTTPConnection("127.0.0.1", port, timeout=5)
+        body = json.dumps({"confirm": True})
+        with patch("deliverytwin.app.clear_demo_data", side_effect=RuntimeError("warehouse permission denied")):
+            connection.request("POST", "/api/reset-all", body, {"Content-Type": "application/json"})
+            response = connection.getresponse()
+            self.assertEqual(response.status, 500)
+            self.assertEqual(
+                json.loads(response.read()),
+                {"error": "Unable to clear demo data: warehouse permission denied"},
+            )
+        connection.close()
 
 
 if __name__ == "__main__":

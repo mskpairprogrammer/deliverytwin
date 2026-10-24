@@ -167,3 +167,293 @@ CREATE TABLE IF NOT EXISTS dpm_dev.mlops.dt_track_snapshots (
 )
 USING DELTA
 COMMENT 'One TRACK outlook per sprint, kept for trend history.';
+
+CREATE TABLE IF NOT EXISTS dpm_dev.mlops.dt_source_systems (
+    source_key STRING PRIMARY KEY,
+    display_name STRING NOT NULL,
+    integration_mode STRING NOT NULL DEFAULT 'simulated'
+,
+    writeback_enabled BIGINT NOT NULL DEFAULT 0
+,
+    created_at STRING NOT NULL DEFAULT CURRENT_TIMESTAMP
+)
+USING DELTA
+TBLPROPERTIES ('delta.feature.allowColumnDefaults' = 'supported');
+
+CREATE TABLE IF NOT EXISTS dpm_dev.mlops.dt_simulation_state (
+    id BIGINT PRIMARY KEY,
+    started_on STRING NOT NULL,
+    as_of STRING NOT NULL,
+    sprints_advanced BIGINT NOT NULL,
+    sprint_days BIGINT NOT NULL,
+    created_at STRING NOT NULL DEFAULT CURRENT_TIMESTAMP
+)
+USING DELTA
+TBLPROPERTIES ('delta.feature.allowColumnDefaults' = 'supported');
+
+CREATE TABLE IF NOT EXISTS dpm_dev.mlops.dt_simulation_settings (
+    key STRING PRIMARY KEY,
+    value STRING NOT NULL
+)
+USING DELTA;
+
+CREATE TABLE IF NOT EXISTS dpm_dev.mlops.dt_simulation_events (
+    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    sprint_number BIGINT NOT NULL,
+    kind STRING NOT NULL,
+    injected_at STRING NOT NULL DEFAULT CURRENT_TIMESTAMP
+)
+USING DELTA
+TBLPROPERTIES ('delta.feature.allowColumnDefaults' = 'supported');
+
+CREATE TABLE IF NOT EXISTS dpm_dev.mlops.dt_ingestion_runs (
+    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    source_key STRING NOT NULL,
+    started_at STRING NOT NULL,
+    completed_at STRING,
+    status STRING NOT NULL,
+    records_loaded BIGINT NOT NULL DEFAULT 0,
+    error_message STRING
+)
+USING DELTA
+TBLPROPERTIES ('delta.feature.allowColumnDefaults' = 'supported');
+
+CREATE TABLE IF NOT EXISTS dpm_dev.mlops.dt_delivery_initiatives (
+    id STRING PRIMARY KEY,
+    name STRING NOT NULL,
+    portfolio STRING NOT NULL,
+    planned_start STRING NOT NULL,
+    target_end STRING NOT NULL,
+    baseline_p50_hours DOUBLE NOT NULL,
+    baseline_p80_hours DOUBLE NOT NULL,
+    integration_buffer_pct DOUBLE NOT NULL,
+    initial_confidence_pct DOUBLE NOT NULL
+)
+USING DELTA;
+
+CREATE TABLE IF NOT EXISTS dpm_dev.mlops.dt_delivery_milestones (
+    id STRING PRIMARY KEY,
+    initiative_id STRING NOT NULL,
+    name STRING NOT NULL,
+    target_date STRING NOT NULL,
+    status STRING NOT NULL
+)
+USING DELTA;
+
+CREATE TABLE IF NOT EXISTS dpm_dev.mlops.dt_people (
+    id STRING PRIMARY KEY,
+    display_name STRING NOT NULL,
+    active BIGINT NOT NULL
+)
+USING DELTA;
+
+CREATE TABLE IF NOT EXISTS dpm_dev.mlops.dt_skills (
+    id STRING PRIMARY KEY,
+    name STRING NOT NULL
+)
+USING DELTA;
+
+CREATE TABLE IF NOT EXISTS dpm_dev.mlops.dt_person_skills (
+    person_id STRING NOT NULL,
+    skill_id STRING NOT NULL,
+    proficiency STRING NOT NULL,
+    PRIMARY KEY (person_id, skill_id)
+)
+USING DELTA;
+
+CREATE TABLE IF NOT EXISTS dpm_dev.mlops.dt_source_entity_map (
+    source_key STRING NOT NULL,
+    entity_type STRING NOT NULL,
+    external_id STRING NOT NULL,
+    twin_entity_id STRING NOT NULL,
+    PRIMARY KEY (source_key, entity_type, external_id)
+)
+USING DELTA;
+
+CREATE TABLE IF NOT EXISTS dpm_dev.mlops.dt_planview_projects (
+    external_id STRING PRIMARY KEY,
+    initiative_id STRING NOT NULL,
+    project_status STRING NOT NULL,
+    capacity_fte DOUBLE NOT NULL,
+    allocated_fte DOUBLE NOT NULL,
+    planned_hours DOUBLE NOT NULL
+)
+USING DELTA;
+
+CREATE TABLE IF NOT EXISTS dpm_dev.mlops.dt_planview_milestones (
+    external_id STRING PRIMARY KEY,
+    initiative_id STRING NOT NULL,
+    name STRING NOT NULL,
+    baseline_date STRING NOT NULL,
+    status STRING NOT NULL
+)
+USING DELTA;
+
+CREATE TABLE IF NOT EXISTS dpm_dev.mlops.dt_planview_resource_assignments (
+    external_id STRING PRIMARY KEY,
+    initiative_id STRING NOT NULL,
+    person_id STRING NOT NULL,
+    role_name STRING NOT NULL,
+    allocated_fte DOUBLE NOT NULL
+)
+USING DELTA;
+
+CREATE TABLE IF NOT EXISTS dpm_dev.mlops.dt_ado_projects (
+    external_id STRING PRIMARY KEY,
+    initiative_id STRING NOT NULL,
+    name STRING NOT NULL
+)
+USING DELTA;
+
+CREATE TABLE IF NOT EXISTS dpm_dev.mlops.dt_ado_sprints (
+    external_id STRING PRIMARY KEY,
+    project_external_id STRING NOT NULL,
+    name STRING NOT NULL,
+    start_date STRING NOT NULL,
+    end_date STRING NOT NULL
+)
+USING DELTA;
+
+CREATE TABLE IF NOT EXISTS dpm_dev.mlops.dt_ado_work_items (
+    external_id STRING PRIMARY KEY,
+    project_external_id STRING NOT NULL,
+    sprint_external_id STRING,
+    title STRING NOT NULL,
+    work_item_type STRING NOT NULL,
+    state STRING NOT NULL,
+    story_points DOUBLE NOT NULL DEFAULT 0,
+    is_unplanned BIGINT NOT NULL DEFAULT 0
+)
+USING DELTA
+TBLPROPERTIES ('delta.feature.allowColumnDefaults' = 'supported');
+
+CREATE TABLE IF NOT EXISTS dpm_dev.mlops.dt_servicenow_incidents (
+    external_id STRING PRIMARY KEY,
+    initiative_id STRING NOT NULL,
+    assignee_person_id STRING,
+    priority BIGINT NOT NULL,
+    state STRING NOT NULL,
+    short_description STRING NOT NULL,
+    opened_at STRING NOT NULL
+)
+USING DELTA;
+
+CREATE TABLE IF NOT EXISTS dpm_dev.mlops.dt_servicenow_change_requests (
+    external_id STRING PRIMARY KEY,
+    initiative_id STRING NOT NULL,
+    short_description STRING NOT NULL,
+    state STRING NOT NULL,
+    opened_at STRING NOT NULL,
+    planned_start STRING,
+    is_blocking BIGINT NOT NULL DEFAULT 0
+)
+USING DELTA
+TBLPROPERTIES ('delta.feature.allowColumnDefaults' = 'supported');
+
+CREATE TABLE IF NOT EXISTS dpm_dev.mlops.dt_oracle_workers (
+    external_id STRING PRIMARY KEY,
+    person_id STRING NOT NULL,
+    department STRING NOT NULL,
+    job_title STRING NOT NULL,
+    worker_status STRING NOT NULL
+)
+USING DELTA;
+
+CREATE TABLE IF NOT EXISTS dpm_dev.mlops.dt_oracle_worker_skills (
+    worker_external_id STRING NOT NULL,
+    skill_id STRING NOT NULL,
+    proficiency STRING NOT NULL,
+    PRIMARY KEY (worker_external_id, skill_id)
+)
+USING DELTA;
+
+CREATE TABLE IF NOT EXISTS dpm_dev.mlops.dt_ukg_shifts (
+    external_id STRING PRIMARY KEY,
+    person_id STRING NOT NULL,
+    shift_date STRING NOT NULL,
+    start_time STRING NOT NULL,
+    end_time STRING NOT NULL,
+    shift_type STRING NOT NULL
+)
+USING DELTA;
+
+CREATE TABLE IF NOT EXISTS dpm_dev.mlops.dt_ukg_time_entries (
+    external_id STRING PRIMARY KEY,
+    person_id STRING NOT NULL,
+    initiative_id STRING,
+    work_date STRING NOT NULL,
+    work_type STRING NOT NULL,
+    hours DOUBLE NOT NULL
+)
+USING DELTA;
+
+CREATE TABLE IF NOT EXISTS dpm_dev.mlops.dt_ukg_pto_requests (
+    external_id STRING PRIMARY KEY,
+    person_id STRING NOT NULL,
+    start_date STRING NOT NULL,
+    end_date STRING NOT NULL,
+    hours DOUBLE NOT NULL,
+    status STRING NOT NULL
+)
+USING DELTA;
+
+CREATE TABLE IF NOT EXISTS dpm_dev.mlops.dt_historical_initiatives (
+    id STRING PRIMARY KEY,
+    name STRING NOT NULL,
+    summary STRING NOT NULL,
+    structure STRING NOT NULL,
+    complexity STRING NOT NULL,
+    systems STRING NOT NULL,
+    roles STRING NOT NULL,
+    dependencies STRING NOT NULL,
+    delivery_pattern STRING NOT NULL,
+    base_p50_hours DOUBLE NOT NULL,
+    base_p80_hours DOUBLE NOT NULL,
+    integration_buffer_pct DOUBLE NOT NULL,
+    on_time_confidence_pct DOUBLE NOT NULL
+)
+USING DELTA;
+
+CREATE TABLE IF NOT EXISTS dpm_dev.mlops.dt_historical_lessons (
+    id STRING PRIMARY KEY,
+    initiative_id STRING NOT NULL,
+    category STRING NOT NULL,
+    lesson STRING NOT NULL,
+    suggested_option STRING NOT NULL
+)
+USING DELTA;
+
+CREATE TABLE IF NOT EXISTS dpm_dev.mlops.dt_historical_projects (
+    project_id STRING PRIMARY KEY,
+    project_name STRING NOT NULL,
+    description STRING NOT NULL,
+    technologies STRING NOT NULL,
+    integrations BIGINT NOT NULL,
+    team_size BIGINT NOT NULL,
+    planned_duration_weeks BIGINT NOT NULL,
+    actual_duration_weeks BIGINT NOT NULL,
+    planned_effort_hours BIGINT NOT NULL,
+    actual_effort_hours BIGINT NOT NULL,
+    outcome STRING NOT NULL,
+    lessons_learned STRING NOT NULL,
+    structure STRING,
+    complexity STRING,
+    systems STRING,
+    roles STRING,
+    dependencies STRING,
+    delivery_pattern STRING,
+    base_p50_hours DOUBLE,
+    base_p80_hours DOUBLE,
+    integration_buffer_pct DOUBLE,
+    on_time_confidence_pct DOUBLE
+)
+USING DELTA;
+
+CREATE TABLE IF NOT EXISTS dpm_dev.mlops.dt_historical_project_lessons (
+    id STRING PRIMARY KEY,
+    project_id STRING NOT NULL,
+    category STRING NOT NULL,
+    lesson STRING NOT NULL,
+    suggested_option STRING NOT NULL
+)
+USING DELTA;

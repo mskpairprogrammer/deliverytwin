@@ -8,7 +8,7 @@
 command: ["python", "-m", "deliverytwin", "serve"]
 
 env:
-  # Workspace and SQL warehouse that hold the four application tables (Unity Catalog / Delta).
+  # Workspace and SQL warehouse that hold all app tables (Unity Catalog / Delta) when Databricks is enabled.
   - name: DATABRICKS_HOST
     value: "https://<workspace>.azuredatabricks.net"
   - name: DATABRICKS_HTTP_PATH

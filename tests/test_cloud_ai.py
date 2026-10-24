@@ -126,6 +126,31 @@ class DatabricksCallTests(unittest.TestCase):
             self.assertEqual(complete([{"role": "user", "content": "hi"}]), "azure")
         self.assertIn("/openai/deployments/dep/", seen["url"])
 
+    def test_foundry_models_endpoint_uses_model_inference_route(self) -> None:
+        seen = {}
+
+        def fake(request, timeout):
+            seen.update(url=request.full_url, body=json.loads(request.data))
+            return reply("{\"ok\": true}")
+
+        settings = {
+            "FOUNDRY_ENDPOINT": "https://example.services.ai.azure.com",
+            "FOUNDRY_MODEL": "dep",
+            "FOUNDRY_API_KEY": "azure-key",
+        }
+        with env(**settings), patch("urllib.request.urlopen", fake):
+            self.assertEqual(
+                complete([{"role": "user", "content": "hi"}], json_mode=True),
+                "{\"ok\": true}",
+            )
+        self.assertEqual(
+            seen["url"],
+            "https://example.services.ai.azure.com/models/chat/completions?api-version=2024-05-01-preview",
+        )
+        self.assertEqual(seen["body"]["model"], "dep")
+        self.assertNotIn("temperature", seen["body"])
+        self.assertEqual(seen["body"]["response_format"], {"type": "json_object"})
+
 
 if __name__ == "__main__":
     unittest.main()

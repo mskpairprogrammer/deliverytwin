@@ -55,7 +55,7 @@ def baseline_approved(connection: Connection) -> bool:
 
 
 def connect(database: str | Path | None = None, dialect: str | None = None) -> Connection:
-    """Open the local engine: DuckDB by default (see ``--dialect`` / ``DELIVERYTWIN_DB_DIALECT``)."""
+    """Open the configured database: DuckDB by default, or Databricks when enabled."""
     return open_connection(database, dialect)
 
 
@@ -64,13 +64,12 @@ def initialize_database(connection: Connection, register_sources: bool = True) -
     connection.executescript(SCHEMA_PATH.read_text(encoding="utf-8"))
     if register_sources:
         with connection:
-            connection.executemany(
-                """
-                INSERT INTO dt_source_systems (source_key, display_name, integration_mode, writeback_enabled)
-                VALUES (?, ?, 'simulated', 0)
-                ON CONFLICT(source_key) DO NOTHING
-                """,
-                [(key, name) for key, (name, _) in SOURCE_SYSTEMS.items()],
+            connection.upsert_rows(
+                "dt_source_systems",
+                ("source_key", "display_name", "integration_mode", "writeback_enabled"),
+                ("source_key",),
+                [(key, name, "simulated", 0) for key, (name, _) in SOURCE_SYSTEMS.items()],
+                (),
             )
 
 
@@ -81,14 +80,7 @@ def _upsert_many(
     rows: list[tuple[Any, ...]],
     update_columns: tuple[str, ...],
 ) -> None:
-    names = ", ".join(columns)
-    placeholders = ", ".join("?" for _ in columns)
-    updates = ", ".join(f"{column}=excluded.{column}" for column in update_columns)
-    connection.executemany(
-        f"INSERT INTO {table} ({names}) VALUES ({placeholders}) "
-        f"ON CONFLICT({columns[0]}) DO UPDATE SET {updates}",
-        rows,
-    )
+    connection.upsert_rows(table, columns, (columns[0],), rows, update_columns)
 
 
 def seed_demo(connection: Connection, as_of: date | None = None) -> dict[str, Any]:
@@ -138,11 +130,8 @@ def seed_demo(connection: Connection, as_of: date | None = None) -> dict[str, An
              ("azure", "Azure")],
             ("name",),
         )
-        connection.executemany(
-            """
-            INSERT INTO dt_person_skills (person_id, skill_id, proficiency) VALUES (?, ?, ?)
-            ON CONFLICT(person_id, skill_id) DO UPDATE SET proficiency=excluded.proficiency
-            """,
+        connection.upsert_rows(
+            "dt_person_skills", ("person_id", "skill_id", "proficiency"), ("person_id", "skill_id"),
             [("data-engineer", "data-engineering", "senior"),
              ("data-engineer", "customer-data-management", "senior"),
              ("data-engineer", "identity-resolution", "senior"),
@@ -150,6 +139,7 @@ def seed_demo(connection: Connection, as_of: date | None = None) -> dict[str, An
              ("privacy-engineer", "privacy-review", "senior"),
              ("privacy-engineer", "customer-data-management", "intermediate"),
              ("lead-engineer", "azure", "senior")],
+            ("proficiency",),
         )
         _upsert_many(
             connection,
@@ -245,12 +235,9 @@ def seed_demo(connection: Connection, as_of: date | None = None) -> dict[str, An
              ("ORCL-EMP-1004", "privacy-engineer", "Data Governance", "Customer Privacy Engineer", "active")],
             ("person_id", "department", "job_title", "worker_status"),
         )
-        connection.executemany(
-            """
-            INSERT INTO dt_oracle_worker_skills (worker_external_id, skill_id, proficiency)
-            VALUES (?, ?, ?)
-            ON CONFLICT(worker_external_id, skill_id) DO UPDATE SET proficiency=excluded.proficiency
-            """,
+        connection.upsert_rows(
+            "dt_oracle_worker_skills", ("worker_external_id", "skill_id", "proficiency"),
+            ("worker_external_id", "skill_id"),
             [("ORCL-EMP-1002", "data-engineering", "senior"),
              ("ORCL-EMP-1002", "customer-data-management", "senior"),
              ("ORCL-EMP-1002", "identity-resolution", "senior"),
@@ -258,20 +245,19 @@ def seed_demo(connection: Connection, as_of: date | None = None) -> dict[str, An
              ("ORCL-EMP-1004", "privacy-review", "senior"),
              ("ORCL-EMP-1004", "customer-data-management", "intermediate"),
              ("ORCL-EMP-1001", "azure", "senior")],
+            ("proficiency",),
         )
-        connection.executemany(
-            """
-            INSERT INTO dt_source_entity_map (source_key, entity_type, external_id, twin_entity_id)
-            VALUES (?, ?, ?, ?)
-            ON CONFLICT(source_key, entity_type, external_id)
-            DO UPDATE SET twin_entity_id=excluded.twin_entity_id
-            """,
+        connection.upsert_rows(
+            "dt_source_entity_map",
+            ("source_key", "entity_type", "external_id", "twin_entity_id"),
+            ("source_key", "entity_type", "external_id"),
             [("planview", "initiative", "PV-AUTO-001", INITIATIVE_ID),
              ("azure_devops", "initiative", "ADO-AUTO", INITIATIVE_ID),
              ("oracle_hcm", "person", "ORCL-EMP-1001", "lead-engineer"),
              ("oracle_hcm", "person", "ORCL-EMP-1002", "data-engineer"),
              ("oracle_hcm", "person", "ORCL-EMP-1003", "delivery-engineer"),
              ("oracle_hcm", "person", "ORCL-EMP-1004", "privacy-engineer")],
+            ("twin_entity_id",),
         )
 
         _upsert_many(
@@ -494,14 +480,11 @@ def simulate_sprints(
                 (baseline["p50_hours"], baseline["p80_hours"], baseline["integration_buffer_pct"],
                  baseline["confidence_pct"], baseline["target_date"], INITIATIVE_ID),
             )
-        connection.execute(
-            """
-            INSERT INTO dt_simulation_state (id, started_on, as_of, sprints_advanced, sprint_days)
-            VALUES (1, ?, ?, ?, ?)
-            ON CONFLICT(id) DO UPDATE SET started_on = excluded.started_on, as_of = excluded.as_of,
-                sprints_advanced = excluded.sprints_advanced, sprint_days = excluded.sprint_days
-            """,
-            (start.isoformat(), as_of.isoformat(), sprints, SPRINT_DAYS),
+        connection.upsert_rows(
+            "dt_simulation_state", ("id", "started_on", "as_of", "sprints_advanced", "sprint_days"),
+            ("id",),
+            [(1, start.isoformat(), as_of.isoformat(), sprints, SPRINT_DAYS)],
+            ("started_on", "as_of", "sprints_advanced", "sprint_days"),
         )
     return {
         "started_on": start.isoformat(),
@@ -579,17 +562,7 @@ def reset_simulation(connection: Connection) -> None:
 
 def clear_demo_data(connection: Connection) -> int:
     """Delete every application data row while preserving the schema (local tables and portable app tables)."""
-    deleted = connection.local.clear_all()
-    if connection.dialect == "databricks":
-        from .storage import (
-            BaselineRepository, IntakeSessionRepository, RecoveryScenarioRepository, TrackSnapshotRepository,
-        )
-
-        warehouse = connection.app_database()
-        for repository in (BaselineRepository, IntakeSessionRepository, RecoveryScenarioRepository,
-                           TrackSnapshotRepository):
-            repository(warehouse).clear()
-    return deleted
+    return connection.local.clear_all()
 
 
 def build_report(connection: Connection, as_of: date | None = None) -> dict[str, Any]:
@@ -940,6 +913,11 @@ def serve_dashboard(
 
     with connect(database) as connection:
         initialize_database(connection, register_sources=False)
+        if chosen_dialect == "databricks" and not connection.execute(
+            "SELECT EXISTS(SELECT 1 FROM dt_delivery_initiatives) "
+            "AND EXISTS(SELECT 1 FROM dt_historical_projects)"
+        ).fetchone()[0]:
+            seed_demo(connection)
 
     class DashboardHandler(BaseHTTPRequestHandler):
         def send_json(self, status: int, payload: dict[str, Any]) -> None:
@@ -1230,6 +1208,10 @@ def serve_dashboard(
                 except (OSError, *DatabaseError) as error:
                     self.send_json(500, {"error": f"Unable to clear demo data: {error}"})
                     return
+                except Exception as error:
+                    logger.exception("Unable to clear demo data")
+                    self.send_json(500, {"error": f"Unable to clear demo data: {error}"})
+                    return
                 self.send_json(200, {"cleared": True, "rows_deleted": deleted})
                 return
             if route == "/api/simulate":
@@ -1459,8 +1441,7 @@ def main(argv: list[str] | None = None) -> int:
     engine.add_argument(
         "--dialect", choices=("duckdb", "databricks"), default=None,
         help="Database engine (default: DELIVERYTWIN_DB_DIALECT, else databricks when DATABRICKS_HOST is set, "
-             "else duckdb). With databricks the simulated source records stay in a local DuckDB file and the "
-             "application tables use the Databricks warehouse.",
+             "else duckdb). Databricks stores sample, simulation and application tables in Unity Catalog.",
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
     subparsers.add_parser("init", parents=[engine], help="Create the schema and register simulated sources")

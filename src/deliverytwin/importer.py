@@ -359,9 +359,9 @@ def parse_exports(files: object, as_of: date | None = None) -> dict[str, Any]:
 
 def save_import(connection: Connection, parsed: dict[str, Any]) -> None:
     with connection:
-        connection.execute(
-            "INSERT INTO dt_simulation_settings (key, value) VALUES ('import_signals', ?) "
-            "ON CONFLICT(key) DO UPDATE SET value = excluded.value", (json.dumps(parsed),),
+        connection.upsert_rows(
+            "dt_simulation_settings", ("key", "value"), ("key",),
+            [("import_signals", json.dumps(parsed))], ("value",),
         )
 
 

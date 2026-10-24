@@ -2929,8 +2929,15 @@
     var simCatalog = null;
     async function loadSimCatalog() {
       try {
-        simCatalog = await (await fetch("/api/simulate/catalog", { cache: "no-store" })).json();
+        const response = await fetch("/api/simulate/catalog", { cache: "no-store" });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.error || `Request failed (${response.status})`);
+        if (!Array.isArray(data.scenarios) || !Array.isArray(data.event_kinds) || !Array.isArray(data.events)) {
+          throw new Error("The server returned an invalid simulation catalog.");
+        }
+        simCatalog = data;
       } catch (error) {
+        byId("sim-status").textContent = `Simulation options could not be loaded: ${error.message}`;
         return;
       }
       const select = byId("sim-scenario");

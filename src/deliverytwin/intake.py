@@ -194,29 +194,23 @@ def seed_historical_projects(connection: Connection) -> None:
         "systems", "roles", "dependencies", "delivery_pattern", "base_p50_hours",
         "base_p80_hours", "integration_buffer_pct", "on_time_confidence_pct",
     )
-    updates = ", ".join(f"{name}=excluded.{name}" for name in columns[1:])
     with connection:
-        connection.executemany(
-            f"INSERT INTO dt_historical_projects ({', '.join(columns)}) "
-            f"VALUES ({', '.join('?' for _ in columns)}) "
-            f"ON CONFLICT(project_id) DO UPDATE SET {updates}",
+        connection.upsert_rows(
+            "dt_historical_projects", columns, ("project_id",),
             [tuple(project[name] for name in columns) for project in projects],
+            columns[1:],
         )
-        connection.executemany(
-            """
-            INSERT INTO dt_historical_project_lessons
-                (id, project_id, category, lesson, suggested_option)
-            VALUES (?, ?, ?, ?, ?)
-            ON CONFLICT(id) DO UPDATE SET
-                project_id=excluded.project_id, category=excluded.category,
-                lesson=excluded.lesson, suggested_option=excluded.suggested_option
-            """,
+        connection.upsert_rows(
+            "dt_historical_project_lessons",
+            ("id", "project_id", "category", "lesson", "suggested_option"),
+            ("id",),
             [
                 (f"{project['project_id']}:{lesson['category']}", project["project_id"],
                  lesson["category"], lesson["lesson"], lesson["suggested_option"])
                 for project in projects
                 for lesson in project["lessons"]
             ],
+            ("project_id", "category", "lesson", "suggested_option"),
         )
 
 

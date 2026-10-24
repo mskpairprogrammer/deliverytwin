@@ -1,8 +1,8 @@
-"""Smoke test for a data backend: create tables, load the dataset, read it back, write app rows.
+"""Smoke test for Databricks: initialize the full app schema, seed data, and test app table writes.
 
 ``python scripts/databricks_smoke.py`` (or ``python -m deliverytwin databricks-smoke``) runs it against a
 Databricks SQL warehouse in a throwaway schema (dropped afterwards), so someone with workspace access can
-verify the adapter in about a minute. The same checks run locally against DuckDB in the unit tests.
+verify the adapter. The data-layer checks also run locally against DuckDB in the unit tests.
 """
 from __future__ import annotations
 
@@ -17,6 +17,7 @@ if not __package__:  # run as `python scripts/databricks_smoke.py`: make the pac
 
 from deliverytwin.storage.app_repository import BaselineRepository, IntakeSessionRepository
 from deliverytwin.storage.database import Database, DatabricksDatabase, DatabricksSettings
+from deliverytwin.storage.connection import Connection
 from deliverytwin.storage.repository import HistoryRepository, load_dataset
 from deliverytwin.storage.schema import TABLES
 
@@ -79,14 +80,21 @@ def run_databricks_smoke(settings: DatabricksSettings | None = None) -> int:
     qualified = f"{admin.catalog}.{schema}"
     print(f"Creating temporary schema {qualified}")
     admin.execute(f"CREATE SCHEMA IF NOT EXISTS {qualified}")
+    scoped: DatabricksDatabase | None = None
     try:
         scoped = DatabricksDatabase(
-            DatabricksSettings(base.server_hostname, base.http_path, base.catalog, schema, base.access_token),
-            admin.connection,
+            DatabricksSettings(base.server_hostname, base.http_path, base.catalog, schema, base.access_token)
         )
+        from deliverytwin.app import initialize_database, seed_demo
+
+        connection = Connection(scoped, "databricks")
+        initialize_database(connection)
+        seed_demo(connection)
         results = run_checks(scoped)
     finally:
         print(f"Dropping temporary schema {qualified}")
+        if scoped is not None:
+            scoped.close()
         admin.execute(f"DROP SCHEMA IF EXISTS {qualified} CASCADE")
         admin.close()
     print(format_report(results))

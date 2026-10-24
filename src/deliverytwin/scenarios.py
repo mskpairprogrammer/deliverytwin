@@ -92,9 +92,8 @@ def set_scenario(connection: Connection, key: str) -> None:
     if key not in SCENARIOS and key != IMPORT_SCENARIO:
         raise ValueError(f"Unknown scenario. Choose one of: {', '.join(SCENARIOS)}.")
     with connection:
-        connection.execute(
-            "INSERT INTO dt_simulation_settings (key, value) VALUES ('scenario', ?) "
-            "ON CONFLICT(key) DO UPDATE SET value = excluded.value", (key,),
+        connection.upsert_rows(
+            "dt_simulation_settings", ("key", "value"), ("key",), [("scenario", key)], ("value",),
         )
 
 

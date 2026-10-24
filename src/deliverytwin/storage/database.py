@@ -20,7 +20,7 @@ from typing import Any, Iterable, Iterator, Sequence
 
 import duckdb
 
-from .schema import ALL_TABLES, TABLES, check_identifier, render_create_table
+from .schema import ALL_TABLES, TABLES, TABLE_PREFIX, check_identifier, render_create_table, translate_schema
 
 # Catch these instead of engine-specific exceptions so no caller depends on the driver module.
 DatabaseError = (duckdb.Error,)
@@ -156,35 +156,6 @@ class Database:
     def run_script(self, script: str) -> None:
         for statement in translate_schema(script, self.dialect):
             self.execute(statement)
-
-
-_AUTOINCREMENT = re.compile(r"INTEGER PRIMARY KEY AUTOINCREMENT", re.I)
-_CREATE_TABLE = re.compile(r"CREATE TABLE IF NOT EXISTS (\w+)", re.I)
-_REAL = re.compile(r"\bREAL\b", re.I)
-
-
-def translate_schema(script: str, dialect: str) -> list[str]:
-    """Split the schema script into statements and adapt them to the target engine.
-
-    DuckDB needs sequences instead of AUTOINCREMENT, 8-byte floats instead of REAL, and no PRAGMA.
-    Foreign keys, CHECK and UNIQUE constraints are kept.
-    """
-    statements: list[str] = []
-    for raw in script.split(";"):
-        statement = raw.strip()
-        if not statement:
-            continue
-        if dialect == "duckdb":
-            if statement.upper().startswith("PRAGMA"):
-                continue
-            created = _CREATE_TABLE.search(statement)
-            if created and _AUTOINCREMENT.search(statement):
-                name = created.group(1)
-                statements.append(f"CREATE SEQUENCE IF NOT EXISTS {name}_seq START 1")
-                statement = _AUTOINCREMENT.sub(f"BIGINT PRIMARY KEY DEFAULT nextval('{name}_seq')", statement)
-            statement = _REAL.sub("DOUBLE", statement)
-        statements.append(statement)
-    return statements
 
 
 class _LocalEngine(Database):
@@ -421,7 +392,17 @@ class DatabricksDatabase(Database):
 
             config = Config(host=f"https://{settings.server_hostname}")
             kwargs["credentials_provider"] = lambda: config.authenticate
-        return databricks_sql.connect(**kwargs)
+        connection = databricks_sql.connect(**kwargs)
+        cursor = connection.cursor()
+        try:
+            cursor.execute(f"USE CATALOG {check_identifier(settings.catalog)}")
+            cursor.execute(f"USE SCHEMA {check_identifier(settings.schema)}")
+        except BaseException:
+            connection.close()
+            raise
+        finally:
+            cursor.close()
+        return connection
 
     @contextmanager
     def _cursor(self) -> Iterator[Any]:
@@ -436,6 +417,12 @@ class DatabricksDatabase(Database):
             cursor.execute(sql, list(params))
             names = [description[0] for description in cursor.description or ()]
             return Result(names, [tuple(row) for row in cursor.fetchall()] if names else [])
+
+    def run_script(self, script: str) -> None:
+        for statement in translate_schema(
+            script, "databricks", catalog=self.catalog, schema=self.schema,
+        ):
+            self.execute(statement)
 
     def close(self) -> None:
         self.connection.close()
@@ -453,6 +440,32 @@ class DatabricksDatabase(Database):
             f"{update_clause}WHEN NOT MATCHED THEN INSERT ({', '.join(columns)}) VALUES ({inserted})"
         )
         return sql, values
+
+    def list_tables(self) -> list[str]:
+        return [
+            row["tableName"] for row in self.query(
+                f"SHOW TABLES IN {check_identifier(self.catalog)}.{check_identifier(self.schema)}"
+            )
+        ]
+
+    def clear_all(self) -> int:
+        """Delete rows from Delivery Twin tables in the configured schema, preserving table definitions."""
+        deleted = 0
+        for name in self.list_tables():
+            if not name.startswith(TABLE_PREFIX):
+                continue
+            table = ".".join((
+                check_identifier(self.catalog),
+                check_identifier(self.schema),
+                check_identifier(name),
+            ))
+            deleted += self.query(f"SELECT COUNT(*) AS row_count FROM {table}")[0]["row_count"]
+            self.execute(f"DELETE FROM {table}")
+        return deleted
+
+    def table_columns(self, name: str) -> list[str]:
+        rows = self.query(f"DESCRIBE TABLE {check_identifier(name)}")
+        return [row["col_name"] for row in rows if row.get("col_name") and not row["col_name"].startswith("#")]
 
 
 def open_database(backend: str, **options: Any) -> Database:

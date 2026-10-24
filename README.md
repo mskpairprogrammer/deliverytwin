@@ -120,16 +120,17 @@ Two switches control the cloud integrations. Both are off by default.
 | Switch | When on (`1`) |
 |---|---|
 | `DELIVERYTWIN_FOUNDRY_ENABLED` | AI features and chat use the Foundry model in `FOUNDRY_PROJECT_ENDPOINT` + `FOUNDRY_MODEL` (managed identity in Azure) |
-| `DELIVERYTWIN_DATABRICKS_ENABLED` | The application tables move to Unity Catalog / Delta once `DATABRICKS_HTTP_PATH` is set |
+| `DELIVERYTWIN_DATABRICKS_ENABLED` | All sample, simulation, and operational tables use Unity Catalog / Delta (`DATABRICKS_HTTP_PATH` required) |
 
 On Azure App Service only Foundry models are used. `OPENAI_API_KEY` is ignored there and never deployed.
 Every setting is listed in [`.env.example`](.env.example).
 
 ## Switch to Azure Databricks
 
-Only the five application tables move to Unity Catalog / Delta: baselines, intake sessions, recovery scenarios
-and their target updates, and TRACK snapshots. The simulated source records and the historical dataset stay in a
-local DuckDB file, and models still come from Foundry. No code changes are needed.
+When enabled, all application data uses Unity Catalog / Delta: the historical project dataset, simulated
+source-system records, simulation state, baselines, intake sessions, recovery scenarios and TRACK snapshots.
+An empty configured schema is initialized from the checked-in synthetic samples at startup. DuckDB remains the
+default when Databricks is disabled. Models still come from Foundry.
 
 [docs/databricks.md](docs/databricks.md) covers the required permissions, configuration, the smoke test
 (`python -m deliverytwin databricks-smoke`), the table DDL ([`scripts/databricks_ddl.sql`](scripts/databricks_ddl.sql))
