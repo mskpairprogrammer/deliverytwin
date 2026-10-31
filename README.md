@@ -137,6 +137,19 @@ Two switches control the cloud integrations. Both are off by default.
 On Azure App Service only Foundry models are used. `OPENAI_API_KEY` is ignored there and never deployed.
 Every setting is listed in [`.env.example`](.env.example).
 
+Local runs and Azure use the same setting names, and a test fails if the lists drift apart. `.env` is never
+deployed: Azure reads application settings, which [`infra/main.bicep`](infra/main.bicep) sets, or which you add
+yourself on a portal install. Four values differ on purpose:
+
+| Setting | Local | Azure |
+|---|---|---|
+| `DELIVERYTWIN_HOST` | `127.0.0.1` | `0.0.0.0` |
+| `DELIVERYTWIN_PORT` | `8765` | `8000` |
+| `DELIVERYTWIN_DB_PATH` | `deliverytwin.duckdb` | `/home/data/deliverytwin.duckdb` |
+| `DELIVERYTWIN_TRUSTED_AUTH` | `0` | `1`, only with Entra ID sign-in on |
+
+Workflow checkpoints stay in memory unless `AZURE_COSMOS_ENDPOINT` is set.
+
 ## Switch to Azure Databricks
 
 When enabled, all application data uses Unity Catalog / Delta: the historical project dataset, simulated

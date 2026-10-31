@@ -78,8 +78,15 @@ Turn on sign-in **before** the app goes live. The app has no login of its own.
    | `DELIVERYTWIN_HOST` / `DELIVERYTWIN_PORT` | `0.0.0.0` / `8000` |
    | `DELIVERYTWIN_DB_PATH` | `/home/data/deliverytwin.duckdb` |
    | `DELIVERYTWIN_TRUSTED_AUTH` | `1` (only with step 2 done) |
-   | `DELIVERYTWIN_DEMO_MODE` | `1` |
+   | `DELIVERYTWIN_DEMO_MODE` / `DELIVERYTWIN_SIMULATION` | `1` / `1` |
+   | `DELIVERYTWIN_BLENDED_RATE` | `150` |
    | `DELIVERYTWIN_FOUNDRY_ENABLED` / `DELIVERYTWIN_DATABRICKS_ENABLED` | `0` / `0` |
+   | `DELIVERYTWIN_CATALOG` / `DELIVERYTWIN_SCHEMA` | Your Unity Catalog catalog and schema |
+   | `AZURE_COSMOS_DATABASE_NAME` / `AZURE_COSMOS_CONTAINER_NAME` | `deliverytwin` / `workflow-checkpoints` |
+
+   These are the names in your local `.env`, which isn't deployed. Copy these as well when you use the feature:
+   `FOUNDRY_PROJECT_ENDPOINT`, `FOUNDRY_MODEL`, `FOUNDRY_ENDPOINT`, `FOUNDRY_API_VERSION`, `DATABRICKS_HOST`,
+   `DATABRICKS_HTTP_PATH`, `DATABRICKS_TOKEN` and `AZURE_COSMOS_ENDPOINT`.
 
    Don't add `OPENAI_API_KEY`; the app ignores it on App Service.
 4. **Set startup, health check and identity.**

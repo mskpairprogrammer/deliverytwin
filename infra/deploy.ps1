@@ -38,6 +38,12 @@ param(
     [string] $FoundryProjectEndpoint = "",
     [string] $FoundryModel = "",
     [string] $FoundryEndpoint = "",   # optional; derived from the project endpoint when blank
+    [string] $FoundryApiVersion = "", # optional; selected from the endpoint type when blank
+
+    # Azure Cosmos DB: workflow checkpoints; kept in memory when the endpoint is blank.
+    [string] $CosmosEndpoint = "",
+    [string] $CosmosDatabaseName = "deliverytwin",
+    [string] $CosmosContainerName = "workflow-checkpoints",
 
     # Azure Databricks: SQL warehouse for all application data.
     [switch] $EnableDatabricks,
@@ -78,7 +84,9 @@ if (-not $SkipInfra) {
         appName = $AppName; location = $Location; skuName = $Sku; pythonVersion = $PythonVersion
         authClientId = $AuthClientId; authClientSecret = $AuthClientSecret; demoMode = (-not $NoDemoMode)
         enableFoundry = [bool]$EnableFoundry; foundryProjectEndpoint = $FoundryProjectEndpoint
-        foundryModel = $FoundryModel; foundryEndpoint = $FoundryEndpoint
+        foundryModel = $FoundryModel; foundryEndpoint = $FoundryEndpoint; foundryApiVersion = $FoundryApiVersion
+        cosmosEndpoint = $CosmosEndpoint; cosmosDatabaseName = $CosmosDatabaseName
+        cosmosContainerName = $CosmosContainerName
         enableDatabricks = [bool]$EnableDatabricks; databricksHost = $DatabricksHost
         databricksHttpPath = $DatabricksHttpPath; databricksCatalog = $DatabricksCatalog
         databricksSchema = $DatabricksSchema; databricksToken = $DatabricksToken

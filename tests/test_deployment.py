@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import re
 import tempfile
 import unittest
 import zipfile
@@ -12,6 +13,11 @@ from deliverytwin.app import _managed_host
 from scripts.package_app import package
 
 ROOT = Path(__file__).resolve().parents[1]
+
+# Application settings that exist only in Azure: the platform's build and sign-in, and the deploy-time pip index.
+CLOUD_ONLY_SETTINGS = {"SCM_DO_BUILD_DURING_DEPLOYMENT", "MICROSOFT_PROVIDER_AUTHENTICATION_SECRET", "PIP_INDEX_URL"}
+# Local-only .env names: the cloud gets Foundry models only, signed in with its managed identity.
+LOCAL_ONLY_SETTINGS = {"OPENAI_API_KEY", "OPENAI_MODEL", "FOUNDRY_API_KEY", "DATABRICKS_SERVING_ENDPOINT"}
 
 
 class DeploymentTests(unittest.TestCase):
@@ -65,6 +71,15 @@ class DeploymentTests(unittest.TestCase):
             self.assertNotIn(absent, template)
         for present in ("FOUNDRY_PROJECT_ENDPOINT", "FOUNDRY_MODEL", "FOUNDRY_ENDPOINT"):
             self.assertIn(f"name: '{present}'", template)
+
+    def test_local_and_cloud_settings_use_the_same_names(self) -> None:
+        template = (ROOT / "infra" / "main.bicep").read_text(encoding="utf-8")
+        cloud = set(re.findall(r"\{ name: '([A-Z0-9_]+)', value:", template)) | {"MICROSOFT_PROVIDER_AUTHENTICATION_SECRET"}
+        example = (ROOT / ".env.example").read_text(encoding="utf-8")
+        local = set(re.findall(r"^([A-Z0-9_]+)=", example, flags=re.MULTILINE))
+        self.assertEqual(cloud - CLOUD_ONLY_SETTINGS, local - LOCAL_ONLY_SETTINGS)
+        guide = (ROOT / "docs" / "deploy-azure-app-service.md").read_text(encoding="utf-8")
+        self.assertFalse([name for name in cloud - CLOUD_ONLY_SETTINGS if f"`{name}`" not in guide])
 
     def test_databricks_libraries_are_installed_only_when_asked(self) -> None:
         with tempfile.TemporaryDirectory() as folder:

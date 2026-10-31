@@ -57,6 +57,19 @@ param foundryModel string = ''
 @description('Optional model endpoint; by default derived from the project (https://<resource>.services.ai.azure.com).')
 param foundryEndpoint string = ''
 
+@description('Optional API version; blank selects the version for the endpoint type.')
+param foundryApiVersion string = ''
+
+// --- Azure Cosmos DB: workflow checkpoints (optional) -----------------------------------------------------
+// Blank endpoint keeps checkpoints in memory. The app signs in with the web app's managed identity, which needs
+// a Cosmos DB data-plane role on the account.
+@description('Cosmos DB account endpoint (https://<account>.documents.azure.com:443/).')
+param cosmosEndpoint string = ''
+
+@description('Cosmos DB database and container for the workflow checkpoints.')
+param cosmosDatabaseName string = 'deliverytwin'
+param cosmosContainerName string = 'workflow-checkpoints'
+
 // --- Azure Databricks (off by default) -------------------------------------------------------------------
 @description('Master switch for Azure Databricks. Off: the Databricks settings below are ignored even if filled in.')
 param enableDatabricks bool = false
@@ -89,6 +102,7 @@ var baseSettings = [
   { name: 'DELIVERYTWIN_DB_PATH', value: databasePath }
   { name: 'DELIVERYTWIN_TRUSTED_AUTH', value: '1' } // paired with authsettingsV2 below
   { name: 'DELIVERYTWIN_DEMO_MODE', value: demoMode ? '1' : '0' }
+  { name: 'DELIVERYTWIN_SIMULATION', value: demoMode ? '1' : '0' }
   { name: 'DELIVERYTWIN_BLENDED_RATE', value: blendedRate }
   { name: authSecretSettingName, value: authClientSecret }
 ]
@@ -97,12 +111,16 @@ var integrationSettings = [
   { name: 'DELIVERYTWIN_DATABRICKS_ENABLED', value: enableDatabricks ? '1' : '0' }
   { name: 'DELIVERYTWIN_CATALOG', value: databricksCatalog }
   { name: 'DELIVERYTWIN_SCHEMA', value: databricksSchema }
+  { name: 'AZURE_COSMOS_DATABASE_NAME', value: cosmosDatabaseName }
+  { name: 'AZURE_COSMOS_CONTAINER_NAME', value: cosmosContainerName }
 ]
 // Only filled-in values become app settings, so a later switch-on needs just the missing values.
 var optionalSettings = filter([
   { name: 'FOUNDRY_PROJECT_ENDPOINT', value: foundryProjectEndpoint }
   { name: 'FOUNDRY_MODEL', value: foundryModel }
   { name: 'FOUNDRY_ENDPOINT', value: foundryEndpoint }
+  { name: 'FOUNDRY_API_VERSION', value: foundryApiVersion }
+  { name: 'AZURE_COSMOS_ENDPOINT', value: cosmosEndpoint }
   { name: 'DATABRICKS_HOST', value: databricksHost }
   { name: 'DATABRICKS_HTTP_PATH', value: databricksHttpPath }
   { name: 'DATABRICKS_TOKEN', value: databricksToken }
